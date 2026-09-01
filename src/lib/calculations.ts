@@ -1,4 +1,4 @@
-﻿export interface InstallmentBreakdown {
+export interface InstallmentBreakdown {
   cashPrice: number;
   downPayment: number;
   financedAmount: number;
@@ -107,5 +107,70 @@ export function allocateInstallmentPayment(
     excessAdvanceCredit,
     status,
     summary,
+  };
+}
+
+export interface EarlySettlementCalculation {
+  totalFinanced: number;
+  totalPrincipalPaid: number;
+  remainingPrincipal: number;
+  totalMarkup: number;
+  unearnedMarkup: number;
+  rebatePercentage: number;
+  rebateDiscountGiven: number;
+  accruedPenalties: number;
+  finalSettlementAmount: number;
+  customerSavings: number;
+}
+
+/**
+ * Early Settlement & Profit Rebate Calculator
+ * Computes exact early payoff, unearned markup, authorized rebate discount, and customer savings.
+ */
+export function calculateEarlySettlement(
+  plan: {
+    totalFinanced: number;
+    cashPrice: number;
+    downPayment: number;
+    totalMarkup: number;
+    accumulatedShortArrears: number;
+    durationMonths: number;
+    schedule: { amountPaid: number; status: string; lateFee?: number }[];
+  },
+  rebatePercentage: number = 0
+): EarlySettlementCalculation {
+  const financedPrincipal = Math.max(0, plan.cashPrice - plan.downPayment);
+  const totalPaidAcrossSchedule = plan.schedule.reduce((acc, curr) => acc + (curr.amountPaid || 0), 0);
+
+  // Calculate principal portion paid vs remaining
+  const principalRatio = financedPrincipal / (plan.totalFinanced || 1);
+  const estimatedPrincipalPaid = Math.min(financedPrincipal, Math.round(totalPaidAcrossSchedule * principalRatio));
+  const remainingPrincipal = Math.max(0, financedPrincipal - estimatedPrincipalPaid);
+
+  // Unearned markup from unpaid future months
+  const paidMonthsCount = plan.schedule.filter((s) => s.status === "PAID").length;
+  const remainingMonths = Math.max(0, plan.durationMonths - paidMonthsCount);
+  const monthlyMarkup = plan.durationMonths > 0 ? plan.totalMarkup / plan.durationMonths : 0;
+  const unearnedMarkup = Math.round(monthlyMarkup * remainingMonths);
+
+  const cleanRebatePct = Math.min(100, Math.max(0, rebatePercentage));
+  const rebateDiscountGiven = Math.round(unearnedMarkup * (cleanRebatePct / 100));
+  const accruedPenalties = plan.accumulatedShortArrears || 0;
+
+  const adjustedMarkupToPay = Math.max(0, unearnedMarkup - rebateDiscountGiven);
+  const finalSettlementAmount = remainingPrincipal + accruedPenalties + adjustedMarkupToPay;
+  const customerSavings = rebateDiscountGiven;
+
+  return {
+    totalFinanced: plan.totalFinanced,
+    totalPrincipalPaid: estimatedPrincipalPaid,
+    remainingPrincipal,
+    totalMarkup: plan.totalMarkup,
+    unearnedMarkup,
+    rebatePercentage: cleanRebatePct,
+    rebateDiscountGiven,
+    accruedPenalties,
+    finalSettlementAmount,
+    customerSavings,
   };
 }

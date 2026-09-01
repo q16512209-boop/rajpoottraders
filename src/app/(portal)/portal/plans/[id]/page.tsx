@@ -78,7 +78,37 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {plan.status === "COMPLETED_EARLY_SETTLED" && plan.settlementRecordId && (
+            <Link
+              href={`/portal/print/noc/${plan.settlementRecordId}`}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow transition-colors"
+            >
+              <Receipt className="w-4 h-4 text-amber-300" />
+              <span>Print Official NOC Certificate</span>
+            </Link>
+          )}
+
+          {plan.status === "ACTIVE" && (
+            <>
+              <Link
+                href={`/portal/plans/${plan.id}/settle`}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-xs rounded-xl shadow transition-colors"
+              >
+                <DollarSign className="w-4 h-4 text-amber-300" />
+                <span>Early Settlement & Rebate</span>
+              </Link>
+
+              <Link
+                href={`/portal/plans/${plan.id}/repossess`}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors"
+              >
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <span>Repossess Item</span>
+              </Link>
+            </>
+          )}
+
           <Link
             href={`/portal/print/contract/${plan.id}`}
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
@@ -88,7 +118,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
           </Link>
           <Link
             href={`/portal/print/receipt/${plan.id}`}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl shadow transition-colors"
           >
             <Receipt className="w-4 h-4" />
             <span>Thermal / A4 Slip</span>

@@ -1,10 +1,10 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 
 export interface LedgerEntryPayload {
   id: string;
   tenantId: string;
   timestamp: string;
-  type: "PAYMENT_IN" | "SHORT_PAYMENT" | "DOWN_PAYMENT" | "EXPENSE" | "HANDOVER_TRANSFER" | "INTERNAL_TRANSFER" | "BAD_DEBT_WRITE_OFF";
+  type: "PAYMENT_IN" | "SHORT_PAYMENT" | "DOWN_PAYMENT" | "EXPENSE" | "HANDOVER_TRANSFER" | "INTERNAL_TRANSFER" | "BAD_DEBT_WRITE_OFF" | "EARLY_SETTLEMENT";
   amount: number;
   fromWallet?: string;
   toWallet?: string;

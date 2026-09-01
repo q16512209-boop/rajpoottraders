@@ -20,9 +20,13 @@ import {
   HandoverRequest,
   ExpenseRecord,
   ArticlePost,
+  IRepossessionRecord,
+  ISettlementRecord,
+  IPTPLog,
+  OfflineCollectionItem,
 } from "./types";
 import { ChainedLedgerBlock, computeBlockHash, verifyLedgerChain, LedgerEntryPayload } from "../crypto/hash-chain";
-import { allocateInstallmentPayment, calculateInstallmentBreakdown } from "../calculations";
+import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
 import { decryptField, encryptField } from "../crypto/aes";
 import { ImportedCustomerRow } from "../excel/excel-helper";
 
@@ -37,6 +41,9 @@ class AppStore {
   private expenses: ExpenseRecord[] = [...initialExpenses];
   private ledgerChain: ChainedLedgerBlock[] = [...initialLedgerChain];
   private articles: ArticlePost[] = [...initialArticles];
+  private repossessions: IRepossessionRecord[] = [];
+  private settlements: ISettlementRecord[] = [];
+  private ptpLogs: IPTPLog[] = [];
   private isProductionCleanMode: boolean = true;
 
   // --- Authentication & User Management ---
@@ -747,6 +754,332 @@ class AppStore {
   deleteArticle(id: string) {
     this.articles = this.articles.filter((a) => a.id !== id);
     return { success: true };
+  }
+
+  // --- Sprint 6: Repossession & Seized Inventory ---
+  getRepossessions(tenantId?: string): IRepossessionRecord[] {
+    if (!tenantId) return this.repossessions;
+    return this.repossessions.filter((r) => r.tenantId === tenantId);
+  }
+
+  repossessPlan(params: {
+    planId: string;
+    seizedDate: string;
+    conditionRating: number;
+    notes: string;
+    officerId: string;
+    officerName: string;
+    witnessName?: string;
+    resaleValuation: number;
+    actorId: string;
+  }): { plan: InstallmentPlan; repossession: IRepossessionRecord; recoveredProduct: Product } {
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Installment contract not found for repossession.");
+
+    // Calculate remaining bad debt written off
+    const totalPaid = plan.schedule.reduce((acc, curr) => acc + (curr.amountPaid || 0), 0);
+    const badDebtWrittenOff = Math.max(0, plan.totalFinanced - totalPaid);
+
+    const repossessionId = `rep_${Date.now()}`;
+    const recoveredSku = `SKU-SEIZED-${plan.imeiSerial.slice(-6)}-${Date.now().toString().slice(-4)}`;
+
+    const repossessionRecord: IRepossessionRecord = {
+      id: repossessionId,
+      contractId: plan.id,
+      planNumber: plan.planNumber,
+      tenantId: plan.tenantId,
+      customerName: plan.customerName,
+      productTitle: plan.productTitle,
+      imeiSerial: plan.imeiSerial,
+      seizedDate: params.seizedDate,
+      conditionRating: params.conditionRating,
+      notes: params.notes,
+      officerId: params.officerId,
+      officerName: params.officerName,
+      witnessName: params.witnessName,
+      recoveredItemSku: recoveredSku,
+      resaleValuation: params.resaleValuation,
+      badDebtWrittenOff,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.repossessions.unshift(repossessionRecord);
+
+    // Update Plan status
+    plan.status = "DEFAULTED_REPOSSESSED";
+    plan.repossessedRecordId = repossessionId;
+    plan.schedule.forEach((s) => {
+      if (s.status !== "PAID") {
+        s.status = "OVERDUE";
+        s.notes = `Contract seized & repossessed on ${params.seizedDate}`;
+      }
+    });
+
+    // Create refurbished / used stock product
+    const recoveredProduct: Product = {
+      id: `prod_refurb_${Date.now()}`,
+      tenantId: plan.tenantId,
+      title: `[Refurbished / Seized] ${plan.productTitle} (Rating: ${params.conditionRating}/5)`,
+      brand: "Rajpoot Verified Seized Stock",
+      category: "REFURBISHED_SEIZED",
+      cashPrice: params.resaleValuation,
+      minDownPaymentPct: 30,
+      maxTenureMonths: 6,
+      imeiSerialList: [plan.imeiSerial],
+      specs: {
+        "Condition Rating": `${params.conditionRating} / 5 Stars`,
+        "Original Contract": plan.planNumber,
+        "Physical Inspection Notes": params.notes,
+        "Recovery Officer": params.officerName,
+        "Seizure Date": params.seizedDate,
+      },
+      inStock: true,
+      stockQuantity: 1,
+      isRefurbishedSeized: true,
+      originalContractId: plan.id,
+    };
+
+    this.products.unshift(recoveredProduct);
+
+    // Ledger block for bad debt write-off & stock asset restoration
+    this.appendLedgerBlock({
+      id: `tx_rep_${repossessionId}`,
+      tenantId: plan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "BAD_DEBT_WRITE_OFF",
+      amount: badDebtWrittenOff,
+      actorId: params.actorId,
+      notes: `Contract ${plan.planNumber} repossessed. Bad debt Rs. ${badDebtWrittenOff.toLocaleString()} written off. Item re-stocked at Rs. ${params.resaleValuation.toLocaleString()} valuation.`,
+    });
+
+    return { plan, repossession: repossessionRecord, recoveredProduct };
+  }
+
+  // --- Sprint 6: Early Settlement & Profit Rebate ---
+  getSettlements(tenantId?: string): ISettlementRecord[] {
+    if (!tenantId) return this.settlements;
+    return this.settlements.filter((s) => s.tenantId === tenantId);
+  }
+
+  getSettlementByNOC(nocId: string): ISettlementRecord | undefined {
+    return this.settlements.find((s) => s.nocCertificateId === nocId);
+  }
+
+  settlePlanEarly(params: {
+    planId: string;
+    rebatePercentage: number;
+    approvedBy: string;
+    targetWalletId: string;
+    actorId: string;
+  }): { plan: InstallmentPlan; settlement: ISettlementRecord } {
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Installment contract not found for early settlement.");
+    if (plan.status !== "ACTIVE") throw new Error(`Contract cannot be early-settled in ${plan.status} status.`);
+
+    const targetWallet = this.wallets.find((w) => w.id === params.targetWalletId);
+    if (!targetWallet) throw new Error("Target settlement payment wallet not found.");
+
+    const calc = calculateEarlySettlement(plan, params.rebatePercentage);
+    const nocId = `NOC-${plan.planNumber}-${Date.now().toString().slice(-6)}`;
+
+    const settlement: ISettlementRecord = {
+      id: `set_${Date.now()}`,
+      contractId: plan.id,
+      planNumber: plan.planNumber,
+      tenantId: plan.tenantId,
+      customerName: plan.customerName,
+      totalOriginalFinanced: calc.totalFinanced,
+      totalPrincipalPaid: calc.totalPrincipalPaid,
+      remainingPrincipal: calc.remainingPrincipal,
+      unearnedMarkup: calc.unearnedMarkup,
+      rebatePercentage: calc.rebatePercentage,
+      rebateDiscountGiven: calc.rebateDiscountGiven,
+      accruedPenalties: calc.accruedPenalties,
+      finalSettlementPaid: calc.finalSettlementAmount,
+      approvedBy: params.approvedBy,
+      clearedAt: new Date().toISOString(),
+      nocCertificateId: nocId,
+      targetWalletId: targetWallet.id,
+    };
+
+    this.settlements.unshift(settlement);
+
+    // Update Plan
+    plan.status = "COMPLETED_EARLY_SETTLED";
+    plan.settlementRecordId = settlement.id;
+    plan.accumulatedShortArrears = 0;
+    plan.schedule.forEach((s) => {
+      if (s.status !== "PAID") {
+        s.status = "PAID";
+        s.paidDate = new Date().toISOString();
+        s.notes = `Early settled with ${params.rebatePercentage}% profit rebate discount (NOC #${nocId})`;
+      }
+    });
+
+    // Credit Target Wallet with final settlement cash
+    targetWallet.balance += calc.finalSettlementAmount;
+    targetWallet.updatedAt = new Date().toISOString();
+
+    // Append Blockchain Ledger Block
+    this.appendLedgerBlock({
+      id: `tx_set_${settlement.id}`,
+      tenantId: plan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "EARLY_SETTLEMENT",
+      amount: calc.finalSettlementAmount,
+      toWallet: targetWallet.id,
+      actorId: params.actorId,
+      notes: `Early settlement for ${plan.customerName} (${plan.planNumber}). Paid Rs. ${calc.finalSettlementAmount.toLocaleString()} with Rs. ${calc.rebateDiscountGiven.toLocaleString()} profit rebate. NOC: ${nocId}`,
+    });
+
+    return { plan, settlement };
+  }
+
+  // --- Sprint 6: Promise to Pay (PTP) Scheduling ---
+  getPTPLogs(tenantId?: string): IPTPLog[] {
+    if (!tenantId) return this.ptpLogs;
+    return this.ptpLogs.filter((p) => p.tenantId === tenantId);
+  }
+
+  logPTP(params: {
+    planId: string;
+    promisedDate: string;
+    expectedAmount: number;
+    reason: IPTPLog["reason"];
+    notes?: string;
+    officerId: string;
+    officerName: string;
+  }): IPTPLog {
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Plan not found for PTP schedule.");
+
+    const ptp: IPTPLog = {
+      id: `ptp_${Date.now()}`,
+      contractId: plan.id,
+      planNumber: plan.planNumber,
+      tenantId: plan.tenantId,
+      customerId: plan.customerId,
+      customerName: plan.customerName,
+      customerPhone: plan.customerPhone,
+      officerId: params.officerId,
+      officerName: params.officerName,
+      promisedDate: params.promisedDate,
+      expectedAmount: params.expectedAmount,
+      reason: params.reason,
+      notes: params.notes,
+      status: "PENDING",
+      createdAt: new Date().toISOString(),
+    };
+
+    this.ptpLogs.unshift(ptp);
+    plan.ptpActive = true;
+    plan.activePTPId = ptp.id;
+
+    return ptp;
+  }
+
+  updatePTPStatus(id: string, status: "PENDING" | "HONORED" | "BROKEN") {
+    const ptp = this.ptpLogs.find((p) => p.id === id);
+    if (!ptp) throw new Error("PTP record not found");
+    ptp.status = status;
+    ptp.updatedAt = new Date().toISOString();
+
+    const plan = this.plans.find((p) => p.id === ptp.contractId);
+    if (plan && status !== "PENDING") {
+      plan.ptpActive = false;
+    }
+    return ptp;
+  }
+
+  // --- Sprint 6: Offline-First Background Sync Processor ---
+  syncOfflineCollections(batches: OfflineCollectionItem[]): {
+    syncedCount: number;
+    totalAmount: number;
+    results: Array<{ tempId: string; planNumber: string; receiptId: string; status: string }>;
+  } {
+    let totalAmount = 0;
+    const results: Array<{ tempId: string; planNumber: string; receiptId: string; status: string }> = [];
+
+    for (const item of batches) {
+      try {
+        const paymentRes = this.recordInstallmentPayment({
+          planId: item.planId,
+          installmentNo: 1, // Auto-finds pending installment
+          amountPaid: item.amount,
+          collectedBy: item.collectedBy,
+          collectorRole: "FIELD_RECOVERY",
+          notes: `[Offline PWA Sync] Originally collected offline at ${item.collectedAt} (Hash: ${item.offlineReceiptHash})`,
+        });
+
+        totalAmount += item.amount;
+        results.push({
+          tempId: item.tempId,
+          planNumber: item.planNumber,
+          receiptId: paymentRes.receiptId || `rec_${Date.now()}`,
+          status: "SYNCED_OK",
+        });
+      } catch (err: any) {
+        results.push({
+          tempId: item.tempId,
+          planNumber: item.planNumber,
+          receiptId: "ERROR",
+          status: `FAILED: ${err.message}`,
+        });
+      }
+    }
+
+    return { syncedCount: results.filter((r) => r.status === "SYNCED_OK").length, totalAmount, results };
+  }
+
+  // --- Sprint 6: Automated Encrypted Cloud Backup ---
+  exportEncryptedBackup(tenantId?: string) {
+    const snapshot = {
+      backupTimestamp: new Date().toISOString(),
+      platform: "RAJPOOT TRADERS - Enterprise Treasury Platform",
+      schemaVersion: "6.0-ENTERPRISE",
+      chainIntegrity: this.verifyChainIntegrity(),
+      data: {
+        tenants: this.tenants,
+        users: this.users,
+        customers: this.customers,
+        products: this.products,
+        plans: this.plans,
+        wallets: this.wallets,
+        handovers: this.handovers,
+        expenses: this.expenses,
+        repossessions: this.repossessions,
+        settlements: this.settlements,
+        ptpLogs: this.ptpLogs,
+        ledgerChain: this.ledgerChain,
+        articles: this.articles,
+      },
+    };
+
+    const rawJson = JSON.stringify(snapshot, null, 2);
+    const encryptedPayload = encryptField(rawJson);
+    const totalRecords =
+      this.tenants.length +
+      this.users.length +
+      this.customers.length +
+      this.products.length +
+      this.plans.length +
+      this.wallets.length +
+      this.handovers.length +
+      this.expenses.length +
+      this.repossessions.length +
+      this.settlements.length +
+      this.ptpLogs.length +
+      this.ledgerChain.length;
+
+    return {
+      backupTimestamp: snapshot.backupTimestamp,
+      totalRecords,
+      chainIntegrityValid: snapshot.chainIntegrity.isValid,
+      chainLength: this.ledgerChain.length,
+      sizeBytes: typeof Blob !== "undefined" ? new Blob([encryptedPayload]).size : encryptedPayload.length,
+      encryptedPayload,
+      unencryptedSnapshot: snapshot,
+    };
   }
 }
 

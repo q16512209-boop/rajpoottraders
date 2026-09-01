@@ -84,7 +84,7 @@ export interface Product {
   tenantId: string;
   title: string;
   brand?: string;
-  category: "SMARTPHONES" | "AIR_CONDITIONERS" | "SOLAR_HYBRID" | "MOTORBIKES" | "HOME_APPLIANCES";
+  category: "SMARTPHONES" | "AIR_CONDITIONERS" | "SOLAR_HYBRID" | "MOTORBIKES" | "HOME_APPLIANCES" | "REFURBISHED_SEIZED";
   cashPrice: number;
   minDownPaymentPct: number;
   maxTenureMonths: number;
@@ -94,6 +94,8 @@ export interface Product {
   stockQuantity?: number;
   image?: string;
   popularInstallmentPlans?: { months: number; downPayment: number; monthly: number }[];
+  isRefurbishedSeized?: boolean;
+  originalContractId?: string;
 }
 
 export interface InstallmentScheduleItem {
@@ -130,7 +132,7 @@ export interface InstallmentPlan {
   durationMonths: number;
   monthlyInstallment: number;
   accumulatedShortArrears: number;
-  status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF";
+  status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF" | "DEFAULTED_REPOSSESSED" | "COMPLETED_EARLY_SETTLED";
   startDate: string;
   endDate: string;
   schedule: InstallmentScheduleItem[];
@@ -140,6 +142,82 @@ export interface InstallmentPlan {
   gpsLocation?: GPSLocation;
   contractVerified: boolean;
   tamperProofHash: string;
+  ptpActive?: boolean;
+  activePTPId?: string;
+  repossessedRecordId?: string;
+  settlementRecordId?: string;
+}
+
+export interface IRepossessionRecord {
+  id: string;
+  contractId: string;
+  planNumber: string;
+  tenantId: string;
+  customerName: string;
+  productTitle: string;
+  imeiSerial: string;
+  seizedDate: string;
+  conditionRating: number; // 1 to 5
+  notes: string;
+  officerId: string;
+  officerName: string;
+  witnessName?: string;
+  recoveredItemSku: string;
+  resaleValuation: number;
+  badDebtWrittenOff: number;
+  createdAt: string;
+}
+
+export interface ISettlementRecord {
+  id: string;
+  contractId: string;
+  planNumber: string;
+  tenantId: string;
+  customerName: string;
+  totalOriginalFinanced: number;
+  totalPrincipalPaid: number;
+  remainingPrincipal: number;
+  unearnedMarkup: number;
+  rebatePercentage: number;
+  rebateDiscountGiven: number;
+  accruedPenalties: number;
+  finalSettlementPaid: number;
+  approvedBy: string;
+  clearedAt: string;
+  nocCertificateId: string;
+  targetWalletId: string;
+}
+
+export interface IPTPLog {
+  id: string;
+  contractId: string;
+  planNumber: string;
+  tenantId: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  officerId: string;
+  officerName: string;
+  promisedDate: string;
+  expectedAmount: number;
+  reason: "SALARY_DELAY" | "MEDICAL_EMERGENCY" | "OUT_OF_CITY_TRAVEL" | "DISPUTED_BILL" | "FAMILY_ISSUE" | "OTHER";
+  notes?: string;
+  status: "PENDING" | "HONORED" | "BROKEN";
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface OfflineCollectionItem {
+  tempId: string;
+  planId: string;
+  planNumber: string;
+  customerName: string;
+  customerPhone: string;
+  amount: number;
+  collectedAt: string;
+  collectedBy: string;
+  synced: boolean;
+  offlineReceiptHash: string;
 }
 
 export interface WalletAccount {
