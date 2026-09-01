@@ -718,13 +718,35 @@ class AppStore {
     return block;
   }
 
-  // --- Articles ---
+  // --- Articles & CMS ---
   getArticles(): ArticlePost[] {
     return this.articles;
   }
 
   getArticleBySlug(slug: string): ArticlePost | undefined {
     return this.articles.find((a) => a.slug === slug);
+  }
+
+  createArticle(articleData: Omit<ArticlePost, "id" | "date">): ArticlePost {
+    const newArticle: ArticlePost = {
+      ...articleData,
+      id: `art_${Date.now()}`,
+      date: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    };
+    this.articles.unshift(newArticle);
+    return newArticle;
+  }
+
+  updateArticle(id: string, updates: Partial<ArticlePost>): ArticlePost {
+    const article = this.articles.find((a) => a.id === id);
+    if (!article) throw new Error("Article not found");
+    Object.assign(article, updates);
+    return article;
+  }
+
+  deleteArticle(id: string) {
+    this.articles = this.articles.filter((a) => a.id !== id);
+    return { success: true };
   }
 }
 

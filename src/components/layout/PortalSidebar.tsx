@@ -64,6 +64,7 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
       title: "Super Admin & Risk (Tier 0)",
       links: [
         { href: "/portal/admin", label: "Master Oversight & Audit Chain", icon: ShieldCheck, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN"] },
+        { href: "/portal/admin/blogs", label: "SEO Blog Post Publisher", icon: FileText, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN"] },
       ],
     },
     {

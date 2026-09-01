@@ -190,13 +190,17 @@ export default function RecoveryPortalPage() {
                       <span>Call Customer</span>
                     </a>
                     <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(p.areaZone)}`}
+                      href={
+                        p.gpsLocation?.lat
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${p.gpsLocation.lat},${p.gpsLocation.lng}`
+                          : `https://maps.google.com/?q=${encodeURIComponent(p.areaZone)}`
+                      }
                       target="_blank"
                       rel="noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl border border-emerald-200"
                     >
                       <MapPin className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>Open Map Pin</span>
+                      <span>{p.gpsLocation?.lat ? "GPS Live Directions" : "Open Map Pin"}</span>
                     </a>
                   </div>
                 </div>

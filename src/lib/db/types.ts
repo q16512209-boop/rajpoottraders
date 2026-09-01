@@ -48,6 +48,16 @@ export interface Guarantor {
   landmark: string;
 }
 
+export interface GPSLocation {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  address?: string;
+  mapUrl?: string;
+  detectedAt?: string;
+  aiSuggestedZone?: string;
+}
+
 export interface Customer {
   id: string;
   tenantId: string;
@@ -61,6 +71,7 @@ export interface Customer {
   city: string;
   zoneArea: string;
   photoUrl?: string;
+  gpsLocation?: GPSLocation;
   guarantors: Guarantor[];
   riskScore: number;
   isDefaulter: boolean;
@@ -126,6 +137,7 @@ export interface InstallmentPlan {
   guarantorIds: string[];
   recoveryOfficerId?: string;
   areaZone: string;
+  gpsLocation?: GPSLocation;
   contractVerified: boolean;
   tamperProofHash: string;
 }
