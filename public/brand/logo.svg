@@ -1,0 +1,12 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="rtGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803d" />
+      <stop offset="100%" stop-color="#052e16" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="40" fill="url(#rtGrad)" />
+  <circle cx="100" cy="100" r="75" fill="none" stroke="#fcd34d" stroke-width="4" stroke-dasharray="6,6" />
+  <text x="75" y="125" font-family="Georgia, serif" font-size="80" font-weight="bold" fill="#fcd34d">R</text>
+  <text x="115" y="125" font-family="Arial, sans-serif" font-size="80" font-weight="900" fill="#ffffff">T</text>
+</svg>
