@@ -15,6 +15,8 @@ export default function HandoversPage() {
   const [notes, setNotes] = useState<string>("");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  if (!currentUser) return null;
+
   const handleSubmitHandover = (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -27,7 +29,7 @@ export default function HandoversPage() {
         notes,
       });
       setHandovers([...store.getHandovers(currentTenant.id)]);
-      setMsg({ type: "success", text: `Handover request of ${formatPKR(submitAmount)} submitted for physical cash verification.` });
+      setMsg({ type: "success", text: "Handover request submitted for physical cash verification." });
       setNotes("");
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Submission failed" });

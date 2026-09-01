@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -11,9 +11,10 @@ export default function PrintRouteSheetPage() {
   const { currentTenant, currentUser } = useAuth();
   const plans = store.getPlans(currentTenant.id);
 
+  if (!currentUser) return null;
+
   return (
     <div className="space-y-6 pb-20">
-      {/* Control Bar */}
       <div className="no-print bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
         <Link
           href="/portal/recovery/route-sheet"
@@ -31,7 +32,6 @@ export default function PrintRouteSheetPage() {
         </button>
       </div>
 
-      {/* Printable Sheet */}
       <div className="bg-white border border-slate-300 shadow-2xl p-6 sm:p-8 mx-auto max-w-5xl font-sans text-slate-900 space-y-4">
         <div className="border-b-2 border-slate-900 pb-3 flex justify-between items-end">
           <div>

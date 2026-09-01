@@ -37,11 +37,88 @@ class AppStore {
   private expenses: ExpenseRecord[] = [...initialExpenses];
   private ledgerChain: ChainedLedgerBlock[] = [...initialLedgerChain];
   private articles: ArticlePost[] = [...initialArticles];
-  private isProductionCleanMode: boolean = false;
+  private isProductionCleanMode: boolean = true;
+
+  // --- Authentication & User Management ---
+  authenticate(email: string, password: string):User | null {
+    const cleanEmail = email.trim().toLowerCase();
+    const user = this.users.find(
+      (u) => u.email.toLowerCase() === cleanEmail && u.password === password && u.status === "ACTIVE"
+    );
+    return user || null;
+  }
+
+  getUsers(tenantId?: string): User[] {
+    if (!tenantId) return this.users;
+    return this.users.filter((u) => u.tenantId === tenantId || u.role === "SUPER_ADMIN");
+  }
+
+  getUserById(id: string): User | undefined {
+    return this.users.find((u) => u.id === id);
+  }
+
+  createUser(creator: User, userData: Omit<User, "id" | "createdAt">): User {
+    // Role permissions check
+    if (creator.role !== "SUPER_ADMIN" && creator.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Super Admin or Shop Owner can create staff users.");
+    }
+
+    if (creator.role === "OWNER" && (userData.role === "SUPER_ADMIN" || userData.role === "OWNER")) {
+      throw new Error("Unauthorized: Shop Owners can only create Branch Managers and Field Recovery Officers.");
+    }
+
+    const existing = this.users.find((u) => u.email.toLowerCase() === userData.email.toLowerCase());
+    if (existing) {
+      throw new Error(`A user with email ${userData.email} already exists.`);
+    }
+
+    const newUser: User = {
+      ...userData,
+      id: `usr_${Date.now()}`,
+      tenantId: creator.role === "SUPER_ADMIN" ? userData.tenantId : creator.tenantId,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.users.push(newUser);
+
+    // If Field Recovery, create a dedicated wallet bag
+    if (newUser.role === "FIELD_RECOVERY") {
+      this.wallets.push({
+        id: `wall_field_${newUser.id}`,
+        tenantId: newUser.tenantId,
+        type: "FIELD_IN_TRANSIT",
+        name: `Field In-Transit (${newUser.name} Bag)`,
+        balance: 0,
+        officerId: newUser.id,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    return newUser;
+  }
+
+  updateUser(id: string, updates: Partial<User>): User {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) throw new Error("User not found");
+    Object.assign(user, updates);
+    return user;
+  }
+
+  deleteUser(id: string) {
+    if (id === "usr_super_admin") {
+      throw new Error("Cannot delete Main Super Admin account.");
+    }
+    this.users = this.users.filter((u) => u.id !== id);
+    return { success: true };
+  }
 
   // --- Production Clean Slate Reset ---
   isCleanMode(): boolean {
     return this.isProductionCleanMode;
+  }
+
+  resetToDemoData() {
+    this.resetToCleanProduction();
   }
 
   resetToCleanProduction(tenantId: string = "tenant_lhr") {
@@ -51,7 +128,6 @@ class AppStore {
     this.expenses = [];
     this.isProductionCleanMode = true;
 
-    // Reset wallets with clean fresh balances
     this.wallets = [
       {
         id: "wall_owner_lhr",
@@ -90,7 +166,6 @@ class AppStore {
       },
     ];
 
-    // Reset ledger chain with clean Genesis block
     const genesisPayload = {
       id: "genesis_clean_000",
       tenantId,
@@ -98,7 +173,7 @@ class AppStore {
       type: "INTERNAL_TRANSFER" as const,
       amount: 0,
       toWallet: "wall_owner_lhr",
-      actorId: "system_admin",
+      actorId: "usr_super_admin",
       notes: "Clean Production Ledger Initialized for Rajpoot Traders Live Operations.",
     };
     const genesisHash = computeBlockHash(0, "0000000000000000000000000000000000000000000000000000000000000000", genesisPayload, genesisPayload.timestamp);
@@ -116,20 +191,6 @@ class AppStore {
     ];
 
     return { success: true, message: "Production database cleared and ready for real company data." };
-  }
-
-  resetToDemoData() {
-    this.tenants = [...initialTenants];
-    this.users = [...initialUsers];
-    this.customers = [...initialCustomers];
-    this.products = [...initialProducts];
-    this.plans = [...initialPlans];
-    this.wallets = [...initialWallets];
-    this.handovers = [...initialHandovers];
-    this.expenses = [...initialExpenses];
-    this.ledgerChain = [...initialLedgerChain];
-    this.isProductionCleanMode = false;
-    return { success: true, message: "Restored sample demo dataset." };
   }
 
   // --- Excel Bulk Import Engine ---
@@ -187,14 +248,13 @@ class AppStore {
         city: r.City || "Lahore",
         zoneArea: r.Zone_Area || "Route-A (Gulberg / Model Town)",
         guarantors,
-        riskScore: 15,
+        riskScore: 10,
         isDefaulter: false,
         createdAt: new Date().toISOString(),
       };
 
       this.customers.unshift(newCust);
 
-      // Create Active Plan if product information is present
       if (r.Product_Item || r.Monthly_Installment) {
         const cashPrice = Number(r.Cash_Price) || 150000;
         const downPayment = Number(r.Advance_Down_Payment) || 30000;
@@ -219,7 +279,7 @@ class AppStore {
           });
         }
 
-        const planNumber = `RT-IMP-${String(this.plans.length + 900).padStart(4, "0")}`;
+        const planNumber = `RT-2026-${String(this.plans.length + 1001).padStart(4, "0")}`;
         const planId = `plan_imp_${Date.now()}_${idx}`;
         const plan: InstallmentPlan = {
           id: planId,
@@ -259,22 +319,13 @@ class AppStore {
     return { importedCount, errors };
   }
 
-  // --- Tenants & Users ---
+  // --- Tenants ---
   getTenants(): Tenant[] {
     return this.tenants;
   }
 
   getTenantById(id: string): Tenant | undefined {
     return this.tenants.find((t) => t.id === id);
-  }
-
-  getUsers(tenantId?: string): User[] {
-    if (!tenantId) return this.users;
-    return this.users.filter((u) => u.tenantId === tenantId || u.role === "SUPER_ADMIN");
-  }
-
-  getUserById(id: string): User | undefined {
-    return this.users.find((u) => u.id === id);
   }
 
   // --- Customers & KYC Defaulter Cross-Check ---
@@ -358,7 +409,7 @@ class AppStore {
   }
 
   createPlan(planData: Omit<InstallmentPlan, "id" | "planNumber" | "tamperProofHash">): InstallmentPlan {
-    const planNumber = `RT-2026-${String(this.plans.length + 882).padStart(4, "0")}`;
+    const planNumber = `RT-2026-${String(this.plans.length + 1001).padStart(4, "0")}`;
     const id = `plan_${Date.now()}`;
     const lastHash = this.ledgerChain[this.ledgerChain.length - 1]?.hash || "0".repeat(64);
     const tamperProofHash = `sha256_${computeBlockHash(this.ledgerChain.length, lastHash, {

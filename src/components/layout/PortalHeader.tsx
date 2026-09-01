@@ -23,6 +23,8 @@ export function PortalHeader({ onMenuToggle }: HeaderProps) {
   const { currentUser, currentTenant } = useAuth();
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
 
+  if (!currentUser) return null;
+
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
       {/* Left: Mobile Hamburger & Branch Title */}

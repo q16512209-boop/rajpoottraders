@@ -1,9 +1,9 @@
-﻿export type UserRole =
-  | "SUPER_ADMIN"     // Tier 0: Platform Super Admin / Main Boss
-  | "OWNER"           // Tier 1: Shop / Trade Company Owner
-  | "BRANCH_MANAGER"  // Tier 2: Branch Operations Manager
-  | "FIELD_RECOVERY"  // Tier 3: Field Recovery Officer / Verifier
-  | "CUSTOMER";       // Tier 4: Customer (Kharedar)
+export type UserRole =
+  | "SUPER_ADMIN"     // Tier 0: Platform Oversight, Audit Chain, Branch Licensing, All Roles
+  | "OWNER"           // Tier 1: Shop Owner, Dedicated Owner Pocket Wallet, Treasury, Staff Roles
+  | "BRANCH_MANAGER"  // Tier 2: Showroom Manager, Till reconciliation, Counter down payments, Customer KYC
+  | "FIELD_RECOVERY"  // Tier 3: Field Recovery Officer, Route sheets, Partial payments, Handovers
+  | "CUSTOMER";       // Tier 4: Self-Service Customer, My Plans, Receipts, Arrears
 
 export interface Tenant {
   id: string;
@@ -11,38 +11,41 @@ export interface Tenant {
   code: string;
   brandHeader: string;
   urduBrandName: string;
-  contact: string;
   address: string;
-  city: string;
-  licenseTier: "ENTERPRISE" | "STANDARD" | "BRANCH";
-  status: "ACTIVE" | "SUSPENDED";
+  contact: string;
+  status: "ACTIVE" | "SUSPENDED" | "TRIAL";
+  ownerName: string;
+  ownerEmail: string;
+  licenseValidUntil: string;
+  licenseTier?: string;
+  createdAt: string;
 }
 
 export interface User {
   id: string;
   tenantId: string;
-  role: UserRole;
   name: string;
   email: string;
+  password?: string;
+  role: UserRole;
   phone: string;
-  branch: string;
-  assignedArea?: string;
   avatar?: string;
-  customerId?: string; // for customer self-service link
+  assignedRouteZone?: string;
+  customerId?: string;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
 }
 
 export interface Guarantor {
   id: string;
   fullName: string;
   fatherName: string;
-  cnic: string; // AES-256 encrypted at rest
+  cnic: string;
   phone: string;
   relation: string;
   address: string;
   workplace: string;
   landmark: string;
-  photoUrl?: string;
-  utilityBillUrl?: string;
 }
 
 export interface Customer {
@@ -50,20 +53,16 @@ export interface Customer {
   tenantId: string;
   fullName: string;
   fatherName: string;
-  cnic: string; // AES-256 encrypted at rest
+  cnic: string;
   phone: string;
   secondaryPhone?: string;
   address: string;
   landmark: string;
   city: string;
-  zoneArea: string; // e.g. "Route-A: Gulberg / Model Town"
-  gpsCoords?: { lat: number; lng: number };
+  zoneArea: string;
   photoUrl?: string;
-  utilityBillUrl?: string;
-  cnicFrontUrl?: string;
-  cnicBackUrl?: string;
   guarantors: Guarantor[];
-  riskScore: number; // 0-100 (0=safe, 100=extreme default risk)
+  riskScore: number;
   isDefaulter: boolean;
   defaulterReason?: string;
   createdAt: string;
@@ -73,20 +72,17 @@ export interface Product {
   id: string;
   tenantId: string;
   title: string;
-  category: "SMARTPHONE" | "INVERTER_AC" | "SOLAR_SYSTEM" | "MOTORBIKE" | "HOME_APPLIANCE" | "LED_TV";
-  brand: string;
-  modelNumber: string;
+  brand?: string;
+  category: "SMARTPHONES" | "AIR_CONDITIONERS" | "SOLAR_HYBRID" | "MOTORBIKES" | "HOME_APPLIANCES";
   cashPrice: number;
-  costPrice: number;
-  stockQuantity: number;
+  minDownPaymentPct: number;
+  maxTenureMonths: number;
   imeiSerialList: string[];
-  image: string;
   specs: Record<string, string>;
-  popularInstallmentPlans?: {
-    months: number;
-    advance: number;
-    monthly: number;
-  }[];
+  inStock: boolean;
+  stockQuantity?: number;
+  image?: string;
+  popularInstallmentPlans?: { months: number; downPayment: number; monthly: number }[];
 }
 
 export interface InstallmentScheduleItem {
@@ -98,15 +94,15 @@ export interface InstallmentScheduleItem {
   totalDue: number;
   amountPaid: number;
   paidDate?: string;
-  status: "PAID" | "PENDING" | "OVERDUE" | "SHORT_PAID";
-  receiptId?: string;
+  status: "PENDING" | "PAID" | "SHORT_PAID" | "OVERDUE";
   collectedBy?: string;
+  receiptId?: string;
   notes?: string;
 }
 
 export interface InstallmentPlan {
   id: string;
-  planNumber: string; // e.g., "RT-2026-0881"
+  planNumber: string;
   tenantId: string;
   customerId: string;
   customerName: string;
@@ -134,21 +130,15 @@ export interface InstallmentPlan {
   tamperProofHash: string;
 }
 
-export type WalletType =
-  | "OWNER_POCKET"        // Physical Cash with the Owner
-  | "COUNTER_TILL"         // Cash at Sales Counter
-  | "FIELD_IN_TRANSIT"     // Field Recovery Officers' in-transit cash
-  | "DIGITAL_BANK";        // Bank / JazzCash / EasyPaisa
-
 export interface WalletAccount {
   id: string;
   tenantId: string;
-  type: WalletType;
+  type: "OWNER_POCKET" | "COUNTER_TILL" | "FIELD_IN_TRANSIT" | "DIGITAL_BANK";
   name: string;
   balance: number;
   accountNumber?: string;
   bankName?: string;
-  officerId?: string; // if linked to specific recovery officer
+  officerId?: string;
   updatedAt: string;
 }
 
@@ -158,18 +148,18 @@ export interface HandoverRequest {
   officerId: string;
   officerName: string;
   requestedAmount: number;
-  submittedAt: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
   targetWalletId: string;
-  verifiedBy?: string;
+  submittedAt: string;
   verifiedAt?: string;
+  verifiedBy?: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
   notes?: string;
 }
 
 export interface ExpenseRecord {
   id: string;
   tenantId: string;
-  category: "FUEL" | "SALARY" | "TEA_UTILITIES" | "VENDOR_STOCK" | "OWNER_DRAW" | "MISC";
+  category: "PETROL_TRANSPORT" | "TEA_REFRESHMENT" | "STAFF_SALARY" | "SHOP_UTILITIES" | "OWNER_WITHDRAWAL" | "MISC";
   amount: number;
   fromWalletId: string;
   fromWalletName: string;
@@ -180,14 +170,15 @@ export interface ExpenseRecord {
 }
 
 export interface ArticlePost {
+  id: string;
   slug: string;
   title: string;
-  summary: string;
+  urduTitle: string;
+  excerpt: string;
   category: string;
-  author: string;
-  date: string;
   readTime: string;
-  content: string;
-  tags: string[];
-  schemaKeywords: string[];
+  date: string;
+  author: string;
+  contentHtml: string;
+  keywords: string[];
 }

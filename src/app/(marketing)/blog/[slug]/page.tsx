@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { store } from "@/lib/db/store";
@@ -15,11 +15,11 @@ export async function generateMetadata({
 
   return {
     title: `${article.title} | Rajpoot Traders Guide`,
-    description: article.summary,
-    keywords: article.schemaKeywords,
+    description: article.excerpt,
+    keywords: article.keywords,
     openGraph: {
       title: article.title,
-      description: article.summary,
+      description: article.excerpt,
       type: "article",
       publishedTime: article.date,
       authors: [article.author],
@@ -35,7 +35,7 @@ export default function ArticleDetailPage({ params }: { params: { slug: string }
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     "headline": article.title,
-    "description": article.summary,
+    "description": article.excerpt,
     "author": {
       "@type": "Person",
       "name": article.author,
@@ -49,7 +49,7 @@ export default function ArticleDetailPage({ params }: { params: { slug: string }
       },
     },
     "datePublished": article.date,
-    "keywords": article.schemaKeywords.join(", "),
+    "keywords": article.keywords.join(", "),
   };
 
   return (
@@ -78,6 +78,9 @@ export default function ArticleDetailPage({ params }: { params: { slug: string }
         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 leading-tight">
           {article.title}
         </h1>
+        <h2 className="text-lg font-urdu font-bold text-emerald-800">
+          {article.urduTitle}
+        </h2>
 
         <div className="flex items-center gap-6 text-xs text-slate-500 pt-2 border-b border-slate-200 pb-6">
           <div className="flex items-center gap-1.5">
@@ -92,34 +95,13 @@ export default function ArticleDetailPage({ params }: { params: { slug: string }
       </header>
 
       <div className="p-5 bg-emerald-50/70 border-l-4 border-emerald-600 rounded-r-2xl text-xs sm:text-sm text-emerald-950 font-medium leading-relaxed">
-        {article.summary}
+        {article.excerpt}
       </div>
 
-      <div className="prose prose-slate max-w-none text-slate-800 space-y-4 leading-relaxed text-sm sm:text-base">
-        {article.content.split("\n\n").map((para, i) => {
-          if (para.startsWith("### ")) {
-            return (
-              <h3 key={i} className="text-xl font-bold text-slate-900 mt-6 mb-2">
-                {para.replace("### ", "")}
-              </h3>
-            );
-          }
-          if (para.startsWith("- ")) {
-            return (
-              <ul key={i} className="list-disc pl-5 space-y-1.5 text-slate-700 text-sm">
-                {para.split("\n").map((line, liIdx) => (
-                  <li key={liIdx}>{line.replace("- ", "")}</li>
-                ))}
-              </ul>
-            );
-          }
-          return (
-            <p key={i} className="text-slate-700 leading-relaxed text-sm">
-              {para}
-            </p>
-          );
-        })}
-      </div>
+      <div
+        className="prose prose-slate max-w-none text-slate-800 space-y-4 leading-relaxed text-sm sm:text-base"
+        dangerouslySetInnerHTML={{ __html: article.contentHtml }}
+      />
 
       <div className="bg-slate-900 text-white rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
         <div className="space-y-1 text-center sm:text-left">

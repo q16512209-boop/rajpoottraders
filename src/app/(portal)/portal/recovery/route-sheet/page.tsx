@@ -1,15 +1,17 @@
-﻿"use client";
+"use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { store } from "@/lib/db/store";
 import { formatPKR, formatDate, formatCNIC, formatPhone } from "@/lib/formatters";
 import { useAuth } from "@/lib/context/auth-context";
-import { Printer, ArrowLeft, Bike } from "lucide-react";
+import { Printer, ArrowLeft } from "lucide-react";
 
 export default function RouteSheetPage() {
   const { currentTenant, currentUser } = useAuth();
   const plans = store.getPlans(currentTenant.id);
+
+  if (!currentUser) return null;
 
   return (
     <div className="space-y-6 pb-12">

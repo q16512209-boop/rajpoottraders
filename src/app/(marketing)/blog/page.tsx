@@ -1,66 +1,67 @@
-﻿import React from "react";
+import React from "react";
 import Link from "next/link";
 import { store } from "@/lib/db/store";
-import { ArrowRight } from "lucide-react";
+import { BookOpen, Calendar, User, ArrowRight } from "lucide-react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Installment Guides & Financing Knowledge Base | Rajpoot Traders",
+  description: "Learn how easy installment plans, hire-purchase agreements, dual guarantor verification, and Shariah-compliant markups work in Pakistan.",
+};
 
 export default function BlogIndexPage() {
   const articles = store.getArticles();
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-10">
       <div className="text-center max-w-3xl mx-auto space-y-3">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-          RAJPOOT TRADERS SEO Engine
+        <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200">
+          Knowledge Base & SEO Guides
         </span>
-        <h1 className="text-3xl sm:text-4xl font-black text-slate-900">
-          Installment Guides, Solar Financing & Consumer Rights
+        <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+          Installment Knowledge & Financial Guides
         </h1>
-        <p className="text-sm text-slate-600">
-          Authoritative articles and market insights helping Pakistani families and business owners make educated, Shariah-compliant hire-purchase decisions.
+        <p className="text-sm sm:text-base text-slate-600 font-urdu leading-relaxed">
+          پاکستان میں آسان اقساط، الیکٹرانکس فنانسنگ، اور قانونی معاہدے کی مکمل معلومات اور گائیڈز
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {articles.map((art) => (
           <article
-            key={art.slug}
-            className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-6 group"
+            key={art.id}
+            className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
           >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
                   {art.category}
                 </span>
-                <span className="text-slate-400 font-medium">{art.readTime}</span>
+                <span className="text-[11px] text-slate-400 font-medium">{art.readTime}</span>
               </div>
 
-              <h2 className="text-lg font-bold text-slate-900 group-hover:text-emerald-700 transition-colors leading-snug">
+              <h2 className="text-lg font-bold text-slate-900 line-clamp-2 hover:text-emerald-700 transition-colors">
                 <Link href={`/blog/${art.slug}`}>{art.title}</Link>
               </h2>
-
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">
-                {art.summary}
+              <p className="text-xs font-urdu font-semibold text-emerald-800 line-clamp-1">
+                {art.urduTitle}
               </p>
 
-              <div className="flex flex-wrap gap-1.5 pt-2">
-                {art.tags.map((t) => (
-                  <span
-                    key={t}
-                    className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded"
-                  >
-                    #{t}
-                  </span>
-                ))}
-              </div>
+              <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                {art.excerpt}
+              </p>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-semibold">{art.author}</span>
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{art.date}</span>
+              </div>
               <Link
                 href={`/blog/${art.slug}`}
-                className="font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
+                className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800"
               >
-                <span>Read Guide</span>
+                <span>Read Full Guide</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>

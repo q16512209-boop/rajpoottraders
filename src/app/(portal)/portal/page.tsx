@@ -33,6 +33,8 @@ export default function PortalDashboard() {
   const expenses = store.getExpenses(currentTenant.id);
   const chainVerification = store.verifyChainIntegrity();
 
+  if (!currentUser) return null;
+
   const ownerPocket = wallets.find((w) => w.type === "OWNER_POCKET")?.balance || 0;
   const counterTill = wallets.find((w) => w.type === "COUNTER_TILL")?.balance || 0;
   const fieldInTransit = wallets
@@ -309,118 +311,86 @@ export default function PortalDashboard() {
           </Link>
         </div>
 
-        {/* Mobile View: Cards */}
-        <div className="block sm:hidden space-y-3">
-          {plans.map((p) => (
-            <div key={p.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {p.planNumber}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getStatusBadgeClass(p.status)}`}>
-                  {p.status}
-                </span>
-              </div>
-              <div>
-                <strong className="text-sm text-slate-900 block">{p.customerName}</strong>
-                <span className="text-slate-600">{p.productTitle}</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Monthly Due:</span>
-                  <strong className="text-slate-900">{formatPKR(p.monthlyInstallment)}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Arrears:</span>
-                  <strong className={p.accumulatedShortArrears > 0 ? "text-rose-700" : "text-emerald-700"}>
-                    {formatPKR(p.accumulatedShortArrears)}
-                  </strong>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Link
-                  href={`/portal/plans/${p.id}`}
-                  className="flex-1 text-center py-2 bg-slate-900 text-white rounded-xl font-bold text-xs"
-                >
-                  Manage
-                </Link>
-                <Link
-                  href={`/portal/print/contract/${p.id}`}
-                  className="flex-1 text-center py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl font-bold text-xs"
-                >
-                  Stamp Paper
-                </Link>
-              </div>
+        {plans.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500 space-y-2">
+            <p className="font-bold text-slate-700">کوئی فعال قسط موجود نہیں ہے (Clean Production Slate)</p>
+            <p>آپ نیا پلان بنا سکتے ہیں یا ایکسل سے پرانا ڈیٹا امپورٹ کر سکتے ہیں۔</p>
+            <div className="pt-2 flex justify-center gap-3">
+              <Link href="/portal/plans/new" className="px-4 py-2 bg-emerald-700 text-white rounded-xl font-bold">
+                Create New Plan
+              </Link>
+              <Link href="/portal/import" className="px-4 py-2 bg-slate-800 text-white rounded-xl font-bold">
+                Import from Excel
+              </Link>
             </div>
-          ))}
-        </div>
-
-        {/* Desktop View: Table */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-extrabold text-[10px]">
-                <th className="py-3 px-4">Plan #</th>
-                <th className="py-3 px-4">Kharedar (Customer)</th>
-                <th className="py-3 px-4">Product / Serial</th>
-                <th className="py-3 px-4">Monthly Due</th>
-                <th className="py-3 px-4">Short Arrears</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {plans.map((plan) => (
-                <tr key={plan.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                    <Link href={`/portal/plans/${plan.id}`} className="hover:text-emerald-700">
-                      {plan.planNumber}
-                    </Link>
-                  </td>
-                  <td className="py-3 px-4">
-                    <strong className="text-slate-900 block">{plan.customerName}</strong>
-                    <span className="text-slate-400 font-mono text-[11px]">{formatCNIC(plan.customerCnic)}</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="font-semibold text-slate-800 block truncate max-w-[180px]">{plan.productTitle}</span>
-                    <span className="text-slate-400 font-mono text-[10px]">IMEI: {plan.imeiSerial}</span>
-                  </td>
-                  <td className="py-3 px-4 font-bold text-slate-900">
-                    {formatPKR(plan.monthlyInstallment)}
-                  </td>
-                  <td className="py-3 px-4">
-                    {plan.accumulatedShortArrears > 0 ? (
-                      <span className="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                        {formatPKR(plan.accumulatedShortArrears)}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-700 font-semibold">Rs. 0</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(plan.status)}`}>
-                      {plan.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-2">
-                    <Link
-                      href={`/portal/plans/${plan.id}`}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px]"
-                    >
-                      Manage
-                    </Link>
-                    <Link
-                      href={`/portal/print/contract/${plan.id}`}
-                      className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px]"
-                    >
-                      Legal Stamp
-                    </Link>
-                  </td>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-extrabold text-[10px]">
+                  <th className="py-3 px-4">Plan #</th>
+                  <th className="py-3 px-4">Kharedar (Customer)</th>
+                  <th className="py-3 px-4">Product / Serial</th>
+                  <th className="py-3 px-4">Monthly Due</th>
+                  <th className="py-3 px-4">Short Arrears</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {plans.map((plan) => (
+                  <tr key={plan.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                      <Link href={`/portal/plans/${plan.id}`} className="hover:text-emerald-700">
+                        {plan.planNumber}
+                      </Link>
+                    </td>
+                    <td className="py-3 px-4">
+                      <strong className="text-slate-900 block">{plan.customerName}</strong>
+                      <span className="text-slate-400 font-mono text-[11px]">{formatCNIC(plan.customerCnic)}</span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="font-semibold text-slate-800 block truncate max-w-[180px]">{plan.productTitle}</span>
+                      <span className="text-slate-400 font-mono text-[10px]">IMEI: {plan.imeiSerial}</span>
+                    </td>
+                    <td className="py-3 px-4 font-bold text-slate-900">
+                      {formatPKR(plan.monthlyInstallment)}
+                    </td>
+                    <td className="py-3 px-4">
+                      {plan.accumulatedShortArrears > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          {formatPKR(plan.accumulatedShortArrears)}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-700 font-semibold">Rs. 0</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(plan.status)}`}>
+                        {plan.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right space-x-2">
+                      <Link
+                        href={`/portal/plans/${plan.id}`}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px]"
+                      >
+                        Manage
+                      </Link>
+                      <Link
+                        href={`/portal/print/contract/${plan.id}`}
+                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[11px]"
+                      >
+                        Legal Stamp
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

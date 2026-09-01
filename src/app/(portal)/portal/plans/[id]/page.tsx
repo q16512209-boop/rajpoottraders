@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -27,6 +27,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const [payNotes, setPayNotes] = useState<string>("");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  if (!currentUser) return null;
   if (!plan) return <div className="p-8 text-center font-bold">Plan not found</div>;
 
   const handleOpenPay = (instNo: number, dueAmount: number) => {

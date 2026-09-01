@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import { store } from "@/lib/db/store";
@@ -10,6 +10,8 @@ export default function TreasuryPage() {
   const { currentTenant, currentUser } = useAuth();
   const [wallets, setWallets] = useState(() => store.getWallets(currentTenant.id));
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+
+  if (!currentUser) return null;
   const [fromWalletId, setFromWalletId] = useState("");
   const [toWalletId, setToWalletId] = useState("");
   const [transferAmount, setTransferAmount] = useState<number>(10000);

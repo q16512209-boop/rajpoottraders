@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
@@ -293,7 +293,7 @@ export default function HomePage() {
                   </Link>
                 </h3>
                 <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
-                  {art.summary}
+                  {art.excerpt}
                 </p>
               </div>
 

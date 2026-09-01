@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -10,13 +10,20 @@ import { Receipt, FileText, CheckCircle2, AlertTriangle, ShieldCheck } from "luc
 export default function CustomerPortalPage() {
   const { currentTenant, currentUser } = useAuth();
   const plans = store.getPlans(currentTenant.id);
-  // Filter for customer's plans
-  const myPlans = plans.filter((p) => p.customerName.includes("Usman") || p.customerId === currentUser.customerId);
+
+  if (!currentUser) {
+    return (
+      <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+        <p className="text-xs text-slate-500">براہ کرم پہلے لاگ اِن کریں</p>
+      </div>
+    );
+  }
+
+  const myPlans = plans.filter((p) => p.customerId === currentUser.customerId || p.customerName.includes(currentUser.name));
   const activePlan = myPlans[0] || plans[0];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-900 to-slate-900 text-white rounded-3xl p-8 shadow-xl space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-700 text-emerald-100 px-3 py-1 rounded-full">
@@ -31,7 +38,7 @@ export default function CustomerPortalPage() {
         </p>
       </div>
 
-      {activePlan && (
+      {activePlan ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
@@ -72,7 +79,6 @@ export default function CustomerPortalPage() {
             </div>
           </div>
 
-          {/* Schedule */}
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-slate-900">Your Repayment History</h3>
             <div className="space-y-2">
@@ -95,6 +101,10 @@ export default function CustomerPortalPage() {
               ))}
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-xs text-slate-500">
+          کوئی فعال اقساط پلان موجود نہیں ہے۔
         </div>
       )}
     </div>
