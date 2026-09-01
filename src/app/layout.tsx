@@ -1,7 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/context/auth-context";
 import { Analytics } from "@vercel/analytics/next";
+
+export const viewport: Viewport = {
+  themeColor: "#047857",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: "RAJPOOT TRADERS - Easy Installments, Electronics & Solar Financing",
@@ -16,6 +24,12 @@ export const metadata: Metadata = {
     "urdu installment contract"
   ],
   authors: [{ name: "Rajpoot Traders Corporate Platform" }],
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Rajpoot Traders",
+  },
   openGraph: {
     title: "RAJPOOT TRADERS - Easy Installments & Electronics Hub",
     description: "Shariah-compliant easy monthly installments with instant approval and dual guarantor trust network.",
