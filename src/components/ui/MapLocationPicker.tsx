@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { GPSLocation } from "@/lib/db/types";
 import { UrduSpeaker } from "./UrduSpeaker";
 import {
@@ -12,7 +13,22 @@ import {
   ExternalLink,
   LocateFixed,
   Compass,
+  Layers,
+  Search,
 } from "lucide-react";
+
+// Dynamic import for Leaflet map with SSR disabled
+const LeafletMapInner = dynamic(() => import("./LeafletMapInner"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-72 bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-300 animate-pulse">
+      <Compass className="w-8 h-8 text-emerald-600 animate-spin" />
+      <span className="text-xs font-bold text-slate-600 font-urdu">
+        لائیو اوپن اسٹریٹ نقشہ لوڈ ہو رہا ہے... (Loading Live Interactive Map)
+      </span>
+    </div>
+  ),
+});
 
 interface MapLocationPickerProps {
   value?: GPSLocation;
@@ -24,20 +40,21 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
   const [isDetecting, setIsDetecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [manualAddress, setManualAddress] = useState(value?.address || "");
+  const [showCoordinateInputs, setShowCoordinateInputs] = useState(false);
+
   const [currentLoc, setCurrentLoc] = useState<GPSLocation>(() => {
-    if (value) return value;
-    // Default to central Lahore Showroom coordinates
+    if (value && value.lat && value.lng) return value;
     return {
       lat: 31.5204,
       lng: 74.3587,
-      accuracy: 15,
+      accuracy: 10,
       address: "Main Commercial Boulevard, Gulberg III, Lahore",
       mapUrl: "https://www.google.com/maps?q=31.5204,74.3587",
       aiSuggestedZone: "Route-A (Gulberg / Model Town)",
     };
   });
 
-  // Pakistani major zone intelligence dictionary
+  // Pakistani major route zones
   const zoneIntelligence = [
     { name: "Route-A (Gulberg / Model Town)", lat: 31.5102, lng: 74.3441, landmark: "Liberty Chowk / Model Town Link Rd" },
     { name: "Route-B (Johar Town / Iqbal Town)", lat: 31.4697, lng: 74.2728, landmark: "Shaukat Khanum Chowk / Main Blvd" },
@@ -47,7 +64,6 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
   ];
 
   const detectAiZone = (lat: number, lng: number) => {
-    // Find closest zone by euclidean distance
     let closest = zoneIntelligence[0];
     let minDist = 999999;
     for (const z of zoneIntelligence) {
@@ -60,181 +76,228 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
     return closest;
   };
 
-  const handleDetectGPS = () => {
+  const handleMapPinSelected = (lat: number, lng: number) => {
+    const matchedZone = detectAiZone(lat, lng);
+    const updatedLoc: GPSLocation = {
+      lat,
+      lng,
+      accuracy: 8,
+      address: manualAddress || `Near ${matchedZone.landmark}, ${matchedZone.name}`,
+      mapUrl: `https://www.google.com/maps?q=${lat},${lng}`,
+      detectedAt: new Date().toISOString(),
+      aiSuggestedZone: matchedZone.name,
+    };
+    setCurrentLoc(updatedLoc);
+    onChange(updatedLoc);
+  };
+
+  const handleDetectLiveGps = () => {
+    setErrorMsg(null);
     if (!navigator.geolocation) {
-      setErrorMsg("آپ کے براؤزر میں GPS لوکیشن سپورٹ دستیاب نہیں ہے۔");
+      setErrorMsg("آپ کا براؤزر GPS کو سپورٹ نہیں کرتا۔ برائے مہربانی نقشے پر کلک کر کے پن لگائیں۔");
       return;
     }
 
     setIsDetecting(true);
-    setErrorMsg(null);
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const lat = Number(position.coords.latitude.toFixed(6));
-        const lng = Number(position.coords.longitude.toFixed(6));
-        const acc = Math.round(position.coords.accuracy);
+        const { latitude, longitude, accuracy } = position.coords;
+        const matchedZone = detectAiZone(latitude, longitude);
 
-        const aiZone = detectAiZone(lat, lng);
-        const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-
-        const updated: GPSLocation = {
-          lat,
-          lng,
-          accuracy: acc,
-          address: manualAddress || `GPS Verified Location near ${aiZone.landmark}`,
-          mapUrl,
+        const newLoc: GPSLocation = {
+          lat: latitude,
+          lng: longitude,
+          accuracy: Math.round(accuracy),
+          address: manualAddress || `Live GPS Captured (Near ${matchedZone.landmark})`,
+          mapUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
           detectedAt: new Date().toISOString(),
-          aiSuggestedZone: aiZone.name,
+          aiSuggestedZone: matchedZone.name,
         };
 
-        setCurrentLoc(updated);
-        onChange(updated);
+        setCurrentLoc(newLoc);
+        onChange(newLoc);
         setIsDetecting(false);
       },
-      (err) => {
+      (error) => {
         setIsDetecting(false);
-        // Fallback to simulated high precision for test/demo environments
-        const fallback = zoneIntelligence[0];
-        const updated: GPSLocation = {
-          lat: fallback.lat,
-          lng: fallback.lng,
-          accuracy: 10,
-          address: manualAddress || `Pin Location near ${fallback.landmark}`,
-          mapUrl: `https://www.google.com/maps?q=${fallback.lat},${fallback.lng}`,
-          detectedAt: new Date().toISOString(),
-          aiSuggestedZone: fallback.name,
-        };
-        setCurrentLoc(updated);
-        onChange(updated);
-        setErrorMsg("GPS اجازت نہیں ملی، ڈیفالٹ برانچ پن منتخب کیا گیا ہے۔");
+        setErrorMsg("براؤزر نے GPS لوکیشن کی اجازت نہیں دی۔ برائے مہربانی نیچے لائیو نقشے پر کلک کر کے پن لگائیں۔");
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const handleSelectZonePreset = (zone: typeof zoneIntelligence[0]) => {
-    const updated: GPSLocation = {
+  const handleApplyZonePreset = (zone: (typeof zoneIntelligence)[0]) => {
+    const newLoc: GPSLocation = {
       lat: zone.lat,
       lng: zone.lng,
-      accuracy: 10,
-      address: manualAddress || `Area Pin: ${zone.landmark}`,
+      accuracy: 25,
+      address: manualAddress || `Zone Hub: ${zone.landmark}`,
       mapUrl: `https://www.google.com/maps?q=${zone.lat},${zone.lng}`,
       detectedAt: new Date().toISOString(),
       aiSuggestedZone: zone.name,
     };
-    setCurrentLoc(updated);
-    onChange(updated);
+    setCurrentLoc(newLoc);
+    onChange(newLoc);
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 text-white space-y-4 shadow-xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-        <div className="space-y-0.5">
+    <div className="bg-slate-50 border-2 border-emerald-500/30 rounded-3xl p-5 sm:p-6 space-y-5 shadow-sm">
+      {/* Header with Title & Speaker */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-black tracking-widest bg-emerald-700/80 text-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-300" />
-              AI & GPS Pin Location Assistant
+            <span className="p-1.5 bg-emerald-700 text-white rounded-xl shadow-sm">
+              <MapPin className="w-4 h-4" />
             </span>
-            <UrduSpeaker customText="گاہک کے گھر یا دکان کی اصل جی پی ایس پن لوکیشن حاصل کریں۔" size="sm" />
+            <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+              <span>Interactive GPS Map Pin Assistant</span>
+              <span className="text-[11px] font-normal text-emerald-800 font-urdu">(لائیو انٹرایکٹو نقشہ پن)</span>
+            </h3>
           </div>
-          <h3 className="text-sm sm:text-base font-black text-white">
-            Customer Delivery & Recovery GPS Pin
-          </h3>
-          <p className="text-xs text-slate-400 font-urdu">
-            فیلڈ ریکوری افسر کے لیے گاہک کی درست ترین لوکیشن محفوظ کریں
+          <p className="text-xs text-slate-500 font-urdu">
+            گاہک کے گھر یا دکان کے مقام پر کلک کریں یا لائیو GPS حاصل کریں
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleDetectGPS}
-          disabled={isDetecting}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-xs rounded-xl shadow-lg transition-all self-start sm:self-auto disabled:opacity-50"
-        >
-          <LocateFixed className={`w-4 h-4 text-amber-300 ${isDetecting ? "animate-spin" : ""}`} />
-          <span>{isDetecting ? "AI لوکیشن ٹریس ہو رہی ہے..." : "حاصل کریں GPS لائیو لوکیشن"}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <UrduSpeaker customText="نقشے پر جہاں گاہک کا گھر ہے وہاں کلک کریں یا GPS لائیو بٹن دبائیں۔" size="sm" showLabel />
+          <button
+            type="button"
+            onClick={handleDetectLiveGps}
+            disabled={isDetecting}
+            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-bold rounded-xl shadow transition-all disabled:opacity-50"
+          >
+            <LocateFixed className={`w-3.5 h-3.5 ${isDetecting ? "animate-spin" : ""}`} />
+            <span>{isDetecting ? "حاصل ہو رہا ہے..." : "حاصل کریں لائیو GPS"}</span>
+          </button>
+        </div>
       </div>
 
       {errorMsg && (
-        <div className="p-3 bg-rose-950/80 border border-rose-800 rounded-xl text-rose-300 text-xs font-urdu flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-urdu flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Interactive Coordinates Card & Quick Presets */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
-        {/* Left: GPS Specs */}
-        <div className="lg:col-span-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400">Captured Coordinates:</span>
-            <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full font-mono text-[10px] font-bold">
-              ✓ Verified High Precision
-            </span>
-          </div>
+      {/* Interactive Visual Leaflet Map Container */}
+      <div className="w-full h-72 sm:h-80 rounded-2xl overflow-hidden relative shadow-md border border-slate-300">
+        <LeafletMapInner
+          lat={currentLoc.lat}
+          lng={currentLoc.lng}
+          address={currentLoc.address}
+          zone={currentLoc.aiSuggestedZone}
+          onLocationSelect={handleMapPinSelected}
+        />
 
-          <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-            <div className="p-2.5 bg-slate-900 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px]">Latitude (عرض بلد)</span>
-              <strong className="text-white text-sm">{currentLoc.lat}</strong>
-            </div>
-            <div className="p-2.5 bg-slate-900 rounded-xl border border-slate-800">
-              <span className="text-slate-500 block text-[10px]">Longitude (طول بلد)</span>
-              <strong className="text-white text-sm">{currentLoc.lng}</strong>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-slate-400 text-[11px] block">AI Suggested Delivery Zone:</span>
-            <div className="p-2 bg-emerald-950/60 border border-emerald-800/80 rounded-xl text-emerald-300 font-bold flex items-center gap-2">
-              <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{currentLoc.aiSuggestedZone || "Route-A (Central Lahore)"}</span>
-            </div>
-          </div>
-
-          <div className="pt-1 flex items-center justify-between">
-            <a
-              href={`https://www.google.com/maps?q=${currentLoc.lat},${currentLoc.lng}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 underline"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Open in Google Maps (براہ راست نقشہ کھولیں)</span>
-            </a>
-          </div>
-        </div>
-
-        {/* Right: Quick Pakistani Zone Presets */}
-        <div className="lg:col-span-6 space-y-2">
-          <span className="text-[11px] font-bold text-slate-400 block font-urdu">
-            یا فوری علاقہ پن منتخب کریں (AI Fast Presets):
-          </span>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-            {zoneIntelligence.map((z, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSelectZonePreset(z)}
-                className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all text-xs ${
-                  currentLoc.aiSuggestedZone === z.name
-                    ? "bg-emerald-950/90 border-emerald-500 text-emerald-200"
-                    : "bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800"
-                }`}
-              >
-                <div>
-                  <strong className="block text-[11px] text-white">{z.name}</strong>
-                  <span className="text-[10px] text-slate-400">{z.landmark}</span>
-                </div>
-                <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              </button>
-            ))}
-          </div>
+        {/* Floating Instruction Badge */}
+        <div className="absolute top-2 right-2 z-[400] bg-slate-950/80 backdrop-blur-sm text-white px-3 py-1 rounded-full text-[10px] font-bold border border-white/20 pointer-events-none flex items-center gap-1.5 shadow">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>Click on Map / Drag Pin to Relocate</span>
         </div>
       </div>
+
+      {/* Live Detected Coordinates & Zone Card */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Latitude & Longitude (کوآرڈینیٹس)
+          </span>
+          <strong className="text-emerald-800 font-mono font-bold block text-sm">
+            {currentLoc.lat.toFixed(6)}, {currentLoc.lng.toFixed(6)}
+          </strong>
+          <span className="text-[10px] text-slate-400 block font-mono">
+            GPS Accuracy: ±{currentLoc.accuracy || 10}m
+          </span>
+        </div>
+
+        <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            AI Recommended Route Zone
+          </span>
+          <strong className="text-purple-900 font-bold block text-xs truncate">
+            {currentLoc.aiSuggestedZone || "Route-A (Gulberg / Model Town)"}
+          </strong>
+          <span className="text-[10px] text-emerald-700 font-urdu block">
+            خودکار روٹ شیٹ اسائنمنٹ
+          </span>
+        </div>
+
+        <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            Google Maps Live Link
+          </span>
+          <a
+            href={currentLoc.mapUrl || `https://www.google.com/maps?q=${currentLoc.lat},${currentLoc.lng}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-bold text-xs pt-1"
+          >
+            <span>Open in Google Maps</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+
+      {/* Quick Area Presets */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+            <Compass className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Fast Area Presets (فوری علاقہ زون جمپ):</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowCoordinateInputs(!showCoordinateInputs)}
+            className="text-[11px] text-slate-500 hover:text-slate-800 underline font-medium"
+          >
+            {showCoordinateInputs ? "Hide Coordinate Inputs" : "Manual Lat/Lng Inputs"}
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {zoneIntelligence.map((zone) => (
+            <button
+              key={zone.name}
+              type="button"
+              onClick={() => handleApplyZonePreset(zone)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                currentLoc.aiSuggestedZone === zone.name
+                  ? "bg-emerald-700 text-white border-emerald-800 shadow-sm"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              {zone.name.split(" (")[0]} ({zone.landmark.split(" / ")[0]})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Manual Lat/Lng Fallback Drawer */}
+      {showCoordinateInputs && (
+        <div className="p-4 bg-white rounded-2xl border border-slate-200 grid grid-cols-2 gap-3 text-xs animate-in fade-in duration-200">
+          <div>
+            <label className="block text-slate-600 font-bold mb-1">Manual Latitude</label>
+            <input
+              type="number"
+              step="0.000001"
+              value={currentLoc.lat}
+              onChange={(e) => handleMapPinSelected(Number(e.target.value), currentLoc.lng)}
+              className="w-full p-2.5 bg-slate-50 border rounded-xl font-mono text-xs outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-600 font-bold mb-1">Manual Longitude</label>
+            <input
+              type="number"
+              step="0.000001"
+              value={currentLoc.lng}
+              onChange={(e) => handleMapPinSelected(currentLoc.lat, Number(e.target.value))}
+              className="w-full p-2.5 bg-slate-50 border rounded-xl font-mono text-xs outline-none"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
