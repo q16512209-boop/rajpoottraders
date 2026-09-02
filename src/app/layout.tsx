@@ -12,6 +12,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://rajpoottraders.vercel.app"),
   title: "RAJPOOT TRADERS - Easy Installments, Electronics & Solar Financing",
   description: "Official multi-tenant installment management and treasury platform for Rajpoot Traders. Easy monthly installments for smartphones, inverter ACs, solar packages, and motorbikes with transparent contracts.",
   keywords: [
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "RAJPOOT TRADERS - Easy Installments & Electronics Hub",
     description: "Shariah-compliant easy monthly installments with instant approval and dual guarantor trust network.",
-    url: "https://rajpoottraders.com",
+    url: "https://rajpoottraders.vercel.app",
     siteName: "Rajpoot Traders",
     locale: "en_PK",
     type: "website",
