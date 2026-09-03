@@ -24,6 +24,9 @@ import {
   ISettlementRecord,
   IPTPLog,
   OfflineCollectionItem,
+  LegacyCustomerInput,
+  Guarantor,
+  InstallmentScheduleItem,
 } from "./types";
 import { ChainedLedgerBlock, computeBlockHash, verifyLedgerChain, LedgerEntryPayload } from "../crypto/hash-chain";
 import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
@@ -1080,6 +1083,243 @@ class AppStore {
       encryptedPayload,
       unencryptedSnapshot: snapshot,
     };
+  }
+
+  // --- Khata Edit, Correction & Transfer for Owners / Super Admin ---
+  correctInstallmentPayment(params: {
+    planId: string;
+    installmentNo: number;
+    newAmountPaid: number;
+    newStatus: "PAID" | "SHORT_PAID" | "PENDING" | "OVERDUE";
+    reason: string;
+    editorUser: User;
+  }): { plan: InstallmentPlan; scheduleItem: InstallmentScheduleItem } {
+    if (params.editorUser.role !== "SUPER_ADMIN" && params.editorUser.role !== "OWNER") {
+      throw new Error("غیر مجاز: کھاتہ میں تصحیح یا تبدیلی کا اختیار صرف دکان کے مالک (Owner) یا سپر ایڈمن کے پاس ہے۔");
+    }
+
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Installment plan not found");
+
+    const item = plan.schedule.find((s) => s.installmentNo === params.installmentNo);
+    if (!item) throw new Error(`Installment #${params.installmentNo} not found`);
+
+    const prevAmount = item.amountPaid || 0;
+    const diff = params.newAmountPaid - prevAmount;
+
+    item.amountPaid = params.newAmountPaid;
+    item.status = params.newStatus;
+    item.notes = `[Khata Correction by ${params.editorUser.name} (${params.editorUser.role})]: ${params.reason} (Previous: Rs. ${prevAmount.toLocaleString()})`;
+
+    // Recalculate plan arrears
+    let accumulatedArrears = 0;
+    for (const s of plan.schedule) {
+      if (s.status === "SHORT_PAID") {
+        accumulatedArrears += Math.max(0, s.totalDue - s.amountPaid);
+      } else if (s.status === "OVERDUE") {
+        accumulatedArrears += s.totalDue;
+      }
+    }
+    plan.accumulatedShortArrears = accumulatedArrears;
+
+    // Append Blockchain Audit Log
+    this.appendLedgerBlock({
+      id: `tx_corr_${Date.now()}`,
+      tenantId: plan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: Math.abs(diff),
+      planId: plan.id,
+      customerId: plan.customerId,
+      actorId: params.editorUser.id,
+      notes: `Khata Correction for ${plan.customerName} (${plan.planNumber}) Inst #${params.installmentNo}: Changed paid amount from Rs. ${prevAmount.toLocaleString()} to Rs. ${params.newAmountPaid.toLocaleString()}. Reason: ${params.reason}`,
+    });
+
+    return { plan, scheduleItem: item };
+  }
+
+  transferKhataPayment(params: {
+    fromPlanId: string;
+    toPlanId: string;
+    amount: number;
+    reason: string;
+    editorUser: User;
+  }): { fromPlan: InstallmentPlan; toPlan: InstallmentPlan } {
+    if (params.editorUser.role !== "SUPER_ADMIN" && params.editorUser.role !== "OWNER") {
+      throw new Error("غیر مجاز: کھاتہ ٹرانسفر کا اختیار صرف دکان کے مالک (Owner) یا سپر ایڈمن کے پاس ہے۔");
+    }
+
+    const fromPlan = this.plans.find((p) => p.id === params.fromPlanId);
+    const toPlan = this.plans.find((p) => p.id === params.toPlanId);
+
+    if (!fromPlan) throw new Error("Source Plan (#1) not found");
+    if (!toPlan) throw new Error("Destination Target Plan (#2) not found");
+
+    // Deduct from fromPlan
+    const fromInst = fromPlan.schedule.slice().reverse().find((s) => s.amountPaid >= params.amount) || fromPlan.schedule[0];
+    fromInst.amountPaid = Math.max(0, fromInst.amountPaid - params.amount);
+    if (fromInst.amountPaid === 0) {
+      fromInst.status = "PENDING";
+    } else {
+      fromInst.status = "SHORT_PAID";
+    }
+    fromInst.notes = `[Payment Transferred Out to ${toPlan.planNumber} by ${params.editorUser.name}]: ${params.reason}`;
+
+    // Credit to toPlan
+    const toInst = toPlan.schedule.find((s) => s.status !== "PAID") || toPlan.schedule[0];
+    toInst.amountPaid = (toInst.amountPaid || 0) + params.amount;
+    if (toInst.amountPaid >= toInst.totalDue) {
+      toInst.status = "PAID";
+      toInst.paidDate = new Date().toISOString();
+    } else {
+      toInst.status = "SHORT_PAID";
+    }
+    toInst.notes = `[Payment Transferred In from ${fromPlan.planNumber} by ${params.editorUser.name}]: ${params.reason}`;
+
+    // Append Blockchain Audit Log
+    this.appendLedgerBlock({
+      id: `tx_xfer_${Date.now()}`,
+      tenantId: fromPlan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: params.amount,
+      planId: toPlan.id,
+      customerId: toPlan.customerId,
+      actorId: params.editorUser.id,
+      notes: `Khata Mistake Rectification: Transferred Rs. ${params.amount.toLocaleString()} from ${fromPlan.customerName} (${fromPlan.planNumber}) to ${toPlan.customerName} (${toPlan.planNumber}). Reason: ${params.reason}`,
+    });
+
+    return { fromPlan, toPlan };
+  }
+
+  // --- Fast Manual Legacy / Old Customer Onboarding ---
+  createLegacyKhataCustomer(data: LegacyCustomerInput): { customer: Customer; plan: InstallmentPlan } {
+    const customerId = `cust_leg_${Date.now()}`;
+    const guarantors: Guarantor[] = [
+      {
+        id: `g1_${Date.now()}`,
+        fullName: data.guarantor1Name,
+        fatherName: "N/A",
+        cnic: data.guarantor1Cnic,
+        phone: data.guarantor1Phone,
+        relation: data.guarantor1Relation || "Friend / Relative",
+        address: data.address,
+        workplace: "Local Market",
+        landmark: data.landmark || data.zoneArea,
+      },
+    ];
+
+    if (data.guarantor2Name) {
+      guarantors.push({
+        id: `g2_${Date.now()}`,
+        fullName: data.guarantor2Name,
+        fatherName: "N/A",
+        cnic: data.guarantor2Cnic || "35201-0000000-0",
+        phone: data.guarantor2Phone || data.phone,
+        relation: data.guarantor2Relation || "Neighbor",
+        address: data.address,
+        workplace: "Business",
+        landmark: data.zoneArea,
+      });
+    }
+
+    const customer: Customer = {
+      id: customerId,
+      tenantId: data.tenantId,
+      fullName: data.fullName,
+      fatherName: data.fatherName,
+      cnic: data.cnic,
+      phone: data.phone,
+      secondaryPhone: data.secondaryPhone,
+      address: data.address,
+      landmark: data.landmark || data.zoneArea,
+      city: data.city || "Lahore",
+      zoneArea: data.zoneArea || "Route-A (Gulberg / Model Town)",
+      guarantors,
+      riskScore: 20,
+      isDefaulter: false,
+      createdAt: data.startDate || new Date().toISOString(),
+    };
+    this.customers.unshift(customer);
+
+    // Build schedule
+    const schedule: InstallmentScheduleItem[] = [];
+    const baseStartDate = data.startDate ? new Date(data.startDate) : new Date();
+
+    for (let i = 1; i <= data.durationMonths; i++) {
+      const dueDateObj = new Date(baseStartDate);
+      dueDateObj.setMonth(dueDateObj.getMonth() + i);
+      const dueDateStr = dueDateObj.toISOString().split("T")[0];
+
+      const isPastPaid = i <= data.monthsAlreadyPaid;
+      const isNextDue = !isPastPaid && i === data.monthsAlreadyPaid + 1;
+      const shortArrears = isNextDue ? (data.pendingShortArrears || 0) : 0;
+      const totalDue = data.monthlyInstallment + shortArrears;
+
+      schedule.push({
+        installmentNo: i,
+        dueDate: isNextDue && data.nextDueDate ? data.nextDueDate : dueDateStr,
+        principalDue: data.monthlyInstallment,
+        lateFee: 0,
+        shortArrears,
+        totalDue,
+        amountPaid: isPastPaid ? data.monthlyInstallment : 0,
+        paidDate: isPastPaid ? dueDateStr : undefined,
+        status: isPastPaid ? "PAID" : "PENDING",
+        collectedBy: isPastPaid ? "Historical Ledger Register" : undefined,
+        notes: isPastPaid ? "Legacy Installment Paid in Past" : undefined,
+      });
+    }
+
+    const planId = `plan_leg_${Date.now()}`;
+    const planNumber = `RT-LEG-${Date.now().toString().slice(-6)}`;
+    const serialNo = data.imeiSerial || `SN-LEG-${Date.now().toString().slice(-6)}`;
+
+    const plan: InstallmentPlan = {
+      id: planId,
+      planNumber,
+      tenantId: data.tenantId,
+      customerId,
+      customerName: data.fullName,
+      customerCnic: data.cnic,
+      customerPhone: data.phone,
+      productId: `prod_leg_${Date.now()}`,
+      productTitle: data.productTitle,
+      imeiSerial: serialNo,
+      cashPrice: Math.round(data.totalFinanced * 0.75),
+      downPayment: data.downPayment,
+      markupRatePct: 25,
+      totalMarkup: Math.round(data.totalFinanced * 0.25),
+      totalFinanced: data.totalFinanced,
+      durationMonths: data.durationMonths,
+      monthlyInstallment: data.monthlyInstallment,
+      accumulatedShortArrears: data.pendingShortArrears || 0,
+      status: data.monthsAlreadyPaid >= data.durationMonths ? "COMPLETED" : "ACTIVE",
+      startDate: data.startDate || new Date().toISOString(),
+      endDate: schedule[schedule.length - 1]?.dueDate || new Date().toISOString(),
+      schedule,
+      guarantorIds: guarantors.map((g) => g.id),
+      areaZone: data.zoneArea,
+      contractVerified: true,
+      tamperProofHash: `LEG_HASH_${Date.now()}`,
+    };
+
+    this.plans.unshift(plan);
+
+    // Append Audit Block
+    this.appendLedgerBlock({
+      id: `tx_leg_${planId}`,
+      tenantId: data.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "PAYMENT_IN",
+      amount: (data.totalPaidInPast || 0) + (data.downPayment || 0),
+      planId,
+      customerId,
+      actorId: data.createdBy,
+      notes: `Legacy Customer Khata Initialized for ${data.fullName} (${planNumber}) - ${data.productTitle}. ${data.monthsAlreadyPaid}/${data.durationMonths} installments pre-settled from past registers.`,
+    });
+
+    return { customer, plan };
   }
 }
 

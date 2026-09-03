@@ -302,17 +302,22 @@ export default function UsersManagementPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Role Permission *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Role Permission (عہدہ و اختیارات) *</label>
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-900"
                   >
-                    {isSuperAdmin && <option value="SUPER_ADMIN">Tier 0: Super Admin (Main Boss)</option>}
-                    {isSuperAdmin && <option value="OWNER">Tier 1: Shop Owner (Treasury & Pocket)</option>}
-                    <option value="BRANCH_MANAGER">Tier 2: Branch Manager (Counter & KYC)</option>
-                    <option value="FIELD_RECOVERY">Tier 3: Field Recovery Officer (Routes)</option>
-                    <option value="CUSTOMER">Tier 4: Customer / Kharedar</option>
+                    {isSuperAdmin && (
+                      <option value="OWNER">Tier 1: Shop Owner / Franchise Partner (دکان کا مالک)</option>
+                    )}
+                    {isOwner && (
+                      <>
+                        <option value="BRANCH_MANAGER">Tier 2: Salesman / Branch Manager (سیلز مین و کاؤنٹر)</option>
+                        <option value="FIELD_RECOVERY">Tier 3: Field Recovery Officer (موٹر سائیکل ریکوری مین)</option>
+                        <option value="CUSTOMER">Tier 4: Customer / Kharedar (سیلف سروس گاہک)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

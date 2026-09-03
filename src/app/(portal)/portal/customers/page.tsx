@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -44,13 +44,23 @@ export default function CustomersPage() {
           </p>
         </div>
 
-        <Link
-          href="/portal/customers/new"
-          className="flex items-center gap-2 px-5 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
-        >
-          <UserPlus className="w-4 h-4 text-amber-300" />
-          <span>Register New Customer & Zamin</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/portal/customers/legacy-entry"
+            className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow transition-all border border-amber-400"
+          >
+            <UserCheck className="w-4 h-4 text-slate-950" />
+            <span>پرانے کسٹمر کا کھاتہ درج کریں (Old Khata Form)</span>
+          </Link>
+
+          <Link
+            href="/portal/customers/new"
+            className="flex items-center gap-2 px-4 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
+          >
+            <UserPlus className="w-4 h-4 text-amber-300" />
+            <span>نیا کسٹمر رجسٹر کریں (New Customer)</span>
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filter */}

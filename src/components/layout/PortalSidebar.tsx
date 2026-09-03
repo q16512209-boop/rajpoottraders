@@ -79,7 +79,8 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
       title: "Operations & KYC (Tier 2)",
       links: [
         { href: "/portal/customers", label: "KYC Vault & Defaulter Radar", icon: Users, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/customers/new", label: "Register Customer & Zamin", icon: UserCheck, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
+        { href: "/portal/customers/legacy-entry", label: "Fast Old Khata Form (پرانا کھاتہ)", icon: UserCheck, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
+        { href: "/portal/customers/new", label: "Register Customer & Zamin", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
         { href: "/portal/plans", label: "Installment Plans & Arrears", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
         { href: "/portal/plans/new", label: "Create Hire-Purchase Plan", icon: CreditCard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
       ],

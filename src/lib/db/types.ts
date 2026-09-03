@@ -272,3 +272,36 @@ export interface ArticlePost {
   contentHtml: string;
   keywords: string[];
 }
+
+export interface LegacyCustomerInput {
+  tenantId: string;
+  fullName: string;
+  fatherName: string;
+  cnic: string;
+  phone: string;
+  secondaryPhone?: string;
+  address: string;
+  landmark?: string;
+  city: string;
+  zoneArea: string;
+  guarantor1Name: string;
+  guarantor1Phone: string;
+  guarantor1Cnic: string;
+  guarantor1Relation: string;
+  guarantor2Name?: string;
+  guarantor2Phone?: string;
+  guarantor2Cnic?: string;
+  guarantor2Relation?: string;
+  productTitle: string;
+  imeiSerial?: string;
+  totalFinanced: number;
+  downPayment: number;
+  durationMonths: number;
+  monthlyInstallment: number;
+  monthsAlreadyPaid: number;
+  totalPaidInPast: number;
+  pendingShortArrears: number;
+  startDate?: string;
+  nextDueDate: string;
+  createdBy: string;
+}
