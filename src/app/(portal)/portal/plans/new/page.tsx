@@ -3,307 +3,356 @@
 import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { store } from "@/lib/db/store";
-import { calculateInstallmentBreakdown } from "@/lib/calculations";
 import { formatPKR, formatCNIC } from "@/lib/formatters";
 import { useAuth } from "@/lib/context/auth-context";
-import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
-import { GPSLocation } from "@/lib/db/types";
+import { GPSLocation, InstallmentFrequency } from "@/lib/db/types";
 import {
   CreditCard,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  MapPin,
-  Sparkles,
-  Smartphone,
   Calendar,
   DollarSign,
+  Package,
+  UserCheck,
+  Tag,
 } from "lucide-react";
 
 function NewPlanForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currentTenant } = useAuth();
+  const { currentTenant, currentUser } = useAuth();
 
   const customers = store.getCustomers(currentTenant.id);
   const products = store.getProducts(currentTenant.id);
 
   const initialCustId = searchParams.get("cust") || customers[0]?.id || "";
-  const initialPrice = Number(searchParams.get("price")) || (products[0]?.cashPrice || 165000);
-  const initialDown = Number(searchParams.get("down")) || Math.round(initialPrice * 0.25);
-  const initialMonths = Number(searchParams.get("months")) || 12;
+  const initialProduct = products[0];
 
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialCustId);
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || "");
-  const [imeiSerial, setImeiSerial] = useState(products[0]?.imeiSerialList[0] || "IMEI-2026-9901");
-  const [cashPrice, setCashPrice] = useState<number>(initialPrice);
-  const [downPayment, setDownPayment] = useState<number>(initialDown);
-  const [durationMonths, setDurationMonths] = useState<number>(initialMonths);
-  const [markupRate, setMarkupRate] = useState<number>(24);
+  const [selectedProductId, setSelectedProductId] = useState(initialProduct?.id || "");
+  const [khataNumber, setKhataNumber] = useState("");
+  const [salesmanName, setSalesmanName] = useState(currentUser?.name || "ضہیم (Zaheem)");
+
+  const [productTitle, setProductTitle] = useState(initialProduct?.title || "استری (Heavy Weight Electric Iron)");
+  const [imeiSerial, setImeiSerial] = useState(initialProduct?.imeiSerialList[0] || "SN-IST-0001");
+  const [cashPrice, setCashPrice] = useState<number>(initialProduct?.cashPrice || 5800);
+  const [totalFinanced, setTotalFinanced] = useState<number>(initialProduct?.installmentPrice || 6800);
+  const [downPayment, setDownPayment] = useState<number>(initialProduct?.defaultDownPayment || 500);
+
+  // Frequency & Schedule Day
+  const [installmentFrequency, setInstallmentFrequency] = useState<InstallmentFrequency>(initialProduct?.defaultFrequency || "WEEKLY");
+  const [collectionDayName, setCollectionDayName] = useState("ہفتہ (Saturday)");
+  const [collectionIntervalDays, setCollectionIntervalDays] = useState<number>(7);
+  const [monthlyInstallment, setMonthlyInstallment] = useState<number>(initialProduct?.defaultInstallmentAmount || 500);
+  const [totalInstallmentsCount, setTotalInstallmentsCount] = useState<number>(initialProduct?.defaultTotalInstallments || 13);
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
-  const [gpsLocation, setGpsLocation] = useState<GPSLocation | undefined>(
-    selectedCustomer?.gpsLocation || undefined
-  );
-
-  const breakdown = calculateInstallmentBreakdown(cashPrice, downPayment, durationMonths, markupRate);
 
   const handleProductChange = (prodId: string) => {
+    setSelectedProductId(prodId);
     const prod = products.find((p) => p.id === prodId);
     if (prod) {
-      setSelectedProductId(prod.id);
+      setProductTitle(prod.title);
       setCashPrice(prod.cashPrice);
-      setDownPayment(Math.round(prod.cashPrice * 0.25));
-      setImeiSerial(prod.imeiSerialList[0] || `IMEI-${Date.now()}`);
-    }
-  };
-
-  const handleCustomerChange = (custId: string) => {
-    setSelectedCustomerId(custId);
-    const c = customers.find((cust) => cust.id === custId);
-    if (c && c.gpsLocation) {
-      setGpsLocation(c.gpsLocation);
+      setTotalFinanced(prod.installmentPrice || prod.cashPrice * 1.2);
+      setDownPayment(prod.defaultDownPayment || 500);
+      setMonthlyInstallment(prod.defaultInstallmentAmount || 500);
+      setInstallmentFrequency(prod.defaultFrequency || "WEEKLY");
+      setTotalInstallmentsCount(prod.defaultTotalInstallments || 13);
+      setCollectionIntervalDays(prod.defaultFrequency === "WEEKLY" ? 7 : (prod.defaultFrequency === "TEN_DAYS" ? 10 : 30));
+      setImeiSerial(prod.imeiSerialList[0] || `SN-${Date.now().toString().slice(-6)}`);
     }
   };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     const customer = customers.find((c) => c.id === selectedCustomerId);
-    const product = products.find((p) => p.id === selectedProductId);
 
-    if (!customer || !product) {
-      alert("Please select customer and product.");
+    if (!customer) {
+      alert("براہ کرم خریدار / گاہک منتخب کریں۔");
       return;
     }
 
     const schedule = [];
-    const startDate = new Date();
-    for (let i = 1; i <= durationMonths; i++) {
-      const dueDate = new Date(startDate);
-      dueDate.setMonth(startDate.getMonth() + i);
+    const baseDate = new Date(startDate);
+    const interval = collectionIntervalDays || (installmentFrequency === "WEEKLY" ? 7 : (installmentFrequency === "TEN_DAYS" ? 10 : 30));
+
+    for (let i = 1; i <= totalInstallmentsCount; i++) {
+      const d = new Date(baseDate);
+      if (installmentFrequency === "WEEKLY" || installmentFrequency === "TEN_DAYS" || installmentFrequency === "FIFTEEN_DAYS") {
+        d.setDate(d.getDate() + (i * interval));
+      } else {
+        d.setMonth(d.getMonth() + i);
+      }
+
       schedule.push({
         installmentNo: i,
-        dueDate: dueDate.toISOString(),
-        principalDue: breakdown.monthlyInstallment,
+        dueDate: d.toISOString().split("T")[0],
+        principalDue: monthlyInstallment,
         lateFee: 0,
         shortArrears: 0,
-        totalDue: breakdown.monthlyInstallment,
+        totalDue: monthlyInstallment,
         amountPaid: 0,
         status: "PENDING" as const,
       });
     }
 
-    const newPlan = store.createPlan({
+    const plan = store.createPlan({
       tenantId: currentTenant.id,
+      khataNumber: khataNumber || undefined,
       customerId: customer.id,
       customerName: customer.fullName,
       customerCnic: customer.cnic,
       customerPhone: customer.phone,
-      productId: product.id,
-      productTitle: product.title,
+      salesmanName,
+      productId: selectedProductId || `prod_${Date.now()}`,
+      productTitle,
       imeiSerial,
       cashPrice,
       downPayment,
-      markupRatePct: markupRate,
-      totalMarkup: breakdown.totalMarkup,
-      totalFinanced: breakdown.totalPayable,
-      durationMonths,
-      monthlyInstallment: breakdown.monthlyInstallment,
+      markupRatePct: Math.round(((totalFinanced - cashPrice) / cashPrice) * 100) || 15,
+      totalMarkup: Math.max(0, totalFinanced - cashPrice),
+      totalFinanced,
+      durationMonths: totalInstallmentsCount,
+      totalInstallmentsCount,
+      installmentFrequency,
+      collectionIntervalDays: interval,
+      collectionDayName,
+      monthlyInstallment,
       accumulatedShortArrears: 0,
       status: "ACTIVE",
-      startDate: new Date().toISOString(),
-      endDate: schedule[schedule.length - 1].dueDate,
+      startDate,
+      endDate: schedule[schedule.length - 1]?.dueDate || startDate,
       schedule,
       guarantorIds: customer.guarantors.map((g) => g.id),
-      recoveryOfficerId: "usr_rec_bilal",
-      areaZone: gpsLocation?.aiSuggestedZone || customer.zoneArea,
-      gpsLocation: gpsLocation || customer.gpsLocation,
+      areaZone: customer.zoneArea,
       contractVerified: true,
     });
 
-    router.push(`/portal/plans/${newPlan.id}`);
+    router.push(`/portal/plans/${plan.id}`);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-            Installment Origination
-          </span>
-          <UrduSpeaker guideKey="NEW_PLAN" size="sm" showLabel />
+    <div className="space-y-6 pb-20 max-w-5xl mx-auto">
+      {/* Top Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-600 text-emerald-50 px-3 py-1 rounded-full border border-emerald-400/30">
+              New Installment Contract
+            </span>
+            <UrduSpeaker customText="نیا قسط پلان تیار کریں۔ پروڈکٹ منتخب کریں اور ہفتہ وار یا ماہانہ شیڈول سیٹ کریں۔" size="sm" showLabel />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+            نیا اقساط پلان تیار کریں (Create Installment Plan)
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
+            راجپوت ٹریڈرز چنیوٹ • خریدار، اشیاء، ایڈوانس، قسط کی رقم اور ہفتہ وار شیڈول کا اندراج
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
-          Create Hire-Purchase Installment Plan
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 font-urdu">
-          آسان اقساط کا نیا معاہدہ، IMEI مختص کرنا اور AI ریکوری پن لوکیشن
-        </p>
       </div>
 
-      <form onSubmit={handleCreate} className="space-y-8">
-        {/* Step 1: Customer Selection */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-base font-bold text-slate-900">
-              1. Select Verified Kharedar (کسٹمر منتخب کریں)
+      <form onSubmit={handleCreate} className="space-y-6">
+        {/* Section 1: Customer & Salesman */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
+          <div className="border-b pb-3 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-emerald-700" />
+            <h2 className="text-base font-black text-slate-900 font-urdu">
+              1. خریدار کا انتخاب اور سیلز مین (Customer & Salesman)
             </h2>
-            <button
-              type="button"
-              onClick={() => router.push("/portal/customers/new")}
-              className="text-xs font-bold text-emerald-700 hover:underline"
-            >
-              + Add New Customer
-            </button>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Registered Customer List
-            </label>
-            <select
-              value={selectedCustomerId}
-              onChange={(e) => handleCustomerChange(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
-            >
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.fullName} — CNIC: {formatCNIC(c.cnic)} — Phone: {c.phone} ({c.zoneArea})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Step 2: Product & Serial Allocation */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-            2. Product Selection & IMEI Allocation (پروڈکٹ و سیریل نمبر)
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Select Product</label>
+              <label className="block font-bold text-slate-700 mb-1">Select Customer (خریدار منتخب کریں) *</label>
               <select
-                value={selectedProductId}
-                onChange={(e) => handleProductChange(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-emerald-600 font-urdu"
               >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} — {formatPKR(p.cashPrice)}
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.fullName} ({c.phone}) — {c.address}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Assigned IMEI / Engine / Serial</label>
+              <label className="block font-bold text-slate-700 mb-1">Khata Number (کھاتہ نمبر - اختیاری)</label>
+              <input
+                type="text"
+                placeholder="e.g. 6"
+                value={khataNumber}
+                onChange={(e) => setKhataNumber(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Salesman Name (سیلز مین کا نام) *</label>
               <input
                 type="text"
                 required
-                value={imeiSerial}
-                onChange={(e) => setImeiSerial(e.target.value)}
-                placeholder="352019900123456"
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs outline-none"
+                placeholder="e.g. ضہیم (Zaheem)"
+                value={salesmanName}
+                onChange={(e) => setSalesmanName(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
               />
             </div>
           </div>
         </div>
 
-        {/* Step 3: AI & GPS Location Pin for Recovery */}
-        <MapLocationPicker
-          value={gpsLocation}
-          onChange={(loc) => setGpsLocation(loc)}
-          defaultCity="Lahore"
-        />
+        {/* Section 2: Product Selection & Pricing */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
+          <div className="border-b pb-3 flex items-center gap-2">
+            <Package className="w-5 h-5 text-emerald-700" />
+            <h2 className="text-base font-black text-slate-900 font-urdu">
+              2. اشیاء کا انتخاب اور قیمت (Product & Pricing)
+            </h2>
+          </div>
 
-        {/* Step 4: Financial Calculations */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-            3. Financing Terms & Installment Matrix (فنانسنگ کی شرائط)
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Cash Price (Rs.)</label>
-              <input
-                type="number"
-                value={cashPrice}
-                onChange={(e) => setCashPrice(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold font-mono outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">Advance Down Payment (Rs.)</label>
-              <input
-                type="number"
-                value={downPayment}
-                onChange={(e) => setDownPayment(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold font-mono outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">Duration (Months)</label>
+              <label className="block font-bold text-slate-700 mb-1">Select from Catalog (کیٹلاگ سے پروڈکٹ منتخب کریں)</label>
               <select
-                value={durationMonths}
-                onChange={(e) => setDurationMonths(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold outline-none"
+                value={selectedProductId}
+                onChange={(e) => handleProductChange(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
               >
-                <option value={3}>3 Months</option>
-                <option value={6}>6 Months</option>
-                <option value={9}>9 Months</option>
-                <option value={12}>12 Months (1 Year)</option>
-                <option value={18}>18 Months</option>
-                <option value={24}>24 Months (2 Years)</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} (نقد: {formatPKR(p.cashPrice)} • قسط: {formatPKR(p.installmentPrice || p.cashPrice * 1.2)})
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Annual Markup Rate (%)</label>
+              <label className="block font-bold text-slate-700 mb-1">Product Title (نام اشیاء) *</label>
               <input
-                type="number"
-                value={markupRate}
-                onChange={(e) => setMarkupRate(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold font-mono outline-none"
+                type="text"
+                required
+                value={productTitle}
+                onChange={(e) => setProductTitle(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
               />
             </div>
-          </div>
 
-          {/* Breakdown Preview Card */}
-          <div className="p-5 bg-gradient-to-br from-slate-900 to-emerald-950 rounded-2xl text-white space-y-3 shadow-inner">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-              <div>
-                <span className="text-[11px] text-slate-400 block">Total Financed</span>
-                <strong className="text-base sm:text-lg font-black text-amber-300">{formatPKR(breakdown.totalPayable)}</strong>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 block">Total Profit Markup</span>
-                <strong className="text-base sm:text-lg font-black text-emerald-400">{formatPKR(breakdown.totalMarkup)}</strong>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 block">Monthly Installment</span>
-                <strong className="text-xl sm:text-2xl font-black text-white">{formatPKR(breakdown.monthlyInstallment)}</strong>
-              </div>
-              <div>
-                <span className="text-[11px] text-slate-400 block">Tenure Plan</span>
-                <strong className="text-base sm:text-lg font-bold text-slate-200">{durationMonths} Months</strong>
-              </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Serial / IMEI No (اختیاری)</label>
+              <input
+                type="text"
+                value={imeiSerial}
+                onChange={(e) => setImeiSerial(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Total Installment Price (کل قسط قیمت - Rs.) *</label>
+              <input
+                type="number"
+                required
+                min={500}
+                value={totalFinanced}
+                onChange={(e) => setTotalFinanced(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 text-sm outline-none focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-500 font-urdu block mt-0.5">قابل رعایت / کمی بیشی ممکن (Negotiable)</span>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Advance Down Payment (ایڈوانس رقم - Rs.) *</label>
+              <input
+                type="number"
+                required
+                min={0}
+                value={downPayment}
+                onChange={(e) => setDownPayment(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-emerald-800 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Installment Frequency (قسط کا دورانیہ) *</label>
+              <select
+                value={installmentFrequency}
+                onChange={(e) => {
+                  const freq = e.target.value as InstallmentFrequency;
+                  setInstallmentFrequency(freq);
+                  setCollectionIntervalDays(freq === "WEEKLY" ? 7 : (freq === "TEN_DAYS" ? 10 : 30));
+                }}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
+              >
+                <option value="WEEKLY">ہفتہ وار (Weekly — مثلاً 500 ہفتہ)</option>
+                <option value="TEN_DAYS">10 روزہ (Every 10 Days)</option>
+                <option value="FIFTEEN_DAYS">15 روزہ (Every 15 Days)</option>
+                <option value="MONTHLY">ماہانہ (Monthly)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Installment Amount (قسط کی رقم - Rs.) *</label>
+              <input
+                type="number"
+                required
+                min={100}
+                value={monthlyInstallment}
+                onChange={(e) => setMonthlyInstallment(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Total Installments Count (کل اقساط کی تعداد) *</label>
+              <input
+                type="number"
+                required
+                min={1}
+                value={totalInstallmentsCount}
+                onChange={(e) => setTotalInstallmentsCount(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Preferred Collection Day (قسط کا دن) *</label>
+              <select
+                value={collectionDayName}
+                onChange={(e) => setCollectionDayName(e.target.value)}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
+              >
+                <option value="ہفتہ (Saturday)">ہفتہ (Saturday)</option>
+                <option value="جمعہ (Friday)">جمعہ (Friday)</option>
+                <option value="اتوار (Sunday)">اتوار (Sunday)</option>
+                <option value="پیر / سوموار (Monday)">پیر / سوموار (Monday)</option>
+                <option value="منگل (Tuesday)">منگل (Tuesday)</option>
+                <option value="بدھ (Wednesday)">بدھ (Wednesday)</option>
+                <option value="جمعرات (Thursday)">جمعرات (Thursday)</option>
+              </select>
             </div>
           </div>
         </div>
 
         {/* Submit */}
-        <div className="flex justify-end gap-3 pt-4">
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+          >
+            منسوخ کریں
+          </button>
           <button
             type="submit"
-            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-sm rounded-xl shadow-xl transition-all flex items-center justify-center gap-2"
+            className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2"
           >
-            <span>Confirm Plan & Generate Legal Stamp (پلان کنفرم کریں)</span>
-            <ArrowRight className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4" />
+            <span>پلان بنائیں اور معاہدہ جاری کریں (Create Contract)</span>
           </button>
         </div>
       </form>
@@ -313,7 +362,7 @@ function NewPlanForm() {
 
 export default function NewPlanPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-slate-500">Loading Plan Form...</div>}>
+    <Suspense fallback={<div className="p-8 text-center font-bold">Loading...</div>}>
       <NewPlanForm />
     </Suspense>
   );

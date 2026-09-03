@@ -26,6 +26,7 @@ import {
   Volume2,
   X,
   UserPlus,
+  Package,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { UserRole } from "@/lib/db/types";
@@ -55,6 +56,7 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
       title: "Core Operations",
       links: [
         { href: "/portal", label: "Dashboard Overview", icon: LayoutDashboard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY", "CUSTOMER"] },
+        { href: "/portal/products", label: "Products Catalog (اشیاء کیٹلاگ)", icon: Package, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
         { href: "/portal/users", label: "Staff & Role Management", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER"] },
         { href: "/portal/import", label: "Excel Bulk Importer", icon: Upload, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
         { href: "/portal/data-management", label: "Clean Production Setup", icon: Database, guideKey: "CLEAN_DATA", roles: ["SUPER_ADMIN", "OWNER"] },

@@ -19,6 +19,9 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   RotateCcw,
+  Calendar,
+  Clock,
+  UserCheck,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 
@@ -46,6 +49,12 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const [xferAmount, setXferAmount] = useState<number>(0);
   const [xferReason, setXferReason] = useState<string>("");
 
+  // Reschedule Due Date Modal (For Recovery Officers & Salesmen)
+  const [reschedModalOpen, setReschedModalOpen] = useState(false);
+  const [reschedInstNo, setReschedInstNo] = useState<number>(1);
+  const [newDueDate, setNewDueDate] = useState<string>("");
+  const [reschedReason, setReschedReason] = useState<string>("گاہک نے تاریخ تبدیل کروائی");
+
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   if (!currentUser) return null;
@@ -70,6 +79,14 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
     setMsg(null);
   };
 
+  const handleOpenReschedule = (item: any) => {
+    setReschedInstNo(item.installmentNo);
+    setNewDueDate(item.dueDate);
+    setReschedReason("گاہک نے تاریخ تبدیل کروائی");
+    setReschedModalOpen(true);
+    setMsg(null);
+  };
+
   const handleOpenTransfer = () => {
     const totalPaid = plan.schedule.reduce((acc, curr) => acc + (curr.amountPaid || 0), 0);
     setXferAmount(Math.min(plan.monthlyInstallment, totalPaid));
@@ -91,7 +108,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
       setPlan({ ...store.getPlanById(plan.id)! });
       setPayModalOpen(false);
-      setMsg({ type: "success", text: `Payment recorded successfully! ${res.allocation.summary} (Receipt #${res.receiptId})` });
+      setMsg({ type: "success", text: `ادائیگی کامیابی سے درج ہو گئی! ${res.allocation.summary} (Receipt #${res.receiptId})` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Payment logging failed" });
     }
@@ -118,7 +135,29 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       setCorrModalOpen(false);
       setMsg({
         type: "success",
-        text: `کھاتہ قسط #${corrInstNo} میں کامیابی سے ترمیم کر دی گئی۔ آڈٹ لاگ بلاک چین پر محفوظ ہو گیا۔`,
+        text: `کھاتہ قسط #${corrInstNo} میں کامیابی سے ترمیم کر دی گئی۔ آڈٹ لاگ محفوظ ہو گیا۔`,
+      });
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message });
+    }
+  };
+
+  const handleConfirmReschedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      store.updatePlanNextDueDate({
+        planId: plan.id,
+        installmentNo: reschedInstNo,
+        newDueDate,
+        reason: reschedReason,
+        updater: currentUser,
+      });
+
+      setPlan({ ...store.getPlanById(plan.id)! });
+      setReschedModalOpen(false);
+      setMsg({
+        type: "success",
+        text: `قسط #${reschedInstNo} کی تاریخ کامیابی سے بدل کر (${newDueDate}) کر دی گئی۔ روٹ شیٹ اپڈیٹ ہو گئی۔`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
@@ -161,20 +200,23 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-bold">
-              {plan.planNumber}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-mono bg-emerald-100 text-emerald-900 px-3 py-1 rounded-lg font-black border border-emerald-300">
+              کھاتہ نمبر: {plan.khataNumber || plan.planNumber}
             </span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getStatusBadgeClass(plan.status)}`}>
+            <span className="text-xs font-bold bg-slate-900 text-amber-300 px-3 py-1 rounded-lg border border-slate-700 font-urdu">
+              سیل مین: {plan.salesmanName || "ضہیم"}
+            </span>
+            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${getStatusBadgeClass(plan.status)}`}>
               {plan.status}
             </span>
-            <UrduSpeaker customText="اقساط معاہدہ کی تفصیلات، اقساط کی وصولی یا کھاتہ میں تصحیح۔" size="sm" showLabel />
+            <UrduSpeaker customText="اقساط معاہدہ کی تفصیلات، قسط وصولی، تاریخ تبدیلی یا کھاتہ تصحیح۔" size="sm" showLabel />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
-            {plan.productTitle}
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 font-urdu">
+            نام اشیاء: {plan.productTitle}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Kharedar: <strong className="text-slate-900">{plan.customerName}</strong> ({formatCNIC(plan.customerCnic)}) • Area: {plan.areaZone}
+          <p className="text-xs text-slate-500 mt-0.5 font-urdu">
+            نام خریدار: <strong className="text-slate-900">{plan.customerName}</strong> ({formatCNIC(plan.customerCnic)}) • کسٹمر فون: <strong className="text-slate-900">{plan.customerPhone}</strong>
           </p>
         </div>
 
@@ -224,14 +266,14 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
           >
             <FileText className="w-4 h-4 text-amber-300" />
-            <span>Print Stamp Paper</span>
+            <span>پرنٹ قانونی معاہدہ</span>
           </Link>
           <Link
             href={`/portal/print/receipt/${plan.id}`}
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl shadow transition-colors"
           >
             <Receipt className="w-4 h-4" />
-            <span>Thermal / A4 Slip</span>
+            <span>پرنٹ پرچی رسید</span>
           </Link>
         </div>
       </div>
@@ -245,61 +287,60 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* Financial Overview Cards */}
+      {/* Financial Overview Cards (Matching Register) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block">Monthly Installment</span>
-          <strong className="text-lg font-black text-slate-900">{formatPKR(plan.monthlyInstallment)}</strong>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">قسط کا شیڈول</span>
+          <strong className="text-lg font-black text-slate-900">
+            {formatPKR(plan.monthlyInstallment)} {plan.installmentFrequency === "WEEKLY" ? "(ہفتہ)" : "(ماہ)"}
+          </strong>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block">Down Payment</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">ایڈوانس رقم</span>
           <strong className="text-lg font-bold text-emerald-700">{formatPKR(plan.downPayment)}</strong>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block">Accumulated Short Arrears</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">شارٹ بقایا جات</span>
           <strong className={`text-lg font-black ${plan.accumulatedShortArrears > 0 ? "text-rose-700" : "text-slate-900"}`}>
             {formatPKR(plan.accumulatedShortArrears)}
           </strong>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Financed Value</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">کل قیمت (Total Price)</span>
           <strong className="text-lg font-bold text-slate-900">{formatPKR(plan.totalFinanced)}</strong>
         </div>
       </div>
 
-      {/* Amortization Schedule Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+      {/* Amortization Schedule Table (Exact Register Format) */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">
-              Payment Amortization & Khata Schedule ({plan.durationMonths} Months)
+            <h2 className="text-base font-black text-slate-900 font-urdu">
+              کھاتہ اقساط شیڈول ({plan.schedule.length} اقساط) • قسط کا دن: {plan.collectionDayName || "ہفتہ"}
             </h2>
             <p className="text-xs text-slate-500 font-urdu">
-              اقساط کا مکمل حساب کتاب۔ دکان کا مالک کسی بھی غلط اندراج کو درست کر سکتا ہے۔
+              رجسٹر کے مطابق تاریخ، وصولی، بقایا رقم اور وصول کنندہ کا باضابطہ ریکارڈ
             </p>
           </div>
 
-          {isOwnerOrSuperAdmin && (
-            <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Owner Khata Edit Authority Enabled</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg font-urdu">
+              ریکوری سائیکل: ہر {plan.collectionIntervalDays || 7} دن بعد
             </span>
-          )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-extrabold text-[10px]">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-black text-[11px] font-urdu">
                 <th className="py-3 px-3">#</th>
-                <th className="py-3 px-3">Due Date</th>
-                <th className="py-3 px-3">Principal</th>
-                <th className="py-3 px-3">Late Fee</th>
-                <th className="py-3 px-3">Short Arrears</th>
-                <th className="py-3 px-3">Total Obligation</th>
-                <th className="py-3 px-3">Amount Paid</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3 text-right">Action</th>
+                <th className="py-3 px-3">تاریخ (Due Date)</th>
+                <th className="py-3 px-3">قسط رقم (Obligation)</th>
+                <th className="py-3 px-3 text-emerald-800">جمع شدہ (Paid)</th>
+                <th className="py-3 px-3">حیثیت (Status)</th>
+                <th className="py-3 px-3">وصول کنندہ / نوٹس</th>
+                <th className="py-3 px-3 text-right">ایکشن (Action)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -308,28 +349,22 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   <td className="py-3 px-3 font-bold text-slate-900 font-mono">
                     {item.installmentNo}
                   </td>
-                  <td className="py-3 px-3 text-slate-600 font-medium">
+                  <td className="py-3 px-3 text-slate-700 font-bold font-mono">
                     {formatDate(item.dueDate)}
-                  </td>
-                  <td className="py-3 px-3 font-semibold text-slate-900">
-                    {formatPKR(item.principalDue)}
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">
-                    {item.lateFee > 0 ? <span className="text-rose-700 font-bold">+{formatPKR(item.lateFee)}</span> : "-"}
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">
-                    {item.shortArrears > 0 ? <span className="text-amber-700 font-bold">+{formatPKR(item.shortArrears)}</span> : "-"}
                   </td>
                   <td className="py-3 px-3 font-black text-slate-900">
                     {formatPKR(item.totalDue)}
                   </td>
-                  <td className="py-3 px-3 font-bold text-emerald-800">
+                  <td className="py-3 px-3 font-black text-emerald-800 text-sm">
                     {item.amountPaid > 0 ? formatPKR(item.amountPaid) : "-"}
                   </td>
                   <td className="py-3 px-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(item.status)}`}>
                       {item.status}
                     </span>
+                  </td>
+                  <td className="py-3 px-3 text-slate-500 text-[11px]">
+                    {item.collectedBy || item.notes || "-"}
                   </td>
                   <td className="py-3 px-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
@@ -344,6 +379,17 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                         <span className="text-[10px] text-slate-400 font-mono font-semibold">
                           {item.receiptId || "PAID"}
                         </span>
+                      )}
+
+                      {/* Reschedule Date Button (For Salesman / Recovery Man) */}
+                      {item.status !== "PAID" && (
+                        <button
+                          onClick={() => handleOpenReschedule(item)}
+                          title="تاریخ تبدیل کریں (Reschedule Collection Day)"
+                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg border border-blue-200 transition-colors"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                        </button>
                       )}
 
                       {/* Owner Khata Correction Button */}
@@ -372,7 +418,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-emerald-600" />
-                Log Repayment #{activeInstallmentNo}
+                قسط وصولی درج کریں (Inst #{activeInstallmentNo})
               </h3>
               <button
                 onClick={() => setPayModalOpen(false)}
@@ -384,7 +430,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleRecordPayment} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-600 font-bold mb-1">Amount to Pay (Rs.)</label>
+                <label className="block text-slate-600 font-bold mb-1">وصول شدہ رقم (Rs.) *</label>
                 <input
                   type="number"
                   required
@@ -396,13 +442,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               <div>
-                <label className="block text-slate-600 font-bold mb-1">Payment Memo / Receipt Note</label>
+                <label className="block text-slate-600 font-bold mb-1">وصولی کا نوٹ / تفصیل</label>
                 <input
                   type="text"
-                  placeholder="e.g. Paid at branch counter"
+                  placeholder="مثلاً: دکان پر ادا کی یا ریکوری مین نے وصول کی"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none"
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
 
@@ -412,13 +458,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   onClick={() => setPayModalOpen(false)}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
-                  Cancel
+                  منسوخ کریں
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow"
                 >
-                  Confirm Payment
+                  ادائیگی محفوظ کریں
                 </button>
               </div>
             </form>
@@ -426,7 +472,70 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* MODAL 2: Owner Khata Correction & Ledger Edit */}
+      {/* MODAL 2: Date Rescheduler (For Customer Requested Day Changes) */}
+      {reschedModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-black tracking-wider bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full border border-blue-300">
+                  Reschedule Installment Due Date
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-1">
+                  قسط #{reschedInstNo} کی تاریخ تبدیل کریں
+                </h3>
+              </div>
+              <button onClick={() => setReschedModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmReschedule} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">نئی وصولی تاریخ (New Due Date) *</label>
+                <input
+                  type="date"
+                  required
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 text-sm outline-none focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">تاریخ تبدیلی کی وجہ (Reason) *</label>
+                <input
+                  type="text"
+                  required
+                  value={reschedReason}
+                  onChange={(e) => setReschedReason(e.target.value)}
+                  placeholder="مثلاً: گاہک نے کہا کہ جمعہ کو تنخواہ ملے گی تو تب آنا..."
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setReschedModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  منسوخ کریں
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>تاریخ محفوظ کریں (Save New Date)</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Owner Khata Correction & Ledger Edit */}
       {corrModalOpen && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
@@ -483,10 +592,6 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 />
               </div>
 
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 font-urdu leading-relaxed">
-                یہ تصحیح بلاک چین آڈٹ چین پر درج ہوگی تاکہ کھاتے میں شفافیت برقرار رہے۔
-              </div>
-
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -508,7 +613,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* MODAL 3: Transfer Payment from Wrong Khata to Correct Khata */}
+      {/* MODAL 4: Transfer Payment from Wrong Khata to Correct Khata */}
       {xferModalOpen && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
@@ -541,7 +646,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 >
                   {allPlans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.customerName} — {p.productTitle} ({p.planNumber})
+                      {p.customerName} — {p.productTitle} (کھاتہ #{p.khataNumber || p.planNumber})
                     </option>
                   ))}
                 </select>

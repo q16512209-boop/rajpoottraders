@@ -1192,6 +1192,54 @@ class AppStore {
     return { fromPlan, toPlan };
   }
 
+  // --- Product Management (Owner / Salesman) ---
+  createProduct(creator: User, productData: Omit<Product, "id">): Product {
+    if (creator.role !== "SUPER_ADMIN" && creator.role !== "OWNER" && creator.role !== "BRANCH_MANAGER") {
+      throw new Error("غیر مجاز: پروڈکٹ شامل کرنے کا اختیار صرف دکان کے مالک یا مینیجر کے پاس ہے۔");
+    }
+    const newProduct: Product = {
+      ...productData,
+      id: `prod_${Date.now()}`,
+      tenantId: creator.tenantId,
+    };
+    this.products.unshift(newProduct);
+    return newProduct;
+  }
+
+  // --- Fast Next Due Date / Installment Day Rescheduler for Recovery Officers & Salesmen ---
+  updatePlanNextDueDate(params: {
+    planId: string;
+    installmentNo: number;
+    newDueDate: string;
+    reason: string;
+    updater: User;
+  }): InstallmentPlan {
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Plan not found");
+
+    const item = plan.schedule.find((s) => s.installmentNo === params.installmentNo);
+    if (!item) throw new Error(`Installment #${params.installmentNo} not found`);
+
+    const prevDueDate = item.dueDate;
+    item.dueDate = params.newDueDate;
+    item.notes = `[Date Rescheduled by ${params.updater.name} (${params.updater.role})]: Changed from ${prevDueDate} to ${params.newDueDate}. Reason: ${params.reason}`;
+
+    // Append Blockchain Audit Log
+    this.appendLedgerBlock({
+      id: `tx_resched_${Date.now()}`,
+      tenantId: plan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId: plan.id,
+      customerId: plan.customerId,
+      actorId: params.updater.id,
+      notes: `Installment Due Date Rescheduled for ${plan.customerName} (${plan.planNumber}) Inst #${params.installmentNo}: Changed from ${prevDueDate} to ${params.newDueDate}. Reason: ${params.reason}`,
+    });
+
+    return plan;
+  }
+
   // --- Fast Manual Legacy / Old Customer Onboarding ---
   createLegacyKhataCustomer(data: LegacyCustomerInput): { customer: Customer; plan: InstallmentPlan } {
     const customerId = `cust_leg_${Date.now()}`;
@@ -1202,23 +1250,23 @@ class AppStore {
         fatherName: "N/A",
         cnic: data.guarantor1Cnic,
         phone: data.guarantor1Phone,
-        relation: data.guarantor1Relation || "Friend / Relative",
+        relation: data.guarantor1Relation || "ضامن",
         address: data.address,
-        workplace: "Local Market",
+        workplace: "مقامی مارکیٹ",
         landmark: data.landmark || data.zoneArea,
       },
     ];
 
-    if (data.guarantor2Name) {
+    if (data.guarantor2Name && data.guarantor2Name.trim().length > 0) {
       guarantors.push({
         id: `g2_${Date.now()}`,
         fullName: data.guarantor2Name,
         fatherName: "N/A",
-        cnic: data.guarantor2Cnic || "35201-0000000-0",
+        cnic: data.guarantor2Cnic || "33202-0000000-0",
         phone: data.guarantor2Phone || data.phone,
-        relation: data.guarantor2Relation || "Neighbor",
+        relation: data.guarantor2Relation || "پڑوسی",
         address: data.address,
-        workplace: "Business",
+        workplace: "کاروبار",
         landmark: data.zoneArea,
       });
     }
@@ -1233,8 +1281,8 @@ class AppStore {
       secondaryPhone: data.secondaryPhone,
       address: data.address,
       landmark: data.landmark || data.zoneArea,
-      city: data.city || "Lahore",
-      zoneArea: data.zoneArea || "Route-A (Gulberg / Model Town)",
+      city: data.city || "چنیوٹ (Chiniot)",
+      zoneArea: data.zoneArea || "محلہ رحمن آباد و مسلم بازار چنیوٹ",
       guarantors,
       riskScore: 20,
       isDefaulter: false,
@@ -1242,13 +1290,19 @@ class AppStore {
     };
     this.customers.unshift(customer);
 
-    // Build schedule
+    // Build schedule based on frequency (Weekly, 10-Days, Monthly)
     const schedule: InstallmentScheduleItem[] = [];
     const baseStartDate = data.startDate ? new Date(data.startDate) : new Date();
+    const totalCount = data.totalInstallmentsCount || data.durationMonths || 12;
+    const intervalDays = data.collectionIntervalDays || (data.installmentFrequency === "WEEKLY" ? 7 : (data.installmentFrequency === "TEN_DAYS" ? 10 : 30));
 
-    for (let i = 1; i <= data.durationMonths; i++) {
+    for (let i = 1; i <= totalCount; i++) {
       const dueDateObj = new Date(baseStartDate);
-      dueDateObj.setMonth(dueDateObj.getMonth() + i);
+      if (data.installmentFrequency === "WEEKLY" || data.installmentFrequency === "TEN_DAYS" || data.installmentFrequency === "FIFTEEN_DAYS") {
+        dueDateObj.setDate(dueDateObj.getDate() + (i * intervalDays));
+      } else {
+        dueDateObj.setMonth(dueDateObj.getMonth() + i);
+      }
       const dueDateStr = dueDateObj.toISOString().split("T")[0];
 
       const isPastPaid = i <= data.monthsAlreadyPaid;
@@ -1266,42 +1320,48 @@ class AppStore {
         amountPaid: isPastPaid ? data.monthlyInstallment : 0,
         paidDate: isPastPaid ? dueDateStr : undefined,
         status: isPastPaid ? "PAID" : "PENDING",
-        collectedBy: isPastPaid ? "Historical Ledger Register" : undefined,
-        notes: isPastPaid ? "Legacy Installment Paid in Past" : undefined,
+        collectedBy: isPastPaid ? (data.salesmanName || "رجسٹر کھاتہ اندراج") : undefined,
+        notes: isPastPaid ? "ماضی میں ادا شدہ قسط" : undefined,
       });
     }
 
     const planId = `plan_leg_${Date.now()}`;
-    const planNumber = `RT-LEG-${Date.now().toString().slice(-6)}`;
-    const serialNo = data.imeiSerial || `SN-LEG-${Date.now().toString().slice(-6)}`;
+    const planNumber = data.khataNumber ? `RT-CHN-${data.khataNumber.padStart(6, "0")}` : `RT-CHN-${Date.now().toString().slice(-6)}`;
+    const serialNo = data.imeiSerial || `SN-CHN-${Date.now().toString().slice(-6)}`;
 
     const plan: InstallmentPlan = {
       id: planId,
       planNumber,
+      khataNumber: data.khataNumber || planNumber.slice(-4),
       tenantId: data.tenantId,
       customerId,
       customerName: data.fullName,
       customerCnic: data.cnic,
       customerPhone: data.phone,
-      productId: `prod_leg_${Date.now()}`,
+      salesmanName: data.salesmanName || "ضہیم",
+      productId: data.productId || `prod_leg_${Date.now()}`,
       productTitle: data.productTitle,
       imeiSerial: serialNo,
-      cashPrice: Math.round(data.totalFinanced * 0.75),
+      cashPrice: Math.round(data.totalFinanced * 0.85),
       downPayment: data.downPayment,
-      markupRatePct: 25,
-      totalMarkup: Math.round(data.totalFinanced * 0.25),
+      markupRatePct: 15,
+      totalMarkup: Math.round(data.totalFinanced * 0.15),
       totalFinanced: data.totalFinanced,
-      durationMonths: data.durationMonths,
+      durationMonths: totalCount,
+      totalInstallmentsCount: totalCount,
+      installmentFrequency: data.installmentFrequency || "WEEKLY",
+      collectionIntervalDays: intervalDays,
+      collectionDayName: data.collectionDayName || "ہفتہ",
       monthlyInstallment: data.monthlyInstallment,
       accumulatedShortArrears: data.pendingShortArrears || 0,
-      status: data.monthsAlreadyPaid >= data.durationMonths ? "COMPLETED" : "ACTIVE",
+      status: data.monthsAlreadyPaid >= totalCount ? "COMPLETED" : "ACTIVE",
       startDate: data.startDate || new Date().toISOString(),
       endDate: schedule[schedule.length - 1]?.dueDate || new Date().toISOString(),
       schedule,
       guarantorIds: guarantors.map((g) => g.id),
       areaZone: data.zoneArea,
       contractVerified: true,
-      tamperProofHash: `LEG_HASH_${Date.now()}`,
+      tamperProofHash: `LEG_HASH_CHN_${Date.now()}`,
     };
 
     this.plans.unshift(plan);
@@ -1316,7 +1376,7 @@ class AppStore {
       planId,
       customerId,
       actorId: data.createdBy,
-      notes: `Legacy Customer Khata Initialized for ${data.fullName} (${planNumber}) - ${data.productTitle}. ${data.monthsAlreadyPaid}/${data.durationMonths} installments pre-settled from past registers.`,
+      notes: `Legacy Khata initialized for ${data.fullName} (کھاتہ #${plan.khataNumber}) - ${data.productTitle} by Salesman ${plan.salesmanName}. ${data.monthsAlreadyPaid}/${totalCount} installments pre-paid in physical register.`,
     });
 
     return { customer, plan };

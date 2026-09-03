@@ -79,13 +79,20 @@ export interface Customer {
   createdAt: string;
 }
 
+export type InstallmentFrequency = "WEEKLY" | "TEN_DAYS" | "FIFTEEN_DAYS" | "MONTHLY";
+
 export interface Product {
   id: string;
   tenantId: string;
   title: string;
   brand?: string;
-  category: "SMARTPHONES" | "AIR_CONDITIONERS" | "SOLAR_HYBRID" | "MOTORBIKES" | "HOME_APPLIANCES" | "REFURBISHED_SEIZED";
+  category: "HOME_APPLIANCES" | "ELECTRIC_IRONS" | "FANS" | "SMARTPHONES" | "AIR_CONDITIONERS" | "SOLAR_HYBRID" | "MOTORBIKES" | "REFURBISHED_SEIZED";
   cashPrice: number;
+  installmentPrice?: number; // کل قسط قیمت (قابل رعایت)
+  defaultDownPayment?: number;
+  defaultInstallmentAmount?: number;
+  defaultFrequency?: InstallmentFrequency;
+  defaultTotalInstallments?: number;
   minDownPaymentPct: number;
   maxTenureMonths: number;
   imeiSerialList: string[];
@@ -116,11 +123,14 @@ export interface InstallmentScheduleItem {
 export interface InstallmentPlan {
   id: string;
   planNumber: string;
+  khataNumber?: string; // e.g. "6" or "کھاتہ نمبر 6"
   tenantId: string;
   customerId: string;
   customerName: string;
   customerCnic: string;
   customerPhone: string;
+  salesmanName?: string; // e.g. "ضہیم"
+  salesmanId?: string;
   productId: string;
   productTitle: string;
   imeiSerial: string;
@@ -130,7 +140,11 @@ export interface InstallmentPlan {
   totalMarkup: number;
   totalFinanced: number;
   durationMonths: number;
-  monthlyInstallment: number;
+  totalInstallmentsCount?: number;
+  installmentFrequency?: InstallmentFrequency; // WEEKLY, TEN_DAYS, FIFTEEN_DAYS, MONTHLY
+  collectionIntervalDays?: number; // e.g. 7 for weekly, 10 for 10-days
+  collectionDayName?: string; // e.g. "FRIDAY", "ہفتہ", "سوموار"
+  monthlyInstallment: number; // installment amount per cycle (e.g. 500 weekly)
   accumulatedShortArrears: number;
   status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF" | "DEFAULTED_REPOSSESSED" | "COMPLETED_EARLY_SETTLED";
   startDate: string;
@@ -275,6 +289,8 @@ export interface ArticlePost {
 
 export interface LegacyCustomerInput {
   tenantId: string;
+  khataNumber?: string; // e.g. "6"
+  salesmanName?: string; // e.g. "ضہیم"
   fullName: string;
   fatherName: string;
   cnic: string;
@@ -288,15 +304,20 @@ export interface LegacyCustomerInput {
   guarantor1Phone: string;
   guarantor1Cnic: string;
   guarantor1Relation: string;
-  guarantor2Name?: string;
+  guarantor2Name?: string; // Optional!
   guarantor2Phone?: string;
   guarantor2Cnic?: string;
   guarantor2Relation?: string;
+  productId?: string;
   productTitle: string;
   imeiSerial?: string;
   totalFinanced: number;
   downPayment: number;
   durationMonths: number;
+  totalInstallmentsCount?: number;
+  installmentFrequency?: InstallmentFrequency; // WEEKLY, TEN_DAYS, FIFTEEN_DAYS, MONTHLY
+  collectionIntervalDays?: number; // e.g. 7 for weekly
+  collectionDayName?: string; // e.g. "FRIDAY", "ہفتہ", "سوموار"
   monthlyInstallment: number;
   monthsAlreadyPaid: number;
   totalPaidInPast: number;

@@ -33,25 +33,25 @@ export default function NewCustomerPage() {
   const [secondaryPhone, setSecondaryPhone] = useState("");
   const [address, setAddress] = useState("");
   const [landmark, setLandmark] = useState("");
-  const [city, setCity] = useState("Lahore");
-  const [zoneArea, setZoneArea] = useState("Route-A (Gulberg / Model Town)");
+  const [city, setCity] = useState("چنیوٹ (Chiniot)");
+  const [zoneArea, setZoneArea] = useState("محلہ رحمن آباد و مسلم بازار چنیوٹ");
   const [gpsLocation, setGpsLocation] = useState<GPSLocation | undefined>(undefined);
 
-  // Guarantor 1 State
+  // Guarantor 1 State (Mandatory)
   const [g1Name, setG1Name] = useState("");
   const [g1Father, setG1Father] = useState("");
   const [g1Cnic, setG1Cnic] = useState("");
   const [g1Phone, setG1Phone] = useState("");
-  const [g1Relation, setG1Relation] = useState("Brother");
+  const [g1Relation, setG1Relation] = useState("بھائی / رشتہ دار");
   const [g1Address, setG1Address] = useState("");
   const [g1Work, setG1Work] = useState("");
 
-  // Guarantor 2 State
+  // Guarantor 2 State (OPTIONAL)
   const [g2Name, setG2Name] = useState("");
   const [g2Father, setG2Father] = useState("");
   const [g2Cnic, setG2Cnic] = useState("");
   const [g2Phone, setG2Phone] = useState("");
-  const [g2Relation, setG2Relation] = useState("Business Partner / Reference");
+  const [g2Relation, setG2Relation] = useState("پڑوسی / کاروباری ریفرنس");
   const [g2Address, setG2Address] = useState("");
   const [g2Work, setG2Work] = useState("");
 
@@ -61,8 +61,36 @@ export default function NewCustomerPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !cnic || !phone || !address) {
-      alert("Please fill all required customer KYC fields (Full Name, CNIC, Phone, Address).");
+      alert("براہ کرم خریدار کی بنیادی تفصیلات (نام، شناختی کارڈ، فون اور پتہ) درج کریں۔");
       return;
+    }
+
+    const guarantorsList = [
+      {
+        id: `gua_${Date.now()}_1`,
+        fullName: g1Name || "Guarantor 1",
+        fatherName: g1Father || "Father",
+        cnic: encryptField(g1Cnic || "33202-0000001-1"),
+        phone: g1Phone || "0300-1111111",
+        relation: g1Relation,
+        address: g1Address || address,
+        workplace: g1Work || "Business",
+        landmark: "Chiniot",
+      },
+    ];
+
+    if (g2Name && g2Name.trim().length > 0) {
+      guarantorsList.push({
+        id: `gua_${Date.now()}_2`,
+        fullName: g2Name,
+        fatherName: g2Father || "Father",
+        cnic: encryptField(g2Cnic || "33202-0000002-2"),
+        phone: g2Phone || "0300-2222222",
+        relation: g2Relation,
+        address: g2Address || address,
+        workplace: g2Work || "Corporate",
+        landmark: "Chiniot",
+      });
     }
 
     const newCust = store.createCustomer({
@@ -73,35 +101,12 @@ export default function NewCustomerPage() {
       phone,
       secondaryPhone,
       address,
-      landmark: landmark || (gpsLocation?.address ? `GPS Pin: ${gpsLocation.address}` : "Main Chowk"),
+      landmark: landmark || (gpsLocation?.address ? `GPS Pin: ${gpsLocation.address}` : "نزد دیسی مسجد / چوک"),
       city,
       zoneArea: gpsLocation?.aiSuggestedZone || zoneArea,
       photoUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
       gpsLocation,
-      guarantors: [
-        {
-          id: `gua_${Date.now()}_1`,
-          fullName: g1Name || "Guarantor 1",
-          fatherName: g1Father || "Father",
-          cnic: encryptField(g1Cnic || "35202-0000001-1"),
-          phone: g1Phone || "0300-1111111",
-          relation: g1Relation,
-          address: g1Address || address,
-          workplace: g1Work || "Business",
-          landmark: "Lahore",
-        },
-        {
-          id: `gua_${Date.now()}_2`,
-          fullName: g2Name || "Guarantor 2",
-          fatherName: g2Father || "Father",
-          cnic: encryptField(g2Cnic || "35201-0000002-2"),
-          phone: g2Phone || "0300-2222222",
-          relation: g2Relation,
-          address: g2Address || address,
-          workplace: g2Work || "Corporate",
-          landmark: "Lahore",
-        },
-      ],
+      guarantors: guarantorsList,
     });
 
     router.push(`/portal/plans/new?cust=${newCust.id}`);
@@ -214,8 +219,8 @@ export default function NewCustomerPage() {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Lahore"
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl focus:border-emerald-500 focus:bg-white outline-none"
+                placeholder="چنیوٹ (Chiniot)"
+                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none font-urdu"
               />
             </div>
 
@@ -226,8 +231,8 @@ export default function NewCustomerPage() {
                 required
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="House 42, St 7, Block C, Model Town, Lahore"
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl focus:border-emerald-500 focus:bg-white outline-none"
+                placeholder="نصرت کشیدہ کاری، نزد دیسی مسجد، چنیوٹ"
+                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
               />
             </div>
 
@@ -237,8 +242,8 @@ export default function NewCustomerPage() {
                 type="text"
                 value={landmark}
                 onChange={(e) => setLandmark(e.target.value)}
-                placeholder="Near Model Town Central Mosque / Goga Pan Shop"
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl focus:border-emerald-500 focus:bg-white outline-none"
+                placeholder="نزد دیسی مسجد / چوک"
+                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
               />
             </div>
           </div>
@@ -259,7 +264,7 @@ export default function NewCustomerPage() {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Building className="w-5 h-5 text-emerald-700" />
             <h2 className="text-base font-bold text-slate-900">
-              2. Dual Guarantors Protocol (دو ضامنان کی تصدیق)
+              2. ضامنان کی تصدیق (ضامن نمبر 2 اختیاری ہے)
             </h2>
           </div>
 
@@ -267,7 +272,7 @@ export default function NewCustomerPage() {
             {/* Guarantor 1 */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <span className="font-extrabold text-emerald-800 text-xs uppercase tracking-wider block">
-                Guarantor 1 (ضامن اول - قریبی رشتہ دار)
+                Guarantor 1 (ضامن اول - لازمی) *
               </span>
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Full Name</label>
@@ -275,8 +280,8 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g1Name}
                   onChange={(e) => setG1Name(e.target.value)}
-                  placeholder="Shahid Iqbal"
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none"
+                  placeholder="محمد اسلم"
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
               <div>
@@ -285,7 +290,7 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g1Cnic}
                   onChange={(e) => setG1Cnic(e.target.value)}
-                  placeholder="35202-9876543-1"
+                  placeholder="33202-9876543-1"
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>
@@ -305,25 +310,28 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g1Relation}
                   onChange={(e) => setG1Relation(e.target.value)}
-                  placeholder="Real Brother"
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none"
+                  placeholder="بھائی / پڑوسی"
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
             </div>
 
-            {/* Guarantor 2 */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <span className="font-extrabold text-emerald-800 text-xs uppercase tracking-wider block">
-                Guarantor 2 (ضامن دوم - کاروباری یا سرکاری ریفرنس)
-              </span>
+            {/* Guarantor 2 (OPTIONAL) */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-slate-700 text-xs uppercase tracking-wider block">
+                  Guarantor 2 (ضامن دوم - اختیاری)
+                </span>
+                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">ضروری نہیں</span>
+              </div>
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Full Name</label>
+                <label className="block text-slate-700 font-bold mb-1">Full Name (اگر ہو)</label>
                 <input
                   type="text"
                   value={g2Name}
                   onChange={(e) => setG2Name(e.target.value)}
-                  placeholder="Kamran Butt"
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none"
+                  placeholder="اختیاری..."
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
               <div>
@@ -332,7 +340,7 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g2Cnic}
                   onChange={(e) => setG2Cnic(e.target.value)}
-                  placeholder="35201-5554443-2"
+                  placeholder="اختیاری..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>
@@ -342,18 +350,18 @@ export default function NewCustomerPage() {
                   type="tel"
                   value={g2Phone}
                   onChange={(e) => setG2Phone(e.target.value)}
-                  placeholder="0322-8889990"
+                  placeholder="اختیاری..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Workplace / Business</label>
+                <label className="block text-slate-700 font-bold mb-1">Relation (رشتہ)</label>
                 <input
                   type="text"
-                  value={g2Work}
-                  onChange={(e) => setG2Work(e.target.value)}
-                  placeholder="Al-Madina Traders / Business Partner"
-                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none"
+                  value={g2Relation}
+                  onChange={(e) => setG2Relation(e.target.value)}
+                  placeholder="اختیاری..."
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
             </div>
