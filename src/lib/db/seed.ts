@@ -70,7 +70,7 @@ export const initialUsers: User[] = [
     tenantId: "tenant_chiniot",
     name: "بلال احمد (Bilal Recovery Officer)",
     email: "recovery@rajpoottraders.com",
-    password: "rec123",
+    password: "recovery123",
     role: "FIELD_RECOVERY",
     phone: "0321-9876543",
     assignedRouteZone: "محلہ رحمن آباد و مسلم بازار چنیوٹ",
