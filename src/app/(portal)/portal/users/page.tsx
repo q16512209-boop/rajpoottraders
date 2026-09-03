@@ -28,7 +28,7 @@ import {
 
 export default function UsersManagementPage() {
   const { currentUser, currentTenant, availableTenants, refreshUsers } = useAuth();
-  const [users, setUsers] = useState<User[]>(() => store.getUsers());
+  const [users, setUsers] = useState<User[]>(() => store.getUsers(currentTenant.id, currentUser?.role));
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -97,6 +97,9 @@ export default function UsersManagementPage() {
     setMsg(null);
   };
 
+  // Strict Privacy: Super Admin is completely invisible to Owner and staff
+  const visibleUsers = users.filter((u) => (isSuperAdmin ? true : u.role !== "SUPER_ADMIN"));
+
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -111,7 +114,7 @@ export default function UsersManagementPage() {
         status: "ACTIVE",
       });
 
-      setUsers([...store.getUsers()]);
+      setUsers([...store.getUsers(currentTenant.id, currentUser.role)]);
       refreshUsers();
       setShowAddModal(false);
       setName("");
@@ -140,7 +143,7 @@ export default function UsersManagementPage() {
         status: editStatus,
       }, currentUser);
 
-      setUsers([...store.getUsers()]);
+      setUsers([...store.getUsers(currentTenant.id, currentUser.role)]);
       refreshUsers();
       setShowEditModal(false);
       setMsg({
@@ -156,7 +159,7 @@ export default function UsersManagementPage() {
     if (confirm(`کیا آپ واقعی اسٹاف ممبر "${userName}" کو سسٹم سے ہٹانا چاہتے ہیں؟`)) {
       try {
         store.deleteUser(id);
-        setUsers([...store.getUsers()]);
+        setUsers([...store.getUsers(currentTenant.id, currentUser.role)]);
         refreshUsers();
         setMsg({ type: "success", text: `اسٹاف ممبر "${userName}" کو سسٹم سے ہٹا دیا گیا ہے۔` });
       } catch (err: any) {
@@ -210,25 +213,36 @@ export default function UsersManagementPage() {
         </div>
       )}
 
-      {/* Quick Credentials Info Box for Chiniot Branch */}
+      {/* Quick Credentials Info Box - Filtered strictly by role */}
       <div className="bg-emerald-50/70 border border-emerald-200 rounded-3xl p-5 text-xs text-emerald-950 space-y-2">
         <div className="flex items-center gap-2 font-black text-sm">
           <KeyRound className="w-4 h-4 text-emerald-700" />
-          <span>راجپوت ٹریڈرز چنیوٹ — ایکٹو اسٹاف لاگ ان اسناد (Login Details)</span>
+          <span className="font-urdu">راجپوت ٹریڈرز چنیوٹ — ایکٹو لاگ ان اسناد (Login Credentials)</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-          <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-0.5">
-            <span className="font-bold text-purple-900 block">سپر ایڈمن (Main Boss):</span>
-            <p className="font-mono text-slate-700">musama4288921@gmail.com</p>
-            <p className="font-mono font-black text-emerald-700">Pass: 33admin401</p>
+          {/* Super Admin ONLY visible when logged in as SUPER_ADMIN */}
+          {isSuperAdmin && (
+            <div className="p-3 bg-white rounded-xl border border-purple-200 space-y-0.5">
+              <span className="font-bold text-purple-900 block font-urdu">سپر ایڈمن (Main Boss):</span>
+              <p className="font-mono text-slate-700">musama4288921@gmail.com</p>
+              <p className="font-mono font-black text-purple-700">Pass: 33admin401</p>
+            </div>
+          )}
+
+          <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-0.5">
+            <span className="font-bold text-amber-900 block font-urdu">دکان کا مالک (Shop Owner):</span>
+            <p className="font-mono text-slate-700">owner@rajpoottraders.com</p>
+            <p className="font-mono font-black text-amber-700">Pass: owner123</p>
           </div>
-          <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-0.5">
-            <span className="font-bold text-blue-900 block">سیلز مین (ضہیم):</span>
+
+          <div className="p-3 bg-white rounded-xl border border-blue-200 space-y-0.5">
+            <span className="font-bold text-blue-900 block font-urdu">سیلز مین (ضہیم):</span>
             <p className="font-mono text-slate-700">salesman@rajpoottraders.com</p>
-            <p className="font-mono font-black text-emerald-700">Pass: sales123</p>
+            <p className="font-mono font-black text-blue-700">Pass: sales123</p>
           </div>
+
           <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-0.5">
-            <span className="font-bold text-emerald-900 block">فیلڈ ریکوری مین (بلال):</span>
+            <span className="font-bold text-emerald-900 block font-urdu">فیلڈ ریکوری مین (بلال):</span>
             <p className="font-mono text-slate-700">recovery@rajpoottraders.com</p>
             <p className="font-mono font-black text-emerald-700">Pass: recovery123</p>
           </div>
@@ -241,7 +255,7 @@ export default function UsersManagementPage() {
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Users className="w-5 h-5 text-purple-700" />
-              Active System Users ({users.length})
+              {isSuperAdmin ? "All System Users" : "Active Shop Staff Members"} ({visibleUsers.length})
             </h2>
             <p className="text-xs text-slate-500 font-urdu">
               ہر ملازم کے سامنے آنکھ 👁️ کے نشان سے پاس ورڈ دیکھیں یا پینسل ✏️ کے بٹن سے تبدیل کریں
@@ -251,7 +265,7 @@ export default function UsersManagementPage() {
 
         {/* Mobile View: Cards */}
         <div className="block sm:hidden space-y-3">
-          {users.map((u) => {
+          {visibleUsers.map((u) => {
             const isPassVisible = !!visiblePasswords[u.id];
             return (
               <div key={u.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs">
@@ -318,7 +332,7 @@ export default function UsersManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map((u) => {
+              {visibleUsers.map((u) => {
                 const isPassVisible = !!visiblePasswords[u.id];
                 return (
                   <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">

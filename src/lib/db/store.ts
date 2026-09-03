@@ -13,6 +13,7 @@ import {
 import {
   Tenant,
   User,
+  UserRole,
   Customer,
   Product,
   InstallmentPlan,
@@ -64,9 +65,15 @@ class AppStore {
     return user || null;
   }
 
-  getUsers(tenantId?: string): User[] {
-    if (!tenantId) return this.users;
-    return this.users.filter((u) => u.tenantId === tenantId || u.role === "SUPER_ADMIN");
+  getUsers(tenantId?: string, requesterRole?: UserRole): User[] {
+    let result = this.users;
+    if (tenantId) {
+      result = result.filter((u) => u.tenantId === tenantId);
+    }
+    if (requesterRole && requesterRole !== "SUPER_ADMIN") {
+      result = result.filter((u) => u.role !== "SUPER_ADMIN");
+    }
+    return result;
   }
 
   getUserById(id: string): User | undefined {
