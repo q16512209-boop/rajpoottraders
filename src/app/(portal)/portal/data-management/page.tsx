@@ -58,7 +58,7 @@ export default function DataManagementPage() {
           Production Live Mode vs Demo Data Controller
         </h1>
         <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-          ڈیمو ڈیٹا صاف کر کے راجپوت ٹریڈرز کا اصل کاروباری ڈیٹا درج کرنے کے لیے یہاں سے کنٹرول کریں
+          Reset demo data to start clean production records for Rajpoot Traders
         </p>
       </div>
 
@@ -90,7 +90,7 @@ export default function DataManagementPage() {
               Wipes all dummy customers, mock installments, and test expenses. Sets your wallets to Rs. 0 ready for real showroom and field recovery operations.
             </p>
             <p className="text-xs font-urdu font-semibold text-emerald-800">
-              تمام فرضی ڈیٹا ختم کر کے اپنے اصلی گاہکوں کا نیا ریکارڈ شروع کریں
+              Purge sample records and initialize empty production store for actual clients.
             </p>
           </div>
 

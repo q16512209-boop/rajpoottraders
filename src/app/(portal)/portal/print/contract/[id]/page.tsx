@@ -67,7 +67,7 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
             {tenant.brandHeader}
           </h1>
           <p className="text-sm font-urdu font-bold text-emerald-800">
-            معاہدہ برائے بیع بالتقسیط (ہائیر پرچیز / آسان اقساط کا باضابطہ قانونی ایگریمنٹ)
+            Hire Purchase Installment Agreement (معاہدہ بیع بالتقسیط)
           </p>
           <p className="text-xs text-slate-600">
             Main Flagship: {tenant.address} • Phone: {tenant.contact}
@@ -78,12 +78,12 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
         <div className="space-y-6 text-xs leading-relaxed text-slate-800">
           <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
-              <strong className="block text-slate-900 text-sm">First Party (Seller / مالکان):</strong>
+              <strong className="block text-slate-900 text-sm">First Party (Seller / Rajpoot Traders):</strong>
               <p className="font-semibold text-emerald-900">{tenant.name}</p>
               <p>Represented by: Chaudhry Kamran Rajpoot</p>
             </div>
             <div>
-              <strong className="block text-slate-900 text-sm">Second Party (Hire-Purchaser / خریدار):</strong>
+              <strong className="block text-slate-900 text-sm">Second Party (Hire-Purchaser / Customer):</strong>
               <p className="font-bold text-slate-900">{plan.customerName} S/O {customer?.fatherName || "—"}</p>
               <p>CNIC: {formatCNIC(decryptField(customer?.cnic || plan.customerCnic))}</p>
               <p>Residence: {customer?.address || plan.areaZone}</p>
@@ -94,7 +94,7 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
           {/* Asset & Financial Terms */}
           <div className="space-y-2">
             <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-1">
-              1. Asset Description & Financial Schedule (تفصیل سامان و شیڈول اقساط)
+              1. Asset Description & Financial Schedule
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border">
               <div>
@@ -119,7 +119,7 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
           {/* Legal Clauses */}
           <div className="space-y-2 text-justify">
             <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-1">
-              2. Terms & Conditions (شرائط و ضوابط)
+              2. Terms & Conditions
             </h3>
             <ol className="list-decimal pl-5 space-y-1.5 text-[11px] text-slate-700">
               <li>
@@ -140,7 +140,7 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
           {/* Dual Guarantor Undertaking */}
           <div className="space-y-3 pt-2">
             <h3 className="font-bold text-slate-900 text-sm border-b border-slate-200 pb-1">
-              3. Joint & Several Guarantee Undertaking (اقرار نامہ و ضمانت ضامنان)
+              3. Joint & Several Guarantee Undertaking
             </h3>
             <p className="text-[11px] text-slate-600">
               We, the undersigned dual guarantors, hereby irrevocably guarantee the prompt payment of all dues by the purchaser. In event of default, we are jointly and severally liable to settle the remaining balance.
@@ -163,31 +163,31 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
           <div className="pt-8 grid grid-cols-4 gap-4 text-center text-xs">
             <div className="space-y-6">
               <div className="h-16 border-b border-slate-400 border-dashed"></div>
-              <span className="font-bold block text-slate-900">Purchaser Signature (دستخط خریدار)</span>
+              <span className="font-bold block text-slate-900">Purchaser Signature</span>
               <div className="w-16 h-20 border border-slate-300 mx-auto rounded flex items-center justify-center text-[10px] text-slate-400">
-                Thumb (انگوٹھا)
+                Thumb Impression
               </div>
             </div>
 
             <div className="space-y-6">
               <div className="h-16 border-b border-slate-400 border-dashed"></div>
-              <span className="font-bold block text-slate-900">Zamin 1 (ضامن اول)</span>
+              <span className="font-bold block text-slate-900">Guarantor 1</span>
               <div className="w-16 h-20 border border-slate-300 mx-auto rounded flex items-center justify-center text-[10px] text-slate-400">
-                Thumb (انگوٹھا)
+                Thumb Impression
               </div>
             </div>
 
             <div className="space-y-6">
               <div className="h-16 border-b border-slate-400 border-dashed"></div>
-              <span className="font-bold block text-slate-900">Zamin 2 (ضامن دوم)</span>
+              <span className="font-bold block text-slate-900">Guarantor 2</span>
               <div className="w-16 h-20 border border-slate-300 mx-auto rounded flex items-center justify-center text-[10px] text-slate-400">
-                Thumb (انگوٹھا)
+                Thumb Impression
               </div>
             </div>
 
             <div className="space-y-6">
               <div className="h-16 border-b border-slate-400 border-dashed"></div>
-              <span className="font-bold block text-slate-900">For Rajpoot Traders (مالکان)</span>
+              <span className="font-bold block text-slate-900">Authorized Signatory (Rajpoot Traders)</span>
               <div className="w-20 h-20 border-2 border-emerald-800 mx-auto rounded-full flex items-center justify-center text-[9px] font-bold text-emerald-800 uppercase p-1">
                 Official Seal
               </div>

@@ -88,7 +88,7 @@ export default function ExcelImportPage() {
             Excel & CSV Customer Import / Export
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            اپنے تمام پرانے کسٹمرز، بقایا اقساط، اور ضامنان کا ڈیٹا ایکسل فائل کے ذریعے ایک کلک میں امپورٹ کریں
+            Bulk import existing customer ledgers, active installment plans, and guarantors via Excel (.xlsx / .csv)
           </p>
         </div>
 
@@ -130,7 +130,7 @@ export default function ExcelImportPage() {
             Upload Existing Customers Spreadsheet (.xlsx, .xls, .csv)
           </h3>
           <p className="text-xs text-slate-500 font-urdu">
-            ایکسل فائل منتخب کریں جس میں نام، شناختی کارڈ، فون، پتہ، ضامن اور قسط کی تفصیلات موجود ہوں
+            Upload .xlsx or .csv spreadsheet containing customer records and active installment balances.
           </p>
         </div>
 
@@ -162,7 +162,7 @@ export default function ExcelImportPage() {
                 Preview Imported Customers ({parsedRows.length} Rows Ready)
               </h2>
               <p className="text-xs text-slate-500 font-urdu">
-                براہ کرم ڈیٹا کی جانچ کریں اور نیچے دیے گئے بٹن پر کلک کر کے سسٹم میں شامل کریں
+                Review and validate records before saving to production ledger.
               </p>
             </div>
 

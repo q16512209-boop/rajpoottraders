@@ -60,7 +60,7 @@ export default function NOCPrintPage() {
             className="flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
           >
             <Printer className="w-4 h-4" />
-            <span>Print Official NOC Certificate (پرنٹ این او سی)</span>
+            <span>Print Official NOC Certificate</span>
           </button>
         </div>
       </div>
@@ -88,7 +88,7 @@ export default function NOCPrintPage() {
           </p>
           <div className="pt-2">
             <span className="inline-block px-5 py-1 bg-emerald-900 text-white font-extrabold text-xs uppercase tracking-widest rounded-full shadow-sm">
-              Official No Objection Certificate (NOC / لا تعلقی و کلیرنس سرٹیفکیٹ)
+              Official No Objection Certificate (NOC / Clearance Certificate)
             </span>
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function NOCPrintPage() {
             <strong className="text-emerald-800 font-bold">{settlement?.nocCertificateId || `NOC-${plan.planNumber}`}</strong>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px]">Issue Date (تاریخ اجراء):</span>
+            <span className="text-slate-500 block text-[10px]">Issue Date:</span>
             <strong className="text-slate-900">{formatDate(settlement?.clearedAt || new Date().toISOString())}</strong>
           </div>
           <div>
@@ -115,7 +115,7 @@ export default function NOCPrintPage() {
         <div className="py-6 space-y-6 text-xs sm:text-sm leading-relaxed text-slate-800 relative z-10">
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
             <h2 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-              1. Kharedar & Product Identification (گاہک و سامان کی تفصیلات)
+              1. Customer & Product Identification
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
@@ -123,7 +123,7 @@ export default function NOCPrintPage() {
                 <strong className="text-slate-900 text-sm">{plan.customerName}</strong>
               </div>
               <div>
-                <span className="text-slate-500 block">CNIC (قومی شناختی کارڈ):</span>
+                <span className="text-slate-500 block">CNIC:</span>
                 <strong className="text-slate-900 font-mono">{formatCNIC(plan.customerCnic)}</strong>
               </div>
               <div>

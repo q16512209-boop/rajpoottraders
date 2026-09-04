@@ -33,7 +33,7 @@ export default function LoginPage() {
     setError(null);
 
     if (failedAttempts >= 5) {
-      setError("سیکیورٹی لاک: مسلسل 5 غلط کوششوں کی وجہ سے لاگ اِن عارضی طور پر بلاک ہے۔ کچھ دیر بعد کوشش کریں۔");
+      setError("Security Lock: Too many failed login attempts. Please wait 15 minutes before trying again.");
       return;
     }
 
@@ -46,7 +46,7 @@ export default function LoginPage() {
       router.push("/portal");
     } else {
       setFailedAttempts((prev) => prev + 1);
-      setError("درج کردہ ای میل یا پاس ورڈ غلط ہے۔ براہ کرم درست اور مجاز کریڈینشلز درج کریں۔");
+      setError("Invalid email or password. Please verify your registered credentials.");
       setIsSubmitting(false);
     }
   };
@@ -67,7 +67,7 @@ export default function LoginPage() {
             RAJPOOT TRADERS
           </h1>
           <p className="text-xs font-urdu text-emerald-400 font-semibold">
-            آسان اقساط و ٹریڈنگ مینجمنٹ پورٹل — محفوظ سیکیورٹی لاگ اِن
+            Installment Management & Retail Operations — Authorized Sign In
           </p>
           <div className="pt-1 flex justify-center">
             <UrduSpeaker customText="سیکیورٹی پورٹل۔ اپنا رجسٹرڈ ای میل اور پاس ورڈ درج کر کے داخل ہوں۔" size="sm" showLabel />
@@ -77,7 +77,7 @@ export default function LoginPage() {
         {/* Security Notice */}
         <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-400 text-[11px] font-urdu flex items-center gap-2.5">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>یہ ایک محفوظ پورٹل ہے۔ صرف مجاز ملازمین اور مالکان اپنے رجسٹرڈ پاس ورڈ سے داخل ہو سکتے ہیں۔</span>
+          <span>Secure Staff & Owner Portal. Please sign in with your authorized credentials.</span>
         </div>
 
         {error && (
@@ -91,7 +91,7 @@ export default function LoginPage() {
           <div>
             <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5 text-emerald-400" />
-              Registered Email (رجسٹرڈ ای میل ایڈریس)
+              Registered Email / Username
             </label>
             <input
               type="email"
@@ -107,7 +107,7 @@ export default function LoginPage() {
           <div>
             <label className="block text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
-              Password (پاس ورڈ)
+              Password
             </label>
             <div className="relative">
               <input
@@ -135,14 +135,14 @@ export default function LoginPage() {
             disabled={isSubmitting}
             className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
           >
-            <span>محفوظ لاگ اِن (Secure Sign In)</span>
+            <span>Secure Sign In</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
         <div className="text-center pt-2 border-t border-slate-800/80">
           <Link href="/" className="text-xs text-slate-400 hover:text-white transition-colors">
-            ← واپس پبلک ویب سائٹ پر جائیں
+            ← Back to Public Website
           </Link>
         </div>
       </div>

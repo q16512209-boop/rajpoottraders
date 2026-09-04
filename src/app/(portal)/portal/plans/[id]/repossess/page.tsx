@@ -105,10 +105,10 @@ export default function RepossessPlanPage() {
             <UrduSpeaker customText="نادہندہ معاہدے کی ضبطگی۔ سامان واپس لے کر ری فربشڈ اسٹاک میں درج کریں۔" size="sm" showLabel />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Repossess Product (سامان کی قانونی ضبطگی)
+            Product Repossession & Asset Recovery
           </h1>
           <p className="text-xs sm:text-sm text-rose-200/90 font-urdu leading-relaxed">
-            گاہک کی عدم ادائیگی پر پروڈکٹ کو قانونی تحویل میں لینا اور بقایا نقصان کی ایڈجسٹمنٹ
+            Legal repossession of asset upon permanent customer default and loss adjustment
           </p>
         </div>
 
@@ -122,12 +122,12 @@ export default function RepossessPlanPage() {
         {/* Contract & Default Snapshot */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">
-            1. Contract Default Overview (معاہدے کی تفصیلات)
+            1. Contract Default Overview
           </h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-sans">
             <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-500 block text-[11px]">Customer (خریدار)</span>
+              <span className="text-slate-500 block text-[11px]">Customer</span>
               <strong className="text-slate-900 font-bold block">{plan.customerName}</strong>
               <span className="text-slate-400 font-mono text-[10px]">{formatCNIC(plan.customerCnic)}</span>
             </div>
@@ -147,7 +147,7 @@ export default function RepossessPlanPage() {
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
               <span className="text-rose-700 font-bold block text-[11px]">Bad Debt Write-Off</span>
               <strong className="text-rose-800 font-black text-sm">{formatPKR(badDebtWrittenOff)}</strong>
-              <span className="text-rose-600 text-[10px]">نقصان کا اخراج</span>
+              <span className="text-rose-600 text-[10px]">Write-Off</span>
             </div>
           </div>
         </div>
@@ -155,13 +155,13 @@ export default function RepossessPlanPage() {
         {/* Repossession Physical Inspection Form */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">
-            2. Seizure & Physical Condition Details (ضبطگی و فزیکل حالت)
+            2. Seizure & Physical Condition Inspection
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block text-slate-700 font-bold mb-1">
-                Official Seizure Date (تاریخ ضبطگی) *
+                Official Seizure Date *
               </label>
               <input
                 type="date"
@@ -174,7 +174,7 @@ export default function RepossessPlanPage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">
-                Recovery Officer In-Charge (ریکوری افسر) *
+                Recovery Officer In-Charge *
               </label>
               <select
                 value={officerId}
@@ -191,7 +191,7 @@ export default function RepossessPlanPage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">
-                Physical Condition Rating (حالت کا درجہ) *
+                Physical Condition Rating *
               </label>
               <div className="flex items-center gap-2 pt-1">
                 {[1, 2, 3, 4, 5].map((rating) => (
@@ -211,17 +211,17 @@ export default function RepossessPlanPage() {
                 ))}
               </div>
               <span className="text-[10px] text-slate-400 mt-1 block">
-                {conditionRating === 1 && "1: شدید خراب / مرمت طلب (Severe Damage)"}
-                {conditionRating === 2 && "2: قابل استعمال لیکن خراشیں زیادہ (Heavily Used)"}
-                {conditionRating === 3 && "3: اوسط حالت / نارمل استعمال (Fair / Average)"}
-                {conditionRating === 4 && "4: بہت اچھی حالت (Very Good / Clean)"}
-                {conditionRating === 5 && "5: بالکل نئی جیسی حالت (Like New / Mint)"}
+                {conditionRating === 1 && "1: Severe Damage / Requires Repair"}
+                {conditionRating === 2 && "2: Heavily Used / Scratches"}
+                {conditionRating === 3 && "3: Fair / Average Condition"}
+                {conditionRating === 4 && "4: Very Good / Clean Condition"}
+                {conditionRating === 5 && "5: Like New / Mint Condition"}
               </span>
             </div>
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">
-                Witness Name / Reference (گواہ کا نام)
+                Witness Name / Reference
               </label>
               <input
                 type="text"
@@ -234,7 +234,7 @@ export default function RepossessPlanPage() {
 
             <div className="sm:col-span-2">
               <label className="block text-slate-700 font-bold mb-1">
-                Mileage / Physical Inspection & Damage Notes (تفصیلی معائنہ نوٹ) *
+                Physical Inspection & Damage Audit Notes *
               </label>
               <textarea
                 required
@@ -253,17 +253,17 @@ export default function RepossessPlanPage() {
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-amber-400" />
             <h2 className="text-base font-bold">
-              3. Refurbished Inventory Re-Stocking (استعمال شدہ اسٹاک میں اندراج)
+              3. Refurbished Inventory Re-Stocking
             </h2>
           </div>
 
           <p className="text-xs text-slate-300 font-urdu leading-relaxed">
-            یہ پروڈکٹ خودکار طور پر راجپوت ٹریڈرز کے کیٹلاگ میں بطور <strong>Refurbished / Used Stock</strong> شامل کر دی جائے گی تاکہ اسے دوبارہ فروخت کیا جا سکے۔
+            This product will automatically be added to inventory as Refurbished / Used Stock for resale.
           </p>
 
           <div className="max-w-xs">
             <label className="block text-slate-300 font-bold mb-1 text-xs">
-              Resale Valuation Price (دوبارہ فروخت کی قیمت - Rs.) *
+              Resale Valuation Price (Rs.) *
             </label>
             <input
               type="number"
@@ -291,7 +291,7 @@ export default function RepossessPlanPage() {
             className="px-8 py-3.5 bg-gradient-to-r from-rose-700 to-rose-800 hover:from-rose-600 hover:to-rose-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <ShieldAlert className="w-4 h-4" />
-            <span>Confirm Repossession & Write-Off (قانونی ضبطگی مکمل کریں)</span>
+            <span>Confirm Repossession & Update Inventory</span>
           </button>
         </div>
       </form>

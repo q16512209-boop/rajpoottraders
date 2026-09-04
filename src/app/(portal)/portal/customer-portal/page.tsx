@@ -14,7 +14,7 @@ export default function CustomerPortalPage() {
   if (!currentUser) {
     return (
       <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
-        <p className="text-xs text-slate-500">براہ کرم پہلے لاگ اِن کریں</p>
+        <p className="text-xs text-slate-500">Please sign in first</p>
       </div>
     );
   }
@@ -34,7 +34,7 @@ export default function CustomerPortalPage() {
           Welcome, {currentUser.name}
         </h1>
         <p className="text-xs text-emerald-200">
-          راجپوت ٹریڈرز کا محفوظ کسٹمر پورٹل — اپنی اقساط اور تصدیقی رسیدیں دیکھیں
+          Customer Installment Portal — View active plans, payment history, and official digital receipts.
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export default function CustomerPortalPage() {
         </div>
       ) : (
         <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-xs text-slate-500">
-          کوئی فعال اقساط پلان موجود نہیں ہے۔
+          No active installment plans found for your account.
         </div>
       )}
     </div>

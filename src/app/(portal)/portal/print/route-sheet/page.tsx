@@ -39,7 +39,7 @@ export default function PrintRouteSheetPage() {
               {currentTenant.brandHeader}
             </h1>
             <p className="text-xs font-urdu font-bold text-emerald-800">
-              روزانہ فیلڈ ریکوری شیٹ برائے وصولی اقساط
+              Daily Field Recovery & Collection Route Sheet
             </p>
             <p className="text-[11px] text-slate-500">
               Branch: {currentTenant.name} • Date: {formatDate(new Date())}

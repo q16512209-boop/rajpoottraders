@@ -177,7 +177,7 @@ export default function AdminBlogsPage() {
             SEO Blog & Marketing CMS Engine
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            گوگل سرچ پر راجپوت ٹریڈرز کی ناموری، نئی رہنمائی اور آسان اقساط کے معلوماتی مضامین کی اشاعت
+            Publish SEO articles, buying guides, and installment announcements to Google Search ranking.
           </p>
         </div>
 
@@ -186,7 +186,7 @@ export default function AdminBlogsPage() {
           className="flex items-center justify-center gap-2 px-5 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-xs rounded-2xl shadow-lg transition-all self-start md:self-auto"
         >
           <Plus className="w-4 h-4 text-amber-300" />
-          <span>Write New SEO Article (نیا بلاگ لکھیں)</span>
+          <span>Write New SEO Article</span>
         </button>
       </div>
 
@@ -198,7 +198,7 @@ export default function AdminBlogsPage() {
               Published Marketing Articles ({filteredArticles.length})
             </h2>
             <p className="text-xs text-slate-500 font-urdu">
-              پبلک بلاگ پر شائع شدہ تمام مضامین کا انتظام
+              Manage all published and draft articles.
             </p>
           </div>
 
@@ -307,7 +307,7 @@ export default function AdminBlogsPage() {
                   {editingArticleId ? "Edit Existing Article" : "Compose New SEO Blog Post"}
                 </span>
                 <h2 className="text-lg font-black">
-                  {editingArticleId ? "مضمون میں ترمیم کریں" : "نیا بلاگ مضمون تحریر کریں"}
+                  {editingArticleId ? "Edit Article" : "Write New SEO Article"}
                 </h2>
               </div>
               <button
@@ -339,14 +339,14 @@ export default function AdminBlogsPage() {
 
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">
-                    Urdu Nastaleeq Heading (اردو عنوان) *
+                    Urdu / English Headline *
                   </label>
                   <input
                     type="text"
                     required
                     value={urduTitle}
                     onChange={(e) => setUrduTitle(e.target.value)}
-                    placeholder="مثال: لاہور میں آسان اقساط پر انورٹر اے سی خریدنے کی مکمل گائیڈ"
+                    placeholder="e.g. Complete Guide to Buying Inverter AC on Easy Installments in Chiniot"
                     className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-purple-600 outline-none font-urdu text-right text-sm"
                   />
                 </div>
@@ -445,28 +445,28 @@ export default function AdminBlogsPage() {
                 <div className="flex flex-wrap gap-1.5 text-[11px]">
                   <button
                     type="button"
-                    onClick={() => insertSnippet("<h2>Main Heading (اہم سرخی)</h2>")}
+                    onClick={() => insertSnippet("<h2>Main Heading</h2>")}
                     className="px-2 py-1 bg-white hover:bg-slate-200 rounded border border-slate-300 font-bold"
                   >
                     + H2 Heading
                   </button>
                   <button
                     type="button"
-                    onClick={() => insertSnippet("<h3>Sub Heading (ذیلی سرخی)</h3>")}
+                    onClick={() => insertSnippet("<h3>Sub Heading</h3>")}
                     className="px-2 py-1 bg-white hover:bg-slate-200 rounded border border-slate-300 font-bold"
                   >
                     + H3 Heading
                   </button>
                   <button
                     type="button"
-                    onClick={() => insertSnippet("<ul>\n  <li>پوائنٹ 1</li>\n  <li>پوائنٹ 2</li>\n</ul>")}
+                    onClick={() => insertSnippet("<ul>\n  <li>Key Benefit 1</li>\n  <li>Key Benefit 2</li>\n</ul>")}
                     className="px-2 py-1 bg-white hover:bg-slate-200 rounded border border-slate-300 font-bold"
                   >
                     + Bullet List
                   </button>
                   <button
                     type="button"
-                    onClick={() => insertSnippet('<div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl font-urdu"><strong>اہم نوٹ:</strong> تمام شرائط پنجاب ای اسٹامپ پر تصدیق شدہ ہوتی ہیں۔</div>')}
+                    onClick={() => insertSnippet('<div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl font-urdu"><strong>Important:</strong> All contracts are verified on Punjab e-Stamp.</div>')}
                     className="px-2 py-1 bg-white hover:bg-slate-200 rounded border border-slate-300 font-bold text-emerald-700"
                   >
                     + Urdu Alert Box

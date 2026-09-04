@@ -42,7 +42,7 @@ export default function UsersManagementPage() {
   const [role, setRole] = useState<UserRole>("FIELD_RECOVERY");
   const [phone, setPhone] = useState("");
   const [tenantId, setTenantId] = useState(currentTenant.id);
-  const [routeZone, setRouteZone] = useState("محلہ رحمن آباد و مسلم بازار چنیوٹ");
+  const [routeZone, setRouteZone] = useState("Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
 
   // Edit Form State
   const [editUserId, setEditUserId] = useState<string>("");
@@ -51,7 +51,7 @@ export default function UsersManagementPage() {
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("FIELD_RECOVERY");
   const [editPhone, setEditPhone] = useState("");
-  const [editRouteZone, setEditRouteZone] = useState("محلہ رحمن آباد و مسلم بازار چنیوٹ");
+  const [editRouteZone, setEditRouteZone] = useState("Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
   const [editStatus, setEditStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [showEditPass, setShowEditPass] = useState(false);
 
@@ -66,8 +66,8 @@ export default function UsersManagementPage() {
     return (
       <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 space-y-2">
         <AlertTriangle className="w-8 h-8 text-rose-600 mx-auto" />
-        <h2 className="text-lg font-bold text-slate-900">رسائی کی اجازت نہیں ہے (Access Restricted)</h2>
-        <p className="text-xs text-slate-500 font-urdu">صرف سپر ایڈمن یا دکان کے مالکان کو اسٹاف بنانے اور پاس ورڈ دیکھنے کی اجازت ہے۔</p>
+        <h2 className="text-lg font-bold text-slate-900">Access Restricted</h2>
+        <p className="text-xs text-slate-500 font-urdu">Only Super Admin and Shop Owner are authorized to manage staff accounts and view credentials.</p>
       </div>
     );
   }
@@ -81,7 +81,7 @@ export default function UsersManagementPage() {
 
   const handleOpenEdit = (user: User) => {
     if (isOwner && user.role === "SUPER_ADMIN") {
-      alert("دکان کا مالک سپر ایڈمن کے پاس ورڈ میں ترمیم نہیں کر سکتا۔");
+      alert("Unauthorized: Shop Owner cannot edit Super Admin credentials.");
       return;
     }
     setEditUserId(user.id);
@@ -90,7 +90,7 @@ export default function UsersManagementPage() {
     setEditPassword(user.password || "");
     setEditRole(user.role);
     setEditPhone(user.phone || "");
-    setEditRouteZone(user.assignedRouteZone || "محلہ رحمن آباد و مسلم بازار چنیوٹ");
+    setEditRouteZone(user.assignedRouteZone || "Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
     setEditStatus(user.status);
     setShowEditPass(false);
     setShowEditModal(true);
@@ -123,7 +123,7 @@ export default function UsersManagementPage() {
       setPhone("");
       setMsg({
         type: "success",
-        text: `نیا اسٹاف ممبر "${name}" بطور (${role}) کامیابی کے ساتھ شامل کر دیا گیا ہے۔ پاس ورڈ: ${password}`,
+        text: `Staff member "${name}" (${role}) created successfully! Password: ${password}`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create user" });
@@ -148,7 +148,7 @@ export default function UsersManagementPage() {
       setShowEditModal(false);
       setMsg({
         type: "success",
-        text: `اسٹاف ممبر "${editName}" کا پاس ورڈ اور کوائف کامیابی سے اپڈیٹ ہو گئے! نیا پاس ورڈ: ${editPassword}`,
+        text: `Staff member "${editName}" updated successfully! New Password: ${editPassword}`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to update user" });
@@ -156,12 +156,12 @@ export default function UsersManagementPage() {
   };
 
   const handleDeleteUser = (id: string, userName: string) => {
-    if (confirm(`کیا آپ واقعی اسٹاف ممبر "${userName}" کو سسٹم سے ہٹانا چاہتے ہیں؟`)) {
+    if (confirm(`Are you sure you want to remove staff member "${userName}" from the system?`)) {
       try {
         store.deleteUser(id);
         setUsers([...store.getUsers(currentTenant.id, currentUser.role)]);
         refreshUsers();
-        setMsg({ type: "success", text: `اسٹاف ممبر "${userName}" کو سسٹم سے ہٹا دیا گیا ہے۔` });
+        setMsg({ type: "success", text: `Staff member "${userName}" has been removed from the system.` });
       } catch (err: any) {
         setMsg({ type: "error", text: err.message });
       }
@@ -188,10 +188,10 @@ export default function UsersManagementPage() {
             <UrduSpeaker customText="اسٹاف مینجمنٹ، پاس ورڈ دیکھنے اور ایڈٹ کرنے کا پورٹل۔" size="sm" showLabel />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            اسٹاف و پاس ورڈ مینجمنٹ (Staff & Credentials)
+            Staff & Credentials Management
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            دکان کا مالک اور سپر ایڈمن تمام ملازمین (سیلز مین، ریکوری مین) کے پاس ورڈز دیکھ سکتے ہیں، بدل سکتے ہیں اور نیا اسٹاف بنا سکتے ہیں۔
+            Shop owners and super admins can manage staff accounts, view credentials, and reset login passwords.
           </p>
         </div>
 
@@ -200,7 +200,7 @@ export default function UsersManagementPage() {
           className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4" />
-          <span>نیا اسٹاف شامل کریں (Add Staff)</span>
+          <span>Add Staff Member</span>
         </button>
       </div>
 
@@ -217,32 +217,32 @@ export default function UsersManagementPage() {
       <div className="bg-emerald-50/70 border border-emerald-200 rounded-3xl p-5 text-xs text-emerald-950 space-y-2">
         <div className="flex items-center gap-2 font-black text-sm">
           <KeyRound className="w-4 h-4 text-emerald-700" />
-          <span className="font-urdu">راجپوت ٹریڈرز چنیوٹ — ایکٹو لاگ ان اسناد (Login Credentials)</span>
+          <span className="font-urdu">Rajpoot Traders - Active Staff Credentials</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
           {/* Super Admin ONLY visible when logged in as SUPER_ADMIN */}
           {isSuperAdmin && (
             <div className="p-3 bg-white rounded-xl border border-purple-200 space-y-0.5">
-              <span className="font-bold text-purple-900 block font-urdu">سپر ایڈمن (Main Boss):</span>
+              <span className="font-bold text-purple-900 block font-urdu">Super Admin:</span>
               <p className="font-mono text-slate-700">musama4288921@gmail.com</p>
               <p className="font-mono font-black text-purple-700">Pass: 33admin401</p>
             </div>
           )}
 
           <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-0.5">
-            <span className="font-bold text-amber-900 block font-urdu">دکان کا مالک (Shop Owner):</span>
+            <span className="font-bold text-amber-900 block font-urdu">Shop Owner:</span>
             <p className="font-mono text-slate-700">owner@rajpoottraders.com</p>
             <p className="font-mono font-black text-amber-700">Pass: owner123</p>
           </div>
 
           <div className="p-3 bg-white rounded-xl border border-blue-200 space-y-0.5">
-            <span className="font-bold text-blue-900 block font-urdu">سیلز مین (ضہیم):</span>
+            <span className="font-bold text-blue-900 block font-urdu">Salesman (Zaheem):</span>
             <p className="font-mono text-slate-700">salesman@rajpoottraders.com</p>
             <p className="font-mono font-black text-blue-700">Pass: sales123</p>
           </div>
 
           <div className="p-3 bg-white rounded-xl border border-emerald-200 space-y-0.5">
-            <span className="font-bold text-emerald-900 block font-urdu">فیلڈ ریکوری مین (بلال):</span>
+            <span className="font-bold text-emerald-900 block font-urdu">Field Recovery Officer (Bilal):</span>
             <p className="font-mono text-slate-700">recovery@rajpoottraders.com</p>
             <p className="font-mono font-black text-emerald-700">Pass: recovery123</p>
           </div>
@@ -258,7 +258,7 @@ export default function UsersManagementPage() {
               {isSuperAdmin ? "All System Users" : "Active Shop Staff Members"} ({visibleUsers.length})
             </h2>
             <p className="text-xs text-slate-500 font-urdu">
-              ہر ملازم کے سامنے آنکھ 👁️ کے نشان سے پاس ورڈ دیکھیں یا پینسل ✏️ کے بٹن سے تبدیل کریں
+              Toggle the eye icon to view passwords, or click the edit icon to reset staff credentials.
             </p>
           </div>
         </div>
@@ -277,7 +277,7 @@ export default function UsersManagementPage() {
                     <button
                       onClick={() => handleOpenEdit(u)}
                       className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                      title="ایڈٹ و پاس ورڈ ری سیٹ"
+                      title="Edit & Reset Password"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
@@ -285,7 +285,7 @@ export default function UsersManagementPage() {
                       <button
                         onClick={() => handleDeleteUser(u.id, u.name)}
                         className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg"
-                        title="اسٹاف ہٹائیں"
+                        title="Remove Staff"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -310,7 +310,7 @@ export default function UsersManagementPage() {
                       {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                  {u.assignedRouteZone && <p className="text-emerald-700 font-bold font-urdu">روٹ: {u.assignedRouteZone}</p>}
+                  {u.assignedRouteZone && <p className="text-emerald-700 font-bold font-urdu">Route: {u.assignedRouteZone}</p>}
                 </div>
               </div>
             );
@@ -324,7 +324,7 @@ export default function UsersManagementPage() {
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-extrabold text-[10px]">
                 <th className="py-3 px-4">Staff Member</th>
                 <th className="py-3 px-4">Role Tier</th>
-                <th className="py-3 px-4">Password (پاس ورڈ)</th>
+                <th className="py-3 px-4">Password</th>
                 <th className="py-3 px-4">Contact Phone</th>
                 <th className="py-3 px-4">Branch / Route</th>
                 <th className="py-3 px-4">Status</th>
@@ -353,7 +353,7 @@ export default function UsersManagementPage() {
                         <button
                           onClick={() => togglePasswordVisibility(u.id)}
                           className="text-slate-400 hover:text-slate-700 p-0.5"
-                          title={isPassVisible ? "پاس ورڈ چھپائیں" : "پاس ورڈ دیکھیں"}
+                          title={isPassVisible ? "Hide Password" : "Show Password"}
                         >
                           {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-emerald-700" />}
                         </button>
@@ -366,7 +366,7 @@ export default function UsersManagementPage() {
                       {u.assignedRouteZone ? (
                         <span className="text-emerald-700 font-bold">{u.assignedRouteZone}</span>
                       ) : (
-                        "چنیوٹ مین شوروم"
+                        "Chiniot Main Showroom"
                       )}
                     </td>
                     <td className="py-3 px-4">
@@ -381,7 +381,7 @@ export default function UsersManagementPage() {
                         <button
                           onClick={() => handleOpenEdit(u)}
                           className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors"
-                          title="پاس ورڈ اور کوائف تبدیل کریں (Edit Staff & Reset Password)"
+                          title="Edit Staff & Reset Password"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -419,7 +419,7 @@ export default function UsersManagementPage() {
                   Staff Credentials Editor
                 </span>
                 <h3 className="text-base font-black text-slate-900 mt-1 font-urdu">
-                  اسٹاف ممبر میں ترمیم و پاس ورڈ ری سیٹ
+                  Edit Staff & Reset Password
                 </h3>
               </div>
               <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">
@@ -429,7 +429,7 @@ export default function UsersManagementPage() {
 
             <form onSubmit={handleUpdateUser} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1 font-urdu">Staff Name (ملازم کا نام) *</label>
+                <label className="block text-slate-700 font-bold mb-1 font-urdu">Staff Full Name *</label>
                 <input
                   type="text"
                   required
@@ -466,7 +466,7 @@ export default function UsersManagementPage() {
               {/* Password Box with Show Toggle */}
               <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-1.5">
                 <label className="block text-amber-950 font-black font-urdu">
-                  نیا پاس ورڈ سیٹ کریں (Reset Password) *
+                  Reset Login Password *
                 </label>
                 <div className="relative">
                   <input
@@ -486,50 +486,50 @@ export default function UsersManagementPage() {
                   </button>
                 </div>
                 <span className="text-[10px] text-amber-800 font-urdu block">
-                  مالک ملازم کا پاس ورڈ یہاں تبدیل کر سکتا ہے اور ملازم اسی پاس ورڈ سے لاگ ان کرے گا۔
+                  Set the new login password for the staff member.
                 </span>
               </div>
 
               {/* Role & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">عہدہ / رول (Role Tier) *</label>
+                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Role Tier *</label>
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as UserRole)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                   >
-                    {isSuperAdmin && <option value="OWNER">دکان کا مالک (Shop Owner / Franchise)</option>}
-                    <option value="BRANCH_MANAGER">سیلز مین و کاؤنٹر مینیجر (Salesman / Manager)</option>
-                    <option value="FIELD_RECOVERY">موٹر سائیکل ریکوری افسر (Field Recovery Officer)</option>
+                    {isSuperAdmin && <option value="OWNER">Shop Owner / Franchise</option>}
+                    <option value="BRANCH_MANAGER">Salesman & Counter Manager</option>
+                    <option value="FIELD_RECOVERY">Field Recovery Officer</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">اکاؤنٹ اسٹیٹس (Status) *</label>
+                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Account Status *</label>
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value as any)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                   >
-                    <option value="ACTIVE">ACTIVE (فعال)</option>
-                    <option value="INACTIVE">INACTIVE (غیر فعال / معطل)</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="INACTIVE">INACTIVE</option>
                   </select>
                 </div>
               </div>
 
               {editRole === "FIELD_RECOVERY" && (
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">مخصوص ریکوری روٹ زون (Chiniot Route Zone)</label>
+                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Assigned Route Zone</label>
                   <select
                     value={editRouteZone}
                     onChange={(e) => setEditRouteZone(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
                   >
-                    <option value="محلہ رحمن آباد و مسلم بازار چنیوٹ">محلہ رحمن آباد و مسلم بازار چنیوٹ</option>
-                    <option value="چناب کالونی و لاہور روڈ چنیوٹ">چناب کالونی و لاہور روڈ چنیوٹ</option>
-                    <option value="جھنگ روڈ و کچہری چنیوٹ">جھنگ روڈ و کچہری چنیوٹ</option>
-                    <option value="ریلوے روڈ و محلہ عالی چنیوٹ">ریلوے روڈ و محلہ عالی چنیوٹ</option>
+                    <option value="Mohallah Rehman Abad & Muslim Bazaar, Chiniot">Mohallah Rehman Abad & Muslim Bazaar, Chiniot</option>
+                    <option value="Chenab Colony & Lahore Road, Chiniot">Chenab Colony & Lahore Road, Chiniot</option>
+                    <option value="Jhang Road & Katchery, Chiniot">Jhang Road & Katchery, Chiniot</option>
+                    <option value="Railway Road & Mohallah Aali, Chiniot">Railway Road & Mohallah Aali, Chiniot</option>
                   </select>
                 </div>
               )}
@@ -540,14 +540,14 @@ export default function UsersManagementPage() {
                   onClick={() => setShowEditModal(false)}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
-                  منسوخ کریں
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>محفوظ کریں اور پاس ورڈ اپڈیٹ کریں (Save Credentials)</span>
+                  <span>Save Changes & Update Password</span>
                 </button>
               </div>
             </form>
@@ -565,7 +565,7 @@ export default function UsersManagementPage() {
                   New Staff Onboarding
                 </span>
                 <h3 className="text-lg font-black text-slate-900 mt-1 font-urdu">
-                  نیا ملازم / افسر رجسٹر کریں (Register Staff)
+                  Register New Staff Member
                 </h3>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
@@ -575,11 +575,11 @@ export default function UsersManagementPage() {
 
             <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1 font-urdu">Staff Full Name (ملازم کا مکمل نام) *</label>
+                <label className="block text-slate-700 font-bold mb-1 font-urdu">Staff Full Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. ضہیم سیلز مین یا بلال ریکوری افسر"
+                  placeholder="e.g. Zaheem Salesman or Bilal Recovery"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none font-urdu"
@@ -600,7 +600,7 @@ export default function UsersManagementPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Login Password (پاس ورڈ) *</label>
+                  <label className="block text-slate-700 font-bold mb-1">Login Password *</label>
                   <input
                     type="text"
                     required
@@ -626,14 +626,14 @@ export default function UsersManagementPage() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">عہدہ / رول (Role Tier) *</label>
+                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Role Tier *</label>
                   {isSuperAdmin ? (
                     <select
                       value={role}
                       onChange={(e) => setRole(e.target.value as UserRole)}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
                     >
-                      <option value="OWNER">دکان کا مالک (Shop Owner / Franchise Partner)</option>
+                      <option value="OWNER">Shop Owner / Franchise Partner</option>
                     </select>
                   ) : (
                     <select
@@ -641,8 +641,8 @@ export default function UsersManagementPage() {
                       onChange={(e) => setRole(e.target.value as UserRole)}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
                     >
-                      <option value="BRANCH_MANAGER">سیلز مین و کاؤنٹر مینیجر (Salesman / Manager)</option>
-                      <option value="FIELD_RECOVERY">موٹر سائیکل ریکوری افسر (Field Recovery Officer)</option>
+                      <option value="BRANCH_MANAGER">Salesman & Counter Manager</option>
+                      <option value="FIELD_RECOVERY">Field Recovery Officer</option>
                     </select>
                   )}
                 </div>
@@ -650,16 +650,16 @@ export default function UsersManagementPage() {
 
               {role === "FIELD_RECOVERY" && (
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">مخصوص ریکوری روٹ زون (Chiniot Route Zone)</label>
+                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Assigned Route Zone</label>
                   <select
                     value={routeZone}
                     onChange={(e) => setRouteZone(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
                   >
-                    <option value="محلہ رحمن آباد و مسلم بازار چنیوٹ">محلہ رحمن آباد و مسلم بازار چنیوٹ</option>
-                    <option value="چناب کالونی و لاہور روڈ چنیوٹ">چناب کالونی و لاہور روڈ چنیوٹ</option>
-                    <option value="جھنگ روڈ و کچہری چنیوٹ">جھنگ روڈ و کچہری چنیوٹ</option>
-                    <option value="ریلوے روڈ و محلہ عالی چنیوٹ">ریلوے روڈ و محلہ عالی چنیوٹ</option>
+                    <option value="Mohallah Rehman Abad & Muslim Bazaar, Chiniot">Mohallah Rehman Abad & Muslim Bazaar, Chiniot</option>
+                    <option value="Chenab Colony & Lahore Road, Chiniot">Chenab Colony & Lahore Road, Chiniot</option>
+                    <option value="Jhang Road & Katchery, Chiniot">Jhang Road & Katchery, Chiniot</option>
+                    <option value="Railway Road & Mohallah Aali, Chiniot">Railway Road & Mohallah Aali, Chiniot</option>
                   </select>
                 </div>
               )}
@@ -670,14 +670,14 @@ export default function UsersManagementPage() {
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
-                  منسوخ کریں
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>اسٹاف شامل کریں (Save Staff)</span>
+                  <span>Save Staff Member</span>
                 </button>
               </div>
             </form>

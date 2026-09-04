@@ -326,3 +326,25 @@ export interface LegacyCustomerInput {
   nextDueDate: string;
   createdBy: string;
 }
+
+export interface IClaimRequest {
+  id: string;
+  tenantId: string;
+  type: "WARRANTY_CLAIM" | "RETURN_WAPSI" | "PRODUCT_ISSUE" | "DISPUTE";
+  planId?: string;
+  planNumber?: string;
+  customerId?: string;
+  customerName: string;
+  customerPhone: string;
+  productTitle: string;
+  imeiSerial?: string;
+  issueDescription: string;
+  physicalConditionNotes?: string;
+  requestedBy: string;
+  requestedByName: string;
+  requesterRole: UserRole;
+  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "RESOLVED";
+  resolutionNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}

@@ -53,7 +53,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const [reschedModalOpen, setReschedModalOpen] = useState(false);
   const [reschedInstNo, setReschedInstNo] = useState<number>(1);
   const [newDueDate, setNewDueDate] = useState<string>("");
-  const [reschedReason, setReschedReason] = useState<string>("گاہک نے تاریخ تبدیل کروائی");
+  const [reschedReason, setReschedReason] = useState<string>("Customer requested reschedule");
 
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -82,7 +82,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const handleOpenReschedule = (item: any) => {
     setReschedInstNo(item.installmentNo);
     setNewDueDate(item.dueDate);
-    setReschedReason("گاہک نے تاریخ تبدیل کروائی");
+    setReschedReason("Customer requested reschedule");
     setReschedModalOpen(true);
     setMsg(null);
   };
@@ -108,7 +108,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
       setPlan({ ...store.getPlanById(plan.id)! });
       setPayModalOpen(false);
-      setMsg({ type: "success", text: `ادائیگی کامیابی سے درج ہو گئی! ${res.allocation.summary} (Receipt #${res.receiptId})` });
+      setMsg({ type: "success", text: `Payment recorded successfully! ${res.allocation.summary} (Receipt #${res.receiptId})` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Payment logging failed" });
     }
@@ -117,7 +117,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const handleConfirmCorrection = (e: React.FormEvent) => {
     e.preventDefault();
     if (!corrReason.trim()) {
-      alert("براہ کرم کھاتہ میں تصحیح کی باضابطہ وجہ درج کریں۔");
+      alert("Please enter a valid reason for khata correction.");
       return;
     }
 
@@ -135,7 +135,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       setCorrModalOpen(false);
       setMsg({
         type: "success",
-        text: `کھاتہ قسط #${corrInstNo} میں کامیابی سے ترمیم کر دی گئی۔ آڈٹ لاگ محفوظ ہو گیا۔`,
+        text: `Khata installment #${corrInstNo} corrected successfully! Audit log created.`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
@@ -157,7 +157,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       setReschedModalOpen(false);
       setMsg({
         type: "success",
-        text: `قسط #${reschedInstNo} کی تاریخ کامیابی سے بدل کر (${newDueDate}) کر دی گئی۔ روٹ شیٹ اپڈیٹ ہو گئی۔`,
+        text: `Installment #${reschedInstNo} due date rescheduled to (${newDueDate}). Route sheet updated.`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
@@ -167,11 +167,11 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const handleConfirmTransfer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetPlanId) {
-      alert("براہ کرم دوسرا کھاتہ منتخب کریں۔");
+      alert("Please select destination khata.");
       return;
     }
     if (!xferReason.trim()) {
-      alert("براہ کرم کھاتہ ٹرانسفر کی وجہ درج کریں۔");
+      alert("Please enter transfer reason note.");
       return;
     }
 
@@ -188,7 +188,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       setXferModalOpen(false);
       setMsg({
         type: "success",
-        text: `رقم ${formatPKR(xferAmount)} غلط کھاتے سے نکال کر صحیح کھاتے میں کامیابی سے منتقل کر دی گئی۔`,
+        text: `Successfully transferred ${formatPKR(xferAmount)} from misposted khata to destination khata.`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
@@ -202,10 +202,10 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-mono bg-emerald-100 text-emerald-900 px-3 py-1 rounded-lg font-black border border-emerald-300">
-              کھاتہ نمبر: {plan.khataNumber || plan.planNumber}
+              Khata #{plan.khataNumber || plan.planNumber}
             </span>
             <span className="text-xs font-bold bg-slate-900 text-amber-300 px-3 py-1 rounded-lg border border-slate-700 font-urdu">
-              سیل مین: {plan.salesmanName || "ضہیم"}
+              Salesman: {plan.salesmanName || "Zaheem"}
             </span>
             <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${getStatusBadgeClass(plan.status)}`}>
               {plan.status}
@@ -213,10 +213,10 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
             <UrduSpeaker customText="اقساط معاہدہ کی تفصیلات، قسط وصولی، تاریخ تبدیلی یا کھاتہ تصحیح۔" size="sm" showLabel />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 font-urdu">
-            نام اشیاء: {plan.productTitle}
+            Product Title: {plan.productTitle}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5 font-urdu">
-            نام خریدار: <strong className="text-slate-900">{plan.customerName}</strong> ({formatCNIC(plan.customerCnic)}) • کسٹمر فون: <strong className="text-slate-900">{plan.customerPhone}</strong>
+            Customer: <strong className="text-slate-900">{plan.customerName}</strong> ({formatCNIC(plan.customerCnic)}) • Phone: <strong className="text-slate-900">{plan.customerPhone}</strong>
           </p>
         </div>
 
@@ -227,7 +227,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
               className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow transition-colors"
             >
               <ArrowLeftRight className="w-4 h-4" />
-              <span>Transfer Payment (غلط کھاتہ ٹرانسفر)</span>
+              <span>Transfer Misposted Payment</span>
             </button>
           )}
 
@@ -266,14 +266,14 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
           >
             <FileText className="w-4 h-4 text-amber-300" />
-            <span>پرنٹ قانونی معاہدہ</span>
+            <span>Print Legal Agreement</span>
           </Link>
           <Link
             href={`/portal/print/receipt/${plan.id}`}
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl shadow transition-colors"
           >
             <Receipt className="w-4 h-4" />
-            <span>پرنٹ پرچی رسید</span>
+            <span>Print Thermal Receipt</span>
           </Link>
         </div>
       </div>
@@ -290,23 +290,23 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       {/* Financial Overview Cards (Matching Register) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">قسط کا شیڈول</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Installment Schedule</span>
           <strong className="text-lg font-black text-slate-900">
-            {formatPKR(plan.monthlyInstallment)} {plan.installmentFrequency === "WEEKLY" ? "(ہفتہ)" : "(ماہ)"}
+            {formatPKR(plan.monthlyInstallment)} {plan.installmentFrequency === "WEEKLY" ? "/ Week" : "/ Month"}
           </strong>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">ایڈوانس رقم</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Down Payment</span>
           <strong className="text-lg font-bold text-emerald-700">{formatPKR(plan.downPayment)}</strong>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">شارٹ بقایا جات</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Short Balance / Arrears</span>
           <strong className={`text-lg font-black ${plan.accumulatedShortArrears > 0 ? "text-rose-700" : "text-slate-900"}`}>
             {formatPKR(plan.accumulatedShortArrears)}
           </strong>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">کل قیمت (Total Price)</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Total Price (Total Price)</span>
           <strong className="text-lg font-bold text-slate-900">{formatPKR(plan.totalFinanced)}</strong>
         </div>
       </div>
@@ -316,16 +316,16 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
           <div>
             <h2 className="text-base font-black text-slate-900 font-urdu">
-              کھاتہ اقساط شیڈول ({plan.schedule.length} اقساط) • قسط کا دن: {plan.collectionDayName || "ہفتہ"}
+              Installment Ledger Schedule ({plan.schedule.length} Installments) • Collection Day: {plan.collectionDayName || "Saturday"}
             </h2>
             <p className="text-xs text-slate-500 font-urdu">
-              رجسٹر کے مطابق تاریخ، وصولی، بقایا رقم اور وصول کنندہ کا باضابطہ ریکارڈ
+              Official ledger records, payment collection history, short arrears, and collector audit trail
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg font-urdu">
-              ریکوری سائیکل: ہر {plan.collectionIntervalDays || 7} دن بعد
+              Collection Cycle: Every {plan.collectionIntervalDays || 7} Days
             </span>
           </div>
         </div>
@@ -335,12 +335,12 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-black text-[11px] font-urdu">
                 <th className="py-3 px-3">#</th>
-                <th className="py-3 px-3">تاریخ (Due Date)</th>
-                <th className="py-3 px-3">قسط رقم (Obligation)</th>
-                <th className="py-3 px-3 text-emerald-800">جمع شدہ (Paid)</th>
-                <th className="py-3 px-3">حیثیت (Status)</th>
-                <th className="py-3 px-3">وصول کنندہ / نوٹس</th>
-                <th className="py-3 px-3 text-right">ایکشن (Action)</th>
+                <th className="py-3 px-3">Due Date</th>
+                <th className="py-3 px-3">Due Amount</th>
+                <th className="py-3 px-3 text-emerald-800">Paid (PKR)</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Collector / Notes</th>
+                <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -385,7 +385,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                       {item.status !== "PAID" && (
                         <button
                           onClick={() => handleOpenReschedule(item)}
-                          title="تاریخ تبدیل کریں (Reschedule Collection Day)"
+                          title="Reschedule Due Date / Collection Day"
                           className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg border border-blue-200 transition-colors"
                         >
                           <Calendar className="w-3.5 h-3.5" />
@@ -396,7 +396,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                       {isOwnerOrSuperAdmin && (
                         <button
                           onClick={() => handleOpenCorrection(item)}
-                          title="کھاتہ درست کریں (Edit / Correct Khata)"
+                          title="Owner Khata Correction & Audit"
                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg border border-slate-300 transition-colors"
                         >
                           <Edit3 className="w-3.5 h-3.5 text-amber-700" />
@@ -418,7 +418,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-emerald-600" />
-                قسط وصولی درج کریں (Inst #{activeInstallmentNo})
+                Record Installment Payment (Inst #{activeInstallmentNo})
               </h3>
               <button
                 onClick={() => setPayModalOpen(false)}
@@ -430,7 +430,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleRecordPayment} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-600 font-bold mb-1">وصول شدہ رقم (Rs.) *</label>
+                <label className="block text-slate-600 font-bold mb-1">Amount Paid (PKR) *</label>
                 <input
                   type="number"
                   required
@@ -442,10 +442,10 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               <div>
-                <label className="block text-slate-600 font-bold mb-1">وصولی کا نوٹ / تفصیل</label>
+                <label className="block text-slate-600 font-bold mb-1">Payment Receipt Note</label>
                 <input
                   type="text"
-                  placeholder="مثلاً: دکان پر ادا کی یا ریکوری مین نے وصول کی"
+                  placeholder="e.g. Paid at shop counter or collected by field officer"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
                   className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
@@ -458,13 +458,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   onClick={() => setPayModalOpen(false)}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
-                  منسوخ کریں
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow"
                 >
-                  ادائیگی محفوظ کریں
+                  Record Payment
                 </button>
               </div>
             </form>
@@ -482,7 +482,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   Reschedule Installment Due Date
                 </span>
                 <h3 className="text-base font-black text-slate-900 mt-1">
-                  قسط #{reschedInstNo} کی تاریخ تبدیل کریں
+                  Reschedule Due Date (Inst #{reschedInstNo})
                 </h3>
               </div>
               <button onClick={() => setReschedModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
@@ -492,7 +492,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleConfirmReschedule} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">نئی وصولی تاریخ (New Due Date) *</label>
+                <label className="block text-slate-700 font-bold mb-1">New Due Date *</label>
                 <input
                   type="date"
                   required
@@ -503,13 +503,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">تاریخ تبدیلی کی وجہ (Reason) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Reschedule Reason *</label>
                 <input
                   type="text"
                   required
                   value={reschedReason}
                   onChange={(e) => setReschedReason(e.target.value)}
-                  placeholder="مثلاً: گاہک نے کہا کہ جمعہ کو تنخواہ ملے گی تو تب آنا..."
+                  placeholder="e.g. Customer requested salary day alignment..."
                   className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -520,14 +520,14 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   onClick={() => setReschedModalOpen(false)}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
-                  منسوخ کریں
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>تاریخ محفوظ کریں (Save New Date)</span>
+                  <span>Save New Due Date</span>
                 </button>
               </div>
             </form>
@@ -555,7 +555,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleConfirmCorrection} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Corrected Amount Paid (وصول شدہ اصل رقم - Rs.) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Corrected Amount Paid (Rs.) *</label>
                 <input
                   type="number"
                   required
@@ -567,27 +567,27 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Status (حیثیت) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Installment Status *</label>
                 <select
                   value={corrStatus}
                   onChange={(e) => setCorrStatus(e.target.value as any)}
                   className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
                 >
-                  <option value="PAID">PAID (مکمل ادا شدہ)</option>
-                  <option value="SHORT_PAID">SHORT_PAID (جزوی قسط / بقایا باقی)</option>
-                  <option value="PENDING">PENDING (غیر ادا شدہ)</option>
-                  <option value="OVERDUE">OVERDUE (تاخیر کا شکار)</option>
+                  <option value="PAID">PAID (Fully Paid)</option>
+                  <option value="SHORT_PAID">SHORT_PAID (Partial / Short Payment)</option>
+                  <option value="PENDING">PENDING (Unpaid / Due)</option>
+                  <option value="OVERDUE">OVERDUE (Defaulted / Overdue)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Correction Reason (تصحیح کی باضابطہ وجہ) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Correction & Adjustment Reason *</label>
                 <textarea
                   required
                   rows={3}
                   value={corrReason}
                   onChange={(e) => setCorrReason(e.target.value)}
-                  placeholder="مثلاً: ریکوری افسر نے غلطی سے 3000 کی جگہ 5000 درج کر دیا تھا یا کیش ایڈجسٹمنٹ..."
+                  placeholder="e.g. Officer miskeyed 5000 instead of 3000 or cash adjustment..."
                   className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-amber-600 font-urdu"
                 />
               </div>
@@ -605,7 +605,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Update & Save Khata (کھاتہ اپڈیٹ کریں)</span>
+                  <span>Update & Save Khata Record</span>
                 </button>
               </div>
             </form>
@@ -633,12 +633,12 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
             <form onSubmit={handleConfirmTransfer} className="space-y-4 text-xs">
               <div className="p-3 bg-slate-50 rounded-xl border space-y-1">
-                <span className="text-slate-500 block text-[11px]">From Khata (جہاں غلطی سے درج ہوئی):</span>
+                <span className="text-slate-500 block text-[11px]">Source Khata (Misposted Account):</span>
                 <strong className="text-slate-900 block font-bold">{plan.customerName} ({plan.planNumber})</strong>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">To Destination Khata (صحیح گاہک کا کھاتہ منتخب کریں) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Destination Khata (Target Customer Account) *</label>
                 <select
                   value={targetPlanId}
                   onChange={(e) => setTargetPlanId(e.target.value)}
@@ -646,14 +646,14 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 >
                   {allPlans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.customerName} — {p.productTitle} (کھاتہ #{p.khataNumber || p.planNumber})
+                      {p.customerName} — {p.productTitle} (Khata #{p.khataNumber || p.planNumber})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Amount to Transfer (رقم منتقل کریں - Rs.) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Amount to Transfer (PKR) *</label>
                 <input
                   type="number"
                   required
@@ -665,13 +665,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Mistake Explanation Note (غلطی کی وضاحت) *</label>
+                <label className="block text-slate-700 font-bold mb-1">Transfer & Audit Reason *</label>
                 <textarea
                   required
                   rows={3}
                   value={xferReason}
                   onChange={(e) => setXferReason(e.target.value)}
-                  placeholder="مثلاً: ریکوری افسر نے غلطی سے کھاتہ 33 میں رقم درج کر دی تھی جبکہ یہ کھاتہ 13 کی قسط تھی..."
+                  placeholder="e.g. Officer mistakenly credited Khata #33 instead of Khata #13..."
                   className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -689,7 +689,7 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
-                  <span>Transfer Money (رقم ٹرانسفر کریں)</span>
+                  <span>Execute Khata Transfer</span>
                 </button>
               </div>
             </form>

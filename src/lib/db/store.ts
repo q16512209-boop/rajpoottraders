@@ -28,6 +28,7 @@ import {
   LegacyCustomerInput,
   Guarantor,
   InstallmentScheduleItem,
+  IClaimRequest,
 } from "./types";
 import { ChainedLedgerBlock, computeBlockHash, verifyLedgerChain, LedgerEntryPayload } from "../crypto/hash-chain";
 import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
@@ -48,6 +49,27 @@ class AppStore {
   private repossessions: IRepossessionRecord[] = [];
   private settlements: ISettlementRecord[] = [];
   private ptpLogs: IPTPLog[] = [];
+  private claimRequests: IClaimRequest[] = [
+    {
+      id: "claim_demo_01",
+      tenantId: "tenant_chiniot",
+      type: "WARRANTY_CLAIM",
+      planId: "plan_khata_6",
+      planNumber: "RT-2026-0006",
+      customerId: "cust_khata_6",
+      customerName: "Akbar Ali (Nusrat Hussain)",
+      customerPhone: "0333-6717585",
+      productTitle: "Electric Heavy Iron",
+      imeiSerial: "SN-IRON-CHN-006",
+      issueDescription: "Iron thermostat tripping repeatedly during heating cycle.",
+      physicalConditionNotes: "Slight scratches on sole plate, otherwise good condition.",
+      requestedBy: "usr_recovery_bilal",
+      requestedByName: "Bilal Ahmed (Field Recovery)",
+      requesterRole: "FIELD_RECOVERY",
+      status: "PENDING_APPROVAL",
+      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    },
+  ];
   private isProductionCleanMode: boolean = true;
 
   // --- Authentication & User Management ---
@@ -1050,6 +1072,67 @@ class AppStore {
     }
 
     return { syncedCount: results.filter((r) => r.status === "SYNCED_OK").length, totalAmount, results };
+  }
+
+  // --- Warranty Claim & Wapsi / Return Requests ---
+  getClaimRequests(tenantId?: string): IClaimRequest[] {
+    if (!tenantId) return this.claimRequests;
+    return this.claimRequests.filter((c) => c.tenantId === tenantId);
+  }
+
+  createClaimRequest(params: Omit<IClaimRequest, "id" | "status" | "createdAt">): IClaimRequest {
+    const newClaim: IClaimRequest = {
+      ...params,
+      id: `claim_${Date.now()}`,
+      status: "PENDING_APPROVAL",
+      createdAt: new Date().toISOString(),
+    };
+    this.claimRequests.unshift(newClaim);
+
+    // Append Blockchain Ledger audit block
+    this.appendLedgerBlock({
+      id: `tx_claim_${newClaim.id}`,
+      tenantId: newClaim.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId: newClaim.planId,
+      customerId: newClaim.customerId,
+      actorId: newClaim.requestedBy,
+      notes: `[${newClaim.type}] Request logged by ${newClaim.requestedByName} (${newClaim.requesterRole}) for ${newClaim.productTitle}: ${newClaim.issueDescription}`,
+    });
+
+    return newClaim;
+  }
+
+  updateClaimRequestStatus(
+    id: string,
+    status: IClaimRequest["status"],
+    resolutionNotes?: string,
+    actor?: User
+  ): IClaimRequest {
+    const claim = this.claimRequests.find((c) => c.id === id);
+    if (!claim) throw new Error("Claim/Wapsi request not found");
+
+    claim.status = status;
+    claim.resolutionNotes = resolutionNotes;
+    claim.updatedAt = new Date().toISOString();
+
+    if (actor) {
+      this.appendLedgerBlock({
+        id: `tx_claim_status_${claim.id}_${Date.now()}`,
+        tenantId: claim.tenantId,
+        timestamp: new Date().toISOString(),
+        type: "INTERNAL_TRANSFER",
+        amount: 0,
+        planId: claim.planId,
+        customerId: claim.customerId,
+        actorId: actor.id,
+        notes: `Claim/Wapsi Request #${claim.id} status updated to ${status} by ${actor.name} (${actor.role}). Notes: ${resolutionNotes || "None"}`,
+      });
+    }
+
+    return claim;
   }
 
   // --- Sprint 6: Automated Encrypted Cloud Backup ---

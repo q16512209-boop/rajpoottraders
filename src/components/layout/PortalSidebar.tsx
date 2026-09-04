@@ -46,9 +46,9 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
   const roleBadgeInfo: Record<UserRole, { label: string; tier: string; color: string }> = {
     SUPER_ADMIN: { label: "Super Admin", tier: "Tier 0: Main Boss", color: "bg-purple-900/60 text-purple-200 border-purple-700" },
     OWNER: { label: "Shop Owner", tier: "Tier 1: Owner Pocket", color: "bg-amber-900/60 text-amber-200 border-amber-700" },
-    BRANCH_MANAGER: { label: "Branch Manager", tier: "Tier 2: Counter & KYC", color: "bg-blue-900/60 text-blue-200 border-blue-700" },
+    BRANCH_MANAGER: { label: "Branch Manager", tier: "Tier 2: Counter & Sales", color: "bg-blue-900/60 text-blue-200 border-blue-700" },
     FIELD_RECOVERY: { label: "Recovery Officer", tier: "Tier 3: Field & Routes", color: "bg-emerald-900/60 text-emerald-200 border-emerald-700" },
-    CUSTOMER: { label: "Customer / Kharedar", tier: "Tier 4: Self-Service", color: "bg-teal-900/60 text-teal-200 border-teal-700" },
+    CUSTOMER: { label: "Customer", tier: "Tier 4: Self-Service", color: "bg-teal-900/60 text-teal-200 border-teal-700" },
   };
 
   const navItems = [
@@ -56,8 +56,8 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
       title: "Core Operations",
       links: [
         { href: "/portal", label: "Dashboard Overview", icon: LayoutDashboard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY", "CUSTOMER"] },
-        { href: "/portal/products", label: "Products Catalog (اشیاء کیٹلاگ)", icon: Package, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/users", label: "Staff & Role Management", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER"] },
+        { href: "/portal/products", label: "Products Catalog & Inventory", icon: Package, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
+        { href: "/portal/users", label: "Staff & Credentials Management", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER"] },
         { href: "/portal/import", label: "Excel Bulk Importer", icon: Upload, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
         { href: "/portal/data-management", label: "Clean Production Setup", icon: Database, guideKey: "CLEAN_DATA", roles: ["SUPER_ADMIN", "OWNER"] },
       ],
@@ -80,11 +80,12 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
     {
       title: "Operations & KYC (Tier 2)",
       links: [
-        { href: "/portal/customers", label: "KYC Vault & Defaulter Radar", icon: Users, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/customers/legacy-entry", label: "Fast Old Khata Form (پرانا کھاتہ)", icon: UserCheck, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/customers/new", label: "Register Customer & Zamin", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
+        { href: "/portal/customers", label: "KYC Vault & Defaulter Radar", icon: Users, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
+        { href: "/portal/customers/legacy-entry", label: "Fast Old Khata Entry", icon: UserCheck, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
+        { href: "/portal/customers/new", label: "Register Customer & Guarantors", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
         { href: "/portal/plans", label: "Installment Plans & Arrears", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
         { href: "/portal/plans/new", label: "Create Hire-Purchase Plan", icon: CreditCard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
+        { href: "/portal/claims", label: "Warranty Claims & Item Returns", icon: CheckSquare, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
       ],
     },
     {
@@ -154,11 +155,11 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
           </span>
           <button
             onClick={logout}
-            className="text-[11px] font-urdu font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 hover:underline"
+            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 hover:underline"
             title="Sign Out"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>لاگ آؤٹ</span>
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
@@ -167,7 +168,7 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
       {currentUser.role === "SUPER_ADMIN" && (
         <div className="px-4 py-2.5 border-b border-slate-800/80 bg-slate-950/40">
           <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">
-            Active Branch (سپر ایڈمن ویو)
+            Active Branch (Super Admin View)
           </label>
           <div className="relative">
             <select

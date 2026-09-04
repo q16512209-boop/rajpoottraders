@@ -33,8 +33,8 @@ export default function NewCustomerPage() {
   const [secondaryPhone, setSecondaryPhone] = useState("");
   const [address, setAddress] = useState("");
   const [landmark, setLandmark] = useState("");
-  const [city, setCity] = useState("چنیوٹ (Chiniot)");
-  const [zoneArea, setZoneArea] = useState("محلہ رحمن آباد و مسلم بازار چنیوٹ");
+  const [city, setCity] = useState("Chiniot");
+  const [zoneArea, setZoneArea] = useState("Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
   const [gpsLocation, setGpsLocation] = useState<GPSLocation | undefined>(undefined);
 
   // Guarantor 1 State (Mandatory)
@@ -42,7 +42,7 @@ export default function NewCustomerPage() {
   const [g1Father, setG1Father] = useState("");
   const [g1Cnic, setG1Cnic] = useState("");
   const [g1Phone, setG1Phone] = useState("");
-  const [g1Relation, setG1Relation] = useState("بھائی / رشتہ دار");
+  const [g1Relation, setG1Relation] = useState("Brother / Relative");
   const [g1Address, setG1Address] = useState("");
   const [g1Work, setG1Work] = useState("");
 
@@ -51,7 +51,7 @@ export default function NewCustomerPage() {
   const [g2Father, setG2Father] = useState("");
   const [g2Cnic, setG2Cnic] = useState("");
   const [g2Phone, setG2Phone] = useState("");
-  const [g2Relation, setG2Relation] = useState("پڑوسی / کاروباری ریفرنس");
+  const [g2Relation, setG2Relation] = useState("Neighbor / Business Reference");
   const [g2Address, setG2Address] = useState("");
   const [g2Work, setG2Work] = useState("");
 
@@ -61,7 +61,7 @@ export default function NewCustomerPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !cnic || !phone || !address) {
-      alert("براہ کرم خریدار کی بنیادی تفصیلات (نام، شناختی کارڈ، فون اور پتہ) درج کریں۔");
+      alert("Please enter customer basic details (Name, CNIC, Phone, Address).");
       return;
     }
 
@@ -101,7 +101,7 @@ export default function NewCustomerPage() {
       phone,
       secondaryPhone,
       address,
-      landmark: landmark || (gpsLocation?.address ? `GPS Pin: ${gpsLocation.address}` : "نزد دیسی مسجد / چوک"),
+      landmark: landmark || (gpsLocation?.address ? `GPS Pin: ${gpsLocation.address}` : "Near Landmark / Bazaar"),
       city,
       zoneArea: gpsLocation?.aiSuggestedZone || zoneArea,
       photoUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
@@ -125,7 +125,7 @@ export default function NewCustomerPage() {
           New Customer & Dual Guarantors Registration
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 font-urdu">
-          خریدار اور دو ضامنان کی تصدیق، نادہندہ چیک اور AI لائیو جی پی ایس لوکیشن
+          Customer & Guarantor KYC Verification, Defaulter Radar & Live GPS Location
         </p>
       </div>
 
@@ -135,7 +135,7 @@ export default function NewCustomerPage() {
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
             <h3 className="font-bold text-sm uppercase tracking-wide">
-              Household Defaulter Radar Alert (نادہندہ الرٹ)
+              Household Defaulter Radar Alert
             </h3>
           </div>
           <p className="text-xs leading-relaxed font-urdu">
@@ -150,13 +150,13 @@ export default function NewCustomerPage() {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <User className="w-5 h-5 text-emerald-700" />
             <h2 className="text-base font-bold text-slate-900">
-              1. Kharedar Personal Details (خریدار کی ذاتی معلومات)
+              1. Customer Personal Information
             </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Full Name (مکمل نام) *</label>
+              <label className="block text-slate-700 font-bold mb-1">Full Name *</label>
               <input
                 type="text"
                 required
@@ -168,7 +168,7 @@ export default function NewCustomerPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Father / Husband Name (والد کا نام)</label>
+              <label className="block text-slate-700 font-bold mb-1">Father / Husband Name</label>
               <input
                 type="text"
                 value={fatherName}
@@ -179,7 +179,7 @@ export default function NewCustomerPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">CNIC Number (قومی شناختی کارڈ) *</label>
+              <label className="block text-slate-700 font-bold mb-1">CNIC Number *</label>
               <input
                 type="text"
                 required
@@ -191,7 +191,7 @@ export default function NewCustomerPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">Primary Mobile (موبائل نمبر) *</label>
+              <label className="block text-slate-700 font-bold mb-1">Primary Mobile Phone *</label>
               <input
                 type="tel"
                 required
@@ -214,35 +214,35 @@ export default function NewCustomerPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">City (شہر)</label>
+              <label className="block text-slate-700 font-bold mb-1">City (City)</label>
               <input
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="چنیوٹ (Chiniot)"
+                placeholder="Chiniot"
                 className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none font-urdu"
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-slate-700 font-bold mb-1">Physical Residential Address (مکمل رہائشی پتہ) *</label>
+              <label className="block text-slate-700 font-bold mb-1">Physical Residential Address *</label>
               <input
                 type="text"
                 required
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="نصرت کشیدہ کاری، نزد دیسی مسجد، چنیوٹ"
+                placeholder="Nusrat Embroidery, Near Desi Masjid, Chiniot"
                 className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
               />
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-slate-700 font-bold mb-1">Nearest Landmark (قریبی مشہور جگہ)</label>
+              <label className="block text-slate-700 font-bold mb-1">Nearest Landmark</label>
               <input
                 type="text"
                 value={landmark}
                 onChange={(e) => setLandmark(e.target.value)}
-                placeholder="نزد دیسی مسجد / چوک"
+                placeholder="e.g. Near Masjid / Chowk"
                 className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
               />
             </div>
@@ -264,7 +264,7 @@ export default function NewCustomerPage() {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Building className="w-5 h-5 text-emerald-700" />
             <h2 className="text-base font-bold text-slate-900">
-              2. ضامنان کی تصدیق (ضامن نمبر 2 اختیاری ہے)
+              2. Guarantors Information (Guarantor 2 is Optional)
             </h2>
           </div>
 
@@ -272,7 +272,7 @@ export default function NewCustomerPage() {
             {/* Guarantor 1 */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <span className="font-extrabold text-emerald-800 text-xs uppercase tracking-wider block">
-                Guarantor 1 (ضامن اول - لازمی) *
+                Guarantor 1 (Mandatory) *
               </span>
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Full Name</label>
@@ -280,7 +280,7 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g1Name}
                   onChange={(e) => setG1Name(e.target.value)}
-                  placeholder="محمد اسلم"
+                  placeholder="Muhammad Aslam"
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -305,12 +305,12 @@ export default function NewCustomerPage() {
                 />
               </div>
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Relation (رشتہ)</label>
+                <label className="block text-slate-700 font-bold mb-1">Relationship</label>
                 <input
                   type="text"
                   value={g1Relation}
                   onChange={(e) => setG1Relation(e.target.value)}
-                  placeholder="بھائی / پڑوسی"
+                  placeholder="e.g. Brother / Neighbor"
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -320,17 +320,17 @@ export default function NewCustomerPage() {
             <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-slate-700 text-xs uppercase tracking-wider block">
-                  Guarantor 2 (ضامن دوم - اختیاری)
+                  Guarantor 2 (Optional)
                 </span>
-                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">ضروری نہیں</span>
+                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">Optional</span>
               </div>
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Full Name (اگر ہو)</label>
+                <label className="block text-slate-700 font-bold mb-1">Full Name (If any)</label>
                 <input
                   type="text"
                   value={g2Name}
                   onChange={(e) => setG2Name(e.target.value)}
-                  placeholder="اختیاری..."
+                  placeholder="Optional..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -340,7 +340,7 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g2Cnic}
                   onChange={(e) => setG2Cnic(e.target.value)}
-                  placeholder="اختیاری..."
+                  placeholder="Optional..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>
@@ -350,17 +350,17 @@ export default function NewCustomerPage() {
                   type="tel"
                   value={g2Phone}
                   onChange={(e) => setG2Phone(e.target.value)}
-                  placeholder="اختیاری..."
+                  placeholder="Optional..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Relation (رشتہ)</label>
+                <label className="block text-slate-700 font-bold mb-1">Relationship</label>
                 <input
                   type="text"
                   value={g2Relation}
                   onChange={(e) => setG2Relation(e.target.value)}
-                  placeholder="اختیاری..."
+                  placeholder="Optional..."
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -382,7 +382,7 @@ export default function NewCustomerPage() {
             type="submit"
             className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-sm rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
           >
-            <span>Save KYC & Proceed to Plan (محفوظ کریں اور پلان بنائیں)</span>
+            <span>Save Customer & Create Plan</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

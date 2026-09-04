@@ -50,7 +50,7 @@ export default function CustomersPage() {
             className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl shadow transition-all border border-amber-400"
           >
             <UserCheck className="w-4 h-4 text-slate-950" />
-            <span>پرانے کسٹمر کا کھاتہ درج کریں (Old Khata Form)</span>
+            <span>Fast Old Khata Entry</span>
           </Link>
 
           <Link
@@ -58,7 +58,7 @@ export default function CustomersPage() {
             className="flex items-center gap-2 px-4 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
           >
             <UserPlus className="w-4 h-4 text-amber-300" />
-            <span>نیا کسٹمر رجسٹر کریں (New Customer)</span>
+            <span>Register New Customer</span>
           </Link>
         </div>
       </div>

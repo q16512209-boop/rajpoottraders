@@ -41,8 +41,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <span className="text-amber-300 font-serif">R</span>T
         </div>
         <div className="text-center space-y-1">
-          <h2 className="text-lg font-bold">راجپوت ٹریڈرز — سیکیورٹی چیک اپ</h2>
-          <p className="text-xs text-slate-400 font-urdu">سسٹم صارف کی توثیق اور رولز چیک کر رہا ہے...</p>
+          <h2 className="text-lg font-bold">Rajpoot Traders — Security Verification</h2>
+          <p className="text-xs text-slate-400 font-urdu">Authenticating user session & role permissions...</p>
         </div>
       </div>
     );
@@ -67,10 +67,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               </span>
             </div>
             <h1 className="text-2xl font-black tracking-tight">
-              لاگ اِن لازمی ہے (Sign In Required)
+              Sign In Required
             </h1>
             <p className="text-xs text-slate-300 font-urdu leading-relaxed">
-              راجپوت ٹریڈرز کے مینجمنٹ پورٹل میں داخل ہونے کے لیے پہلے اپنے مجاز ای میل اور پاس ورڈ سے لاگ اِن کریں۔
+              Please sign in with your authorized credentials to access the Rajpoot Traders management portal.
             </p>
           </div>
 
@@ -88,14 +88,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-xs"
             >
               <KeyRound className="w-4 h-4" />
-              <span>لاگ اِن صفحے پر جائیں (Go to Login)</span>
+              <span>Go to Sign In Page</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
           <div className="pt-1">
             <Link href="/" className="text-xs text-slate-400 hover:text-white transition-colors">
-              ← واپس پبلک ہوم پیج
+              ← Back to Public Website
             </Link>
           </div>
         </div>
@@ -109,9 +109,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white">
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl text-center space-y-4">
           <AlertOctagon className="w-12 h-12 text-amber-500 mx-auto" />
-          <h2 className="text-xl font-bold">برانچ لائسنس معطل ہے (Branch Suspended)</h2>
+          <h2 className="text-xl font-bold">Branch License Suspended</h2>
           <p className="text-xs text-slate-400 font-urdu leading-relaxed">
-            اس برانچ ({currentTenant.name}) کا پورٹل لائسنس معطل ہے۔ براہ کرم سپر ایڈمن اسامہ راجپوت (musama4288921@gmail.com) سے رابطہ کریں۔
+            The portal license for branch ({currentTenant.name}) has been suspended. Please contact Super Admin Usama Rajpoot (musama4288921@gmail.com).
           </p>
           <button onClick={logout} className="px-4 py-2 bg-slate-800 text-xs rounded-xl font-bold">
             Sign Out
@@ -136,10 +136,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               Access Restricted • 403 Forbidden
             </span>
             <h1 className="text-xl sm:text-2xl font-black text-white">
-              رسائی کی اجازت نہیں ہے
+              Access Restricted
             </h1>
             <p className="text-xs text-rose-300 font-urdu leading-relaxed">
-              {accessCheck.reason || "آپ کا موجودہ رول اس سیکشن کو کھولنے کی اجازت نہیں دیتا۔"}
+              {accessCheck.reason || "Your current user role does not have authorization to view this section."}
             </p>
           </div>
 
@@ -178,7 +178,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               href="/portal"
               className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl shadow text-xs transition-colors flex items-center justify-center gap-2"
             >
-              <span>اپنے مجاز ڈیش بورڈ پر جائیں (My Dashboard)</span>
+              <span>Go to My Dashboard</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
@@ -187,7 +187,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-2"
             >
               <LogOut className="w-3.5 h-3.5 text-rose-400" />
-              <span>لاگ آؤٹ کر کے دوسرا اکاؤنٹ استعمال کریں</span>
+              <span>Sign Out & Switch Account</span>
             </button>
           </div>
         </div>

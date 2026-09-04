@@ -149,7 +149,7 @@ export default function ReceiptPrintPage({ params }: { params: { id: string } })
               HASH: {plan.tamperProofHash.slice(0, 28)}
             </p>
             <p className="text-[10px] font-sans font-urdu text-slate-800">
-              راجپوت ٹریڈرز پر اعتماد کا شکریہ • ادائیگی باضابطہ وصول ہوئی
+              Thank you for trusting Rajpoot Traders • Official Payment Receipt
             </p>
             <div className="pt-3 border-t border-slate-300 flex justify-between text-[9px] text-slate-500">
               <span>Operator Sign</span>

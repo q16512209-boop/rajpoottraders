@@ -52,12 +52,12 @@ export default function EarlySettlementPage() {
     setError(null);
 
     if (rebatePct > 0 && !isAuthorizedForRebate) {
-      setError("منافع میں رعایت (Rebate > 0%) صرف سپر ایڈمن یا دکان کے مالک کے اختیار میں ہے۔");
+      setError("Markup Rebate (> 0%) requires authorization from Super Admin or Shop Owner.");
       return;
     }
 
     if (!targetWalletId) {
-      setError("براہ کرم رقم وصولی کے لیے والٹ منتخب کریں۔");
+      setError("Please select a destination cash wallet.");
       return;
     }
 
@@ -99,10 +99,10 @@ export default function EarlySettlementPage() {
             <UrduSpeaker customText="قبل از وقت مکمل ادائیگی اور منافع میں رعایت۔ کلیئرنس سرٹیفکیٹ جاری کریں۔" size="sm" showLabel />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Early Settlement Calculator (قبل از وقت یکمشت ادائیگی)
+            Early Settlement & NOC Clearance Calculator
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            بقیہ غیر واجب الادا منافع پر گاہک کو رعایت دے کر فوری این او سی (NOC) کلیئرنس جاری کرنا
+            Provide unearned profit discount for early lump-sum payment and issue instant NOC clearance.
           </p>
         </div>
 
@@ -123,12 +123,12 @@ export default function EarlySettlementPage() {
         {/* Step 1: Contract Snapshot */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">
-            1. Contract Status Overview (معاہدے کی موجودہ پوزیشن)
+            1. Contract Status Overview
           </h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-500 block text-[11px]">Kharedar (گاہک)</span>
+              <span className="text-slate-500 block text-[11px]">Customer</span>
               <strong className="text-slate-900 font-bold block">{plan.customerName}</strong>
               <span className="text-slate-400 font-mono text-[10px]">{formatCNIC(plan.customerCnic)}</span>
             </div>
@@ -146,7 +146,7 @@ export default function EarlySettlementPage() {
             </div>
 
             <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-500 block text-[11px]">Unearned Markup (بقیہ منافع)</span>
+              <span className="text-slate-500 block text-[11px]">Unearned Markup</span>
               <strong className="text-purple-700 font-bold text-sm">{formatPKR(calc.unearnedMarkup)}</strong>
               <span className="text-slate-400 text-[10px]">Future profit</span>
             </div>
@@ -158,10 +158,10 @@ export default function EarlySettlementPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-                2. Unearned Profit Rebate Discount (غیر واجب الادا منافع میں رعایت)
+                2. Unearned Profit Rebate Discount
               </h2>
               <p className="text-xs text-slate-500 font-urdu">
-                گاہک کی جلد ادائیگی پر منافع کا کتنا فیصد معاف کیا جائے؟
+                Percentage of unearned markup waived for early full settlement:
               </p>
             </div>
 
@@ -214,7 +214,7 @@ export default function EarlySettlementPage() {
               <Award className="w-4 h-4" />
               Settlement Ledger Breakdown
             </span>
-            <span className="text-xs font-urdu text-emerald-400">حتمی کلیئرنس رقم</span>
+            <span className="text-xs font-urdu text-emerald-400">Final Settlement Payable</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
@@ -242,7 +242,7 @@ export default function EarlySettlementPage() {
           </div>
 
           <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between text-xs">
-            <span className="text-slate-300 font-urdu">گاہک کو ملنے والا کل فائدہ (Total Customer Savings):</span>
+            <span className="text-slate-300 font-urdu">Total Customer Savings via Rebate:</span>
             <span className="text-sm font-black text-amber-300 font-mono">{formatPKR(calc.customerSavings)}</span>
           </div>
         </div>
@@ -250,13 +250,13 @@ export default function EarlySettlementPage() {
         {/* Step 4: Wallet Deposit & Approval */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4 text-xs">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">
-            3. Deposit Settlement Cash (رقم وصولی کا والٹ)
+            3. Deposit Settlement Cash
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-slate-700 font-bold mb-1">
-                Deposit Destination Wallet (رقم کہاں جمع ہو؟) *
+                Deposit Destination Wallet *
               </label>
               <select
                 value={targetWalletId}
@@ -273,7 +273,7 @@ export default function EarlySettlementPage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">
-                Approved By (منظور کنندہ)
+                Approved By
               </label>
               <input
                 type="text"
@@ -301,7 +301,7 @@ export default function EarlySettlementPage() {
             className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <FileCheck className="w-4 h-4 text-amber-300" />
-            <span>Approve Settlement & Print NOC (ادائیگی منظور کریں اور این او سی بنائیں)</span>
+            <span>Approve Early Settlement & Issue NOC</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

@@ -51,7 +51,7 @@ export function UrduSpeaker({
       <button
         type="button"
         onClick={handleSpeak}
-        title="اردو آواز میں رہنمائی سنیں (Urdu Voice Guide)"
+        title="Listen to Urdu Voice Guide"
         className={`inline-flex items-center justify-center gap-1 rounded-full transition-all focus:outline-none ${
           isPlaying
             ? "bg-amber-400 text-slate-950 scale-110 shadow-md ring-2 ring-amber-300 animate-pulse"
@@ -70,7 +70,7 @@ export function UrduSpeaker({
           <Volume2 className="w-3.5 h-3.5" />
         )}
         {showLabel && (
-          <span className="font-urdu font-bold text-[11px] px-1">اردو آواز</span>
+          <span className="font-bold text-[11px] px-1">Urdu Audio</span>
         )}
       </button>
 
@@ -79,7 +79,7 @@ export function UrduSpeaker({
         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 min-w-[220px] max-w-[300px] p-3 bg-slate-900 text-white rounded-2xl shadow-2xl border border-emerald-500/40 text-center animate-in fade-in zoom-in duration-200 pointer-events-none">
           <div className="flex items-center justify-center gap-1 text-[10px] text-amber-300 font-bold uppercase tracking-wider mb-1">
             <Sparkles className="w-3 h-3 text-amber-300" />
-            <span>اردو صوتی رہنمائی</span>
+            <span>Voice Guide</span>
           </div>
           <p className="font-urdu text-xs leading-relaxed text-slate-100 dir-rtl">
             {textToSpeak}

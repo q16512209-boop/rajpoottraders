@@ -83,7 +83,7 @@ export default function SuperAdminPage() {
             Super Admin Master Oversight & Cryptographic Audit
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 max-w-3xl font-urdu leading-relaxed">
-            راجپوت ٹریڈرز کا مرکزی مالیاتی اور سیکیورٹی کنٹرول روم۔ SHA-256 بلاک چین ٹرانزیکشن چین اور ملٹری گریڈ AES-256 فیلڈ انکرپشن
+            Rajpoot Traders Central Security & Audit Control Room. Real-time SHA-256 Blockchain Ledger & AES-256 Encryption.
           </p>
         </div>
 
@@ -122,7 +122,7 @@ export default function SuperAdminPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-urdu">
-                بلاک چین لیجر، کسٹمر شناختی کارڈ والٹ اور تمام معاہدوں کا خودکار کلاؤڈ اسنیپ شاٹ
+                Automated cloud snapshot of immutable blockchain ledger, customer CNIC vault, and signed legal agreements.
               </p>
             </div>
           </div>
@@ -199,7 +199,7 @@ export default function SuperAdminPage() {
                 SHA-256 Cryptographic Hash-Chain Ledger
               </h2>
               <p className="text-xs text-slate-500 font-urdu">
-                کسی بھی ٹرانزیکشن میں ردوبدل کو فوری پکڑنے والی بلاک چین آڈٹ چین
+                Cryptographic SHA-256 blockchain audit chain detecting any unauthorized ledger tampering.
               </p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function SuperAdminPage() {
               </strong>
               <span className="font-urdu">
                 {verificationResult.isValid
-                  ? `تمام ${ledgerChain.length} بلاکس کی زنجیر جینیسس سے لے کر آخری بلاک تک بالکل درست اور محفوظ ہے۔`
+                  ? `All ${ledgerChain.length} ledger blocks from genesis to current block are cryptographically valid and tamper-proof.`
                   : verificationResult.reason}
               </span>
             </div>

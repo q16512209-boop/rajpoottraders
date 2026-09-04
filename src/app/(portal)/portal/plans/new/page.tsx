@@ -33,9 +33,9 @@ function NewPlanForm() {
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialCustId);
   const [selectedProductId, setSelectedProductId] = useState(initialProduct?.id || "");
   const [khataNumber, setKhataNumber] = useState("");
-  const [salesmanName, setSalesmanName] = useState(currentUser?.name || "ضہیم (Zaheem)");
+  const [salesmanName, setSalesmanName] = useState(currentUser?.name || "Zaheem");
 
-  const [productTitle, setProductTitle] = useState(initialProduct?.title || "استری (Heavy Weight Electric Iron)");
+  const [productTitle, setProductTitle] = useState(initialProduct?.title || "Heavy Weight Electric Iron");
   const [imeiSerial, setImeiSerial] = useState(initialProduct?.imeiSerialList[0] || "SN-IST-0001");
   const [cashPrice, setCashPrice] = useState<number>(initialProduct?.cashPrice || 5800);
   const [totalFinanced, setTotalFinanced] = useState<number>(initialProduct?.installmentPrice || 6800);
@@ -43,7 +43,7 @@ function NewPlanForm() {
 
   // Frequency & Schedule Day
   const [installmentFrequency, setInstallmentFrequency] = useState<InstallmentFrequency>(initialProduct?.defaultFrequency || "WEEKLY");
-  const [collectionDayName, setCollectionDayName] = useState("ہفتہ (Saturday)");
+  const [collectionDayName, setCollectionDayName] = useState("Saturday");
   const [collectionIntervalDays, setCollectionIntervalDays] = useState<number>(7);
   const [monthlyInstallment, setMonthlyInstallment] = useState<number>(initialProduct?.defaultInstallmentAmount || 500);
   const [totalInstallmentsCount, setTotalInstallmentsCount] = useState<number>(initialProduct?.defaultTotalInstallments || 13);
@@ -72,7 +72,7 @@ function NewPlanForm() {
     const customer = customers.find((c) => c.id === selectedCustomerId);
 
     if (!customer) {
-      alert("براہ کرم خریدار / گاہک منتخب کریں۔");
+      alert("Please select a customer first.");
       return;
     }
 
@@ -147,10 +147,10 @@ function NewPlanForm() {
             <UrduSpeaker customText="نیا قسط پلان تیار کریں۔ پروڈکٹ منتخب کریں اور ہفتہ وار یا ماہانہ شیڈول سیٹ کریں۔" size="sm" showLabel />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            نیا اقساط پلان تیار کریں (Create Installment Plan)
+            Create Installment Plan
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            راجپوت ٹریڈرز چنیوٹ • خریدار، اشیاء، ایڈوانس، قسط کی رقم اور ہفتہ وار شیڈول کا اندراج
+            Rajpoot Traders Chiniot • Customer, Product, Down Payment, Installment Amount & Route Schedule
           </p>
         </div>
       </div>
@@ -161,13 +161,13 @@ function NewPlanForm() {
           <div className="border-b pb-3 flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-emerald-700" />
             <h2 className="text-base font-black text-slate-900 font-urdu">
-              1. خریدار کا انتخاب اور سیلز مین (Customer & Salesman)
+              1. Select Customer & Salesman
             </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Select Customer (خریدار منتخب کریں) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Select Customer *</label>
               <select
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
@@ -182,7 +182,7 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Khata Number (کھاتہ نمبر - اختیاری)</label>
+              <label className="block font-bold text-slate-700 mb-1">Khata / Account Number (Optional)</label>
               <input
                 type="text"
                 placeholder="e.g. 6"
@@ -193,11 +193,11 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Salesman Name (سیلز مین کا نام) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Salesman Name *</label>
               <input
                 type="text"
                 required
-                placeholder="e.g. ضہیم (Zaheem)"
+                placeholder="e.g. Zaheem"
                 value={salesmanName}
                 onChange={(e) => setSalesmanName(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
@@ -211,13 +211,13 @@ function NewPlanForm() {
           <div className="border-b pb-3 flex items-center gap-2">
             <Package className="w-5 h-5 text-emerald-700" />
             <h2 className="text-base font-black text-slate-900 font-urdu">
-              2. اشیاء کا انتخاب اور قیمت (Product & Pricing)
+              2. Select Product & Price
             </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Select from Catalog (کیٹلاگ سے پروڈکٹ منتخب کریں)</label>
+              <label className="block font-bold text-slate-700 mb-1">Select from Catalog (Select from Catalog)</label>
               <select
                 value={selectedProductId}
                 onChange={(e) => handleProductChange(e.target.value)}
@@ -225,14 +225,14 @@ function NewPlanForm() {
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.title} (نقد: {formatPKR(p.cashPrice)} • قسط: {formatPKR(p.installmentPrice || p.cashPrice * 1.2)})
+                    {p.title} (Cash: {formatPKR(p.cashPrice)} • Installment: {formatPKR(p.installmentPrice || p.cashPrice * 1.2)})
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Product Title (نام اشیاء) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Product Title (Product Title) *</label>
               <input
                 type="text"
                 required
@@ -243,7 +243,7 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Serial / IMEI No (اختیاری)</label>
+              <label className="block font-bold text-slate-700 mb-1">Serial / IMEI Number (Optional)</label>
               <input
                 type="text"
                 value={imeiSerial}
@@ -253,7 +253,7 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Total Installment Price (کل قسط قیمت - Rs.) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Total Installment Price (PKR) *</label>
               <input
                 type="number"
                 required
@@ -262,11 +262,11 @@ function NewPlanForm() {
                 onChange={(e) => setTotalFinanced(Number(e.target.value))}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 text-sm outline-none focus:border-emerald-600"
               />
-              <span className="text-[10px] text-slate-500 font-urdu block mt-0.5">قابل رعایت / کمی بیشی ممکن (Negotiable)</span>
+              <span className="text-[10px] text-slate-500 font-urdu block mt-0.5">Negotiable / Adjustable by Salesman</span>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Advance Down Payment (ایڈوانس رقم - Rs.) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Advance Down Payment (Down Payment - Rs.) *</label>
               <input
                 type="number"
                 required
@@ -278,7 +278,7 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Installment Frequency (قسط کا دورانیہ) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Installment Frequency (Installment Frequency) *</label>
               <select
                 value={installmentFrequency}
                 onChange={(e) => {
@@ -288,15 +288,15 @@ function NewPlanForm() {
                 }}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
               >
-                <option value="WEEKLY">ہفتہ وار (Weekly — مثلاً 500 ہفتہ)</option>
-                <option value="TEN_DAYS">10 روزہ (Every 10 Days)</option>
-                <option value="FIFTEEN_DAYS">15 روزہ (Every 15 Days)</option>
-                <option value="MONTHLY">ماہانہ (Monthly)</option>
+                <option value="WEEKLY">Weekly (e.g. Rs. 500/week)</option>
+                <option value="TEN_DAYS">Every 10 Days</option>
+                <option value="FIFTEEN_DAYS">Every 15 Days</option>
+                <option value="MONTHLY">Monthly</option>
               </select>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Installment Amount (قسط کی رقم - Rs.) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Installment Amount (Installment Amount - Rs.) *</label>
               <input
                 type="number"
                 required
@@ -308,7 +308,7 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Total Installments Count (کل اقساط کی تعداد) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Total Installments Count *</label>
               <input
                 type="number"
                 required
@@ -320,19 +320,19 @@ function NewPlanForm() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Preferred Collection Day (قسط کا دن) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Preferred Collection Day *</label>
               <select
                 value={collectionDayName}
                 onChange={(e) => setCollectionDayName(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
               >
-                <option value="ہفتہ (Saturday)">ہفتہ (Saturday)</option>
-                <option value="جمعہ (Friday)">جمعہ (Friday)</option>
-                <option value="اتوار (Sunday)">اتوار (Sunday)</option>
-                <option value="پیر / سوموار (Monday)">پیر / سوموار (Monday)</option>
-                <option value="منگل (Tuesday)">منگل (Tuesday)</option>
-                <option value="بدھ (Wednesday)">بدھ (Wednesday)</option>
-                <option value="جمعرات (Thursday)">جمعرات (Thursday)</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Friday">Friday</option>
+                <option value="Sunday">Sunday</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
               </select>
             </div>
           </div>
@@ -345,14 +345,14 @@ function NewPlanForm() {
             onClick={() => router.back()}
             className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
           >
-            منسوخ کریں
+            Cancel
           </button>
           <button
             type="submit"
             className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>پلان بنائیں اور معاہدہ جاری کریں (Create Contract)</span>
+            <span>Create Installment Contract</span>
           </button>
         </div>
       </form>

@@ -66,7 +66,7 @@ export default function ExpensesPage() {
             Showroom & Field Expenses Logger
           </h1>
           <p className="text-xs text-slate-500 font-urdu">
-            روزانہ کے اخراجات، پیٹرول، چائے، اور بلز کا باقاعدہ کھاتہ
+            Track operational store overheads, fuel, utility bills, and tea/entertainment expenses.
           </p>
         </div>
       </div>

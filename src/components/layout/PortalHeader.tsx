@@ -52,8 +52,8 @@ export function PortalHeader({ onMenuToggle }: HeaderProps) {
         {/* Global Urdu Voice Assistant Indicator */}
         <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-xl">
           <UrduSpeaker customText="راجپوت ٹریڈرز پورٹل میں خوش آمدید۔ آپ کا سسٹم مکمل طور پر تیار ہے۔" size="sm" />
-          <span className="hidden md:inline font-urdu font-bold text-xs text-emerald-800">
-            صوتی رہنمائی
+          <span className="hidden md:inline font-bold text-xs text-emerald-800">
+            Voice Guide
           </span>
         </div>
 

@@ -111,7 +111,7 @@ export default function RecoveryPortalPage() {
       localStorage.removeItem("rt_offline_queue");
       setMsg({
         type: "success",
-        text: `کامیابی: ${res.syncedCount} آف لائن وصولیاں کامیابی سے سنک ہو گئیں (کل رقم: ${formatPKR(res.totalAmount)})۔`,
+        text: `Success: ${res.syncedCount} offline receipts synced successfully (Total: ${formatPKR(res.totalAmount)}).`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: `Sync Failed: ${err.message}` });
@@ -165,7 +165,7 @@ export default function RecoveryPortalPage() {
 
       setMsg({
         type: "offline",
-        text: `آف لائن رسید محفوظ: رقم ${formatPKR(payAmount)} آف لائن ڈیوائس میں محفوظ کر لی گئی ہے۔ انٹرنیٹ بحال ہونے پر سنک کریں۔`,
+        text: `Offline receipt saved: ${formatPKR(payAmount)} stored on device. Will auto-sync when online.`,
         receiptId: tempId,
         phone: payModalPlan.customerPhone,
         customerName: payModalPlan.customerName,
@@ -191,7 +191,7 @@ export default function RecoveryPortalPage() {
       setPlans([...store.getPlans(currentTenant.id)]);
       setMsg({
         type: "success",
-        text: `فیلڈ وصولی: رقم ${formatPKR(payAmount)} وصول کر کے آپ کے کیش بیگ میں شامل کر دی گئی ہے۔`,
+        text: `Field Recovery: Collected ${formatPKR(payAmount)} and added to Cash In Hand bag.`,
         receiptId: res.receiptId,
         phone: payModalPlan.customerPhone,
         customerName: payModalPlan.customerName,
@@ -225,7 +225,7 @@ export default function RecoveryPortalPage() {
 
       setMsg({
         type: "success",
-        text: `وعدہ ادائیگی (PTP) درج ہو گیا: تاریخ ${formatDate(ptpDate)} پر رقم ${formatPKR(ptpAmount)}۔ یہ گاہک اب روٹ کے اوپر ترجیح میں رہے گا۔`,
+        text: `PTP Promised Payment logged for ${formatDate(ptpDate)} (Amount: ${formatPKR(ptpAmount)}). Customer moved to top priority.`,
         phone: ptpModalPlan.customerPhone,
         customerName: ptpModalPlan.customerName,
         ptpReminderText: reminderTxt,
@@ -253,7 +253,7 @@ export default function RecoveryPortalPage() {
             Area Route Recovery & PTP Schedule
           </h1>
           <p className="text-xs sm:text-sm text-emerald-200 font-urdu leading-relaxed">
-            {currentTenant.urduBrandName} • لائیو GPS رہنمائی، آف لائن کیش رسیدیں اور وعدہ ادائیگی شیڈول
+            Live GPS Guidance, Offline Field Receipts & PTP Scheduling
           </p>
         </div>
 
@@ -350,8 +350,8 @@ export default function RecoveryPortalPage() {
       {/* Cards List */}
       {sortedPlans.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-xs text-slate-500 font-urdu space-y-2">
-          <p className="font-bold text-slate-700">اس روٹ پر کوئی فعال قسط موجود نہیں ہے (Clean Slate)</p>
-          <p>نیا گاہک رجسٹر کریں یا ایکسل سے امپورٹ کریں۔</p>
+          <p className="font-bold text-slate-700">No active installments pending on this route (Clean Slate)</p>
+          <p>Register a new customer or import from customer ledger.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -432,7 +432,7 @@ export default function RecoveryPortalPage() {
                         <strong className="text-amber-950 font-black">{formatPKR(activePtp.expectedAmount)}</strong>
                       </div>
                       <p className="text-[11px] text-amber-800 font-urdu">
-                        وجہ: {activePtp.reason} {activePtp.notes ? `(${activePtp.notes})` : ""}
+                        Reason: {activePtp.reason} {activePtp.notes ? `(${activePtp.notes})` : ""}
                       </p>
                     </div>
                   )}
@@ -480,7 +480,7 @@ export default function RecoveryPortalPage() {
                       className="w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl border border-purple-200 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                       <Calendar className="w-3.5 h-3.5 text-purple-700" />
-                      <span>Log PTP (وعدہ)</span>
+                      <span>Log PTP Promise</span>
                     </button>
                   </div>
 
@@ -554,8 +554,8 @@ export default function RecoveryPortalPage() {
 
               <div className="p-3 bg-slate-50 rounded-xl text-[11px] text-slate-500 font-urdu">
                 {isOnline
-                  ? "یہ وصولی فوری طور پر بلاک چین لیجر میں شامل ہو کر آپ کے کیش بیگ میں جمع ہو جائے گی۔"
-                  : "آپ اس وقت آف لائن ہیں۔ یہ وصولی آپ کے فون میں محفوظ ہوگی اور انٹرنیٹ کنیکٹ ہونے پر سنک ہو جائے گی۔"}
+                  ? "This collection will immediately record in the verified ledger and add to your cash bag."
+                  : "Device is offline. Receipt is stored locally and will sync when connected."}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
@@ -571,7 +571,7 @@ export default function RecoveryPortalPage() {
                   className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isOnline ? "Confirm Payment (وصولی کنفرم کریں)" : "Save Offline (آف لائن محفوظ کریں)"}</span>
+                  <span>{isOnline ? "Confirm Payment" : "Save Offline Receipt"}</span>
                 </button>
               </div>
             </form>
@@ -600,7 +600,7 @@ export default function RecoveryPortalPage() {
             <form onSubmit={handleConfirmPTP} className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
-                  Promised Payment Date (وعدہ ادائیگی کی تاریخ) *
+                  Promised Payment Date *
                 </label>
                 <input
                   type="date"
@@ -627,19 +627,19 @@ export default function RecoveryPortalPage() {
 
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
-                  Delay Reason Category (تاخیر کی وجہ) *
+                  Delay Reason Category *
                 </label>
                 <select
                   value={ptpReason}
                   onChange={(e) => setPtpReason(e.target.value as any)}
                   className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold outline-none focus:border-purple-600"
                 >
-                  <option value="SALARY_DELAY">تنخواہ میں تاخیر (Salary Delay)</option>
-                  <option value="MEDICAL_EMERGENCY">طبی ایمرجنسی / ہسپتال (Medical)</option>
-                  <option value="OUT_OF_CITY_TRAVEL">شہر سے باہر سفر (Out of City Travel)</option>
-                  <option value="DISPUTED_BILL">بل یا حساب پر اختلاف (Disputed Bill)</option>
-                  <option value="FAMILY_ISSUE">خاندانی مجبوری (Family Issue)</option>
-                  <option value="OTHER">دیگر عذر (Other)</option>
+                  <option value="SALARY_DELAY">Salary Delay / Not Paid Yet</option>
+                  <option value="MEDICAL_EMERGENCY">Medical Emergency / Hospitalization</option>
+                  <option value="OUT_OF_CITY_TRAVEL">Out of City / Traveling</option>
+                  <option value="DISPUTED_BILL">Account Dispute / Bill Clarification</option>
+                  <option value="FAMILY_ISSUE">Family Emergency</option>
+                  <option value="OTHER">Other Valid Reason</option>
                 </select>
               </div>
 
@@ -669,7 +669,7 @@ export default function RecoveryPortalPage() {
                   className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
                   <Calendar className="w-4 h-4" />
-                  <span>Save PTP Schedule (وعدہ محفوظ کریں)</span>
+                  <span>Save PTP Commitment</span>
                 </button>
               </div>
             </form>

@@ -38,7 +38,7 @@ export default function PortalProductsPage() {
   const [defaultInstallmentAmount, setDefaultInstallmentAmount] = useState<number>(500);
   const [defaultTotalInstallments, setDefaultTotalInstallments] = useState<number>(13);
   const [stockQuantity, setStockQuantity] = useState<number>(20);
-  const [warrantySpec, setWarrantySpec] = useState("1 سال وارنٹی");
+  const [warrantySpec, setWarrantySpec] = useState("1 Year Warranty");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   if (!currentUser) return null;
@@ -68,7 +68,7 @@ export default function PortalProductsPage() {
         minDownPaymentPct: Math.round((defaultDownPayment / installmentPrice) * 100) || 10,
         maxTenureMonths: defaultFrequency === "WEEKLY" ? Math.ceil(defaultTotalInstallments / 4) : defaultTotalInstallments,
         imeiSerialList: [`SN-${title.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`],
-        specs: { "وارنٹی و تفصیل": warrantySpec },
+        specs: { "Warranty & Specs": warrantySpec },
         inStock: Number(stockQuantity) > 0,
         stockQuantity: Number(stockQuantity),
       });
@@ -78,7 +78,7 @@ export default function PortalProductsPage() {
       setTitle("");
       setMsg({
         type: "success",
-        text: `پروڈکٹ "${newProd.title}" کامیابی سے کیٹلاگ میں شامل کر دی گئی۔ سیلز مین اب پلان میں منتخب کر سکتے ہیں۔`,
+        text: `Product added to catalog successfully. Salesmen can now select it in plans.`,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create product" });
@@ -97,10 +97,10 @@ export default function PortalProductsPage() {
             <UrduSpeaker customText="اشیاء اور پروڈکٹس کیٹلاگ۔ مالک نئی پروڈکٹ نقد و قسط قیمت کے ساتھ شامل کر سکتا ہے۔" size="sm" showLabel />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            اشیاء و انوینٹری کیٹلاگ (Products Catalog)
+            Products Catalog & Inventory
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            دکان کے مالک کی طرف سے اشیاء کی نقد قیمت، کل قسط قیمت، ایڈوانس اور ہفتہ وار یا ماہانہ قسط کا باضابطہ اندراج
+            Official catalog of products, cash price, installment total, down payment, and installment schedules.
           </p>
         </div>
 
@@ -110,7 +110,7 @@ export default function PortalProductsPage() {
             className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg transition-all self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
-            <span>نئی آئٹم / پروڈکٹ شامل کریں (Add Product)</span>
+            <span>Add New Product</span>
           </button>
         )}
       </div>
@@ -129,7 +129,7 @@ export default function PortalProductsPage() {
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="پروڈکٹ کا نام یا برانڈ تلاش کریں (مثلاً استری، فین، اے سی)..."
+            placeholder="Search product name or brand (e.g. Iron, Fan, AC)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-600 font-urdu"
@@ -148,31 +148,31 @@ export default function PortalProductsPage() {
                   {prod.category}
                 </span>
                 <span className="text-[11px] font-bold text-slate-500">
-                  اسٹاک: {prod.stockQuantity || 0} عدد
+                  Stock: {prod.stockQuantity || 0} Units
                 </span>
               </div>
               <h3 className="text-base font-black text-slate-900 leading-tight">
                 {prod.title}
               </h3>
               <p className="text-xs text-slate-500">
-                برانڈ: <strong className="text-slate-800">{prod.brand}</strong>
+                Brand: <strong className="text-slate-800">{prod.brand}</strong>
               </p>
             </div>
 
             {/* Price Box */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">نقد قیمت (Cash):</span>
+                <span className="text-slate-500">Cash Price:</span>
                 <strong className="text-slate-900 font-mono font-bold">{formatPKR(prod.cashPrice)}</strong>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-emerald-900 font-bold">کل قسط قیمت (Installment):</span>
+                <span className="text-emerald-900 font-bold">Installment Total:</span>
                 <strong className="text-emerald-700 font-mono font-black text-sm">{formatPKR(prod.installmentPrice || prod.cashPrice * 1.2)}</strong>
               </div>
               <div className="border-t border-slate-200 pt-2 flex items-center justify-between text-[11px]">
-                <span className="text-amber-900 font-semibold">ایڈوانس: {formatPKR(prod.defaultDownPayment || 500)}</span>
+                <span className="text-amber-900 font-semibold">Advance: {formatPKR(prod.defaultDownPayment || 500)}</span>
                 <span className="bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded font-bold">
-                  {formatPKR(prod.defaultInstallmentAmount || 500)} {prod.defaultFrequency === "WEEKLY" ? "/ ہفتہ" : "/ ماہ"}
+                  {formatPKR(prod.defaultInstallmentAmount || 500)} {prod.defaultFrequency === "WEEKLY" ? "/ Week" : "/ Month"}
                 </span>
               </div>
             </div>
@@ -182,7 +182,7 @@ export default function PortalProductsPage() {
                 href="/portal/plans/new"
                 className="w-full text-center py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow transition-colors"
               >
-                نیا اقساط پلان بنائیں (Sell on Installment)
+                Sell on Installment
               </Link>
             </div>
           </div>
@@ -199,7 +199,7 @@ export default function PortalProductsPage() {
                   New Inventory Item
                 </span>
                 <h3 className="text-lg font-black text-slate-900 mt-1">
-                  نئی پروڈکٹ / سامان شامل کریں (Add Product)
+                  Add New Inventory Product
                 </h3>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
@@ -209,11 +209,11 @@ export default function PortalProductsPage() {
 
             <form onSubmit={handleCreateProduct} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Product Title (پروڈکٹ کا نام) *</label>
+                <label className="block font-bold text-slate-700 mb-1">Product Title *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. استری National Heavy Weight یا GFC Ceiling Fan"
+                  placeholder="e.g. National Heavy Weight Iron or GFC Ceiling Fan"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-emerald-600 font-urdu"
@@ -222,7 +222,7 @@ export default function PortalProductsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Brand Name (برانڈ / کمپنی) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Brand / Company *</label>
                   <input
                     type="text"
                     required
@@ -234,18 +234,18 @@ export default function PortalProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Category (کیٹیگری) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Category *</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none"
                   >
-                    <option value="ELECTRIC_IRONS">استری (Electric Irons)</option>
-                    <option value="FANS">سیلنگ و پیڈسٹل فین (Fans)</option>
-                    <option value="HOME_APPLIANCES">گھریلو سامان و واشنگ مشین (Appliances)</option>
-                    <option value="AIR_CONDITIONERS">انورٹر اے سی (Inverter ACs)</option>
-                    <option value="MOTORBIKES">موٹر سائیکل (Motorbikes)</option>
-                    <option value="SMARTPHONES">اسمارٹ فونز (Smartphones)</option>
+                    <option value="ELECTRIC_IRONS">Electric Irons</option>
+                    <option value="FANS">Ceiling & Pedestal Fans</option>
+                    <option value="HOME_APPLIANCES">Home Appliances & Washing Machines</option>
+                    <option value="AIR_CONDITIONERS">Inverter ACs</option>
+                    <option value="MOTORBIKES">Motorbikes</option>
+                    <option value="SMARTPHONES">Smartphones & Electronics</option>
                   </select>
                 </div>
               </div>
@@ -253,7 +253,7 @@ export default function PortalProductsPage() {
               {/* Pricing Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Cash Price (نقد قیمت - Rs.) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Cash Price (PKR) *</label>
                   <input
                     type="number"
                     required
@@ -265,7 +265,7 @@ export default function PortalProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-emerald-900 mb-1">Installment Price (کل قسط قیمت - Rs.) *</label>
+                  <label className="block font-bold text-emerald-900 mb-1">Total Installment Price (PKR) *</label>
                   <input
                     type="number"
                     required
@@ -274,11 +274,11 @@ export default function PortalProductsPage() {
                     onChange={(e) => setInstallmentPrice(Number(e.target.value))}
                     className="w-full p-2.5 bg-white border border-emerald-300 rounded-xl font-mono font-black text-emerald-900 text-sm outline-none"
                   />
-                  <span className="text-[10px] text-slate-500 font-urdu block mt-0.5">قابل رعایت / کمی بیشی ممکن (Negotiable)</span>
+                  <span className="text-[10px] text-slate-500 font-urdu block mt-0.5">Negotiable on spot by salesman</span>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Default Advance (معمول کا ایڈوانس - Rs.) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Default Down Payment / Advance (PKR) *</label>
                   <input
                     type="number"
                     required
@@ -290,21 +290,21 @@ export default function PortalProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Installment Frequency (قسط کا دورانیہ) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Installment Frequency (Installment Frequency) *</label>
                   <select
                     value={defaultFrequency}
                     onChange={(e) => setDefaultFrequency(e.target.value as InstallmentFrequency)}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                   >
-                    <option value="WEEKLY">ہفتہ وار (Weekly - مثلاً 500 ہفتہ)</option>
-                    <option value="TEN_DAYS">10 روزہ (Every 10 Days)</option>
-                    <option value="FIFTEEN_DAYS">15 روزہ (Every 15 Days)</option>
-                    <option value="MONTHLY">ماہانہ (Monthly)</option>
+                    <option value="WEEKLY">Weekly Installment (e.g. Rs. 500/week)</option>
+                    <option value="TEN_DAYS">Every 10 Days</option>
+                    <option value="FIFTEEN_DAYS">Every 15 Days</option>
+                    <option value="MONTHLY">Monthly</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Installment Amount (قسط کی رقم - Rs.) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Installment Amount (Installment Amount - Rs.) *</label>
                   <input
                     type="number"
                     required
@@ -316,7 +316,7 @@ export default function PortalProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Total Installments Count (کل اقساط کی تعداد) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">Total Installments Count *</label>
                   <input
                     type="number"
                     required
@@ -330,7 +330,7 @@ export default function PortalProductsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">In-Stock Quantity (موجود تعداد) *</label>
+                  <label className="block font-bold text-slate-700 mb-1">In-Stock Quantity (Units) *</label>
                   <input
                     type="number"
                     required
@@ -342,10 +342,10 @@ export default function PortalProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Warranty & Specs (وارنٹی یا خصوصیات)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Warranty & Technical Specifications</label>
                   <input
                     type="text"
-                    placeholder="e.g. 1 سال وارنٹی"
+                    placeholder="e.g. 1 Year Warranty"
                     value={warrantySpec}
                     onChange={(e) => setWarrantySpec(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-urdu"
@@ -359,14 +359,14 @@ export default function PortalProductsPage() {
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
-                  منسوخ کریں (Cancel)
+                  Cancel (Cancel)
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>محفوظ کریں (Save Product)</span>
+                  <span>Save Product to Catalog</span>
                 </button>
               </div>
             </form>

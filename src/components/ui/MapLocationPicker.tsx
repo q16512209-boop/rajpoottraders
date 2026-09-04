@@ -24,7 +24,7 @@ const LeafletMapInner = dynamic(() => import("./LeafletMapInner"), {
     <div className="w-full h-72 bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-300 animate-pulse">
       <Compass className="w-8 h-8 text-emerald-600 animate-spin" />
       <span className="text-xs font-bold text-slate-600 font-urdu">
-        لائیو اوپن اسٹریٹ نقشہ لوڈ ہو رہا ہے... (Loading Live Interactive Map)
+        Loading Live Interactive Map...
       </span>
     </div>
   ),
@@ -94,7 +94,7 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
   const handleDetectLiveGps = () => {
     setErrorMsg(null);
     if (!navigator.geolocation) {
-      setErrorMsg("آپ کا براؤزر GPS کو سپورٹ نہیں کرتا۔ برائے مہربانی نقشے پر کلک کر کے پن لگائیں۔");
+      setErrorMsg("Browser does not support GPS geolocation. Please click on the map to pin.");
       return;
     }
 
@@ -120,7 +120,7 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
       },
       (error) => {
         setIsDetecting(false);
-        setErrorMsg("براؤزر نے GPS لوکیشن کی اجازت نہیں دی۔ برائے مہربانی نیچے لائیو نقشے پر کلک کر کے پن لگائیں۔");
+        setErrorMsg("Location permission denied. Please click directly on the map to drop the GPS pin.");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -151,11 +151,11 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
             </span>
             <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
               <span>Interactive GPS Map Pin Assistant</span>
-              <span className="text-[11px] font-normal text-emerald-800 font-urdu">(لائیو انٹرایکٹو نقشہ پن)</span>
+              <span className="text-[11px] font-normal text-emerald-800 font-urdu">(Live Interactive Map Pin)</span>
             </h3>
           </div>
           <p className="text-xs text-slate-500 font-urdu">
-            گاہک کے گھر یا دکان کے مقام پر کلک کریں یا لائیو GPS حاصل کریں
+            Click customer home/shop location on map or acquire live device GPS
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
             className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-bold rounded-xl shadow transition-all disabled:opacity-50"
           >
             <LocateFixed className={`w-3.5 h-3.5 ${isDetecting ? "animate-spin" : ""}`} />
-            <span>{isDetecting ? "حاصل ہو رہا ہے..." : "حاصل کریں لائیو GPS"}</span>
+            <span>{isDetecting ? "Acquiring..." : "Get Live GPS"}</span>
           </button>
         </div>
       </div>
@@ -201,7 +201,7 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Latitude & Longitude (کوآرڈینیٹس)
+            GPS Coordinates
           </span>
           <strong className="text-emerald-800 font-mono font-bold block text-sm">
             {currentLoc.lat.toFixed(6)}, {currentLoc.lng.toFixed(6)}
@@ -219,7 +219,7 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
             {currentLoc.aiSuggestedZone || "Route-A (Gulberg / Model Town)"}
           </strong>
           <span className="text-[10px] text-emerald-700 font-urdu block">
-            خودکار روٹ شیٹ اسائنمنٹ
+            Auto Route Sheet Assignment
           </span>
         </div>
 
@@ -244,7 +244,7 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
             <Compass className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Fast Area Presets (فوری علاقہ زون جمپ):</span>
+            <span>Fast Area Presets (Chiniot Zones):</span>
           </span>
           <button
             type="button"
