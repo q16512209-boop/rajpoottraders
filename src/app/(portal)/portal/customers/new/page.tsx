@@ -256,6 +256,13 @@ export default function NewCustomerPage() {
             setGpsLocation(loc);
             if (loc.aiSuggestedZone) setZoneArea(loc.aiSuggestedZone);
           }}
+          onAddressAutoFill={(autoAddr, zone) => {
+            if (autoAddr) setAddress(autoAddr);
+            if (zone) {
+              setZoneArea(zone);
+              setLandmark(`Near ${zone}`);
+            }
+          }}
           defaultCity={city}
         />
 

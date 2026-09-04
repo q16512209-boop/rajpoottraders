@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/auth-context";
 import { store } from "@/lib/db/store";
-import { Product, InstallmentFrequency } from "@/lib/db/types";
+import { Product, InstallmentFrequency, GPSLocation } from "@/lib/db/types";
 import { formatPKR } from "@/lib/formatters";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
+import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
 import {
   UserPlus,
   CheckCircle2,
@@ -18,12 +19,14 @@ import {
   Calendar,
   DollarSign,
   UserCheck,
+  MapPin,
 } from "lucide-react";
 
 export default function LegacyCustomerEntryPage() {
   const router = useRouter();
   const { currentTenant, currentUser } = useAuth();
   const products = store.getProducts(currentTenant.id);
+  const dynamicRoutes = store.getRouteZones(currentTenant.id);
 
   // Khata & Salesman
   const [khataNumber, setKhataNumber] = useState("6");
@@ -37,7 +40,9 @@ export default function LegacyCustomerEntryPage() {
   const [secondaryPhone, setSecondaryPhone] = useState("");
   const [address, setAddress] = useState("Nusrat Embroidery, Near Desi Masjid, Chiniot");
   const [city, setCity] = useState("Chiniot");
-  const [zoneArea, setZoneArea] = useState("Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
+  const [zoneArea, setZoneArea] = useState(dynamicRoutes[0]?.name || "Mohallah Rehman Abad & Muslim Bazaar");
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [gpsLocation, setGpsLocation] = useState<GPSLocation | undefined>(undefined);
 
   // Guarantors (Guarantor 2 is optional)
   const [g1Name, setG1Name] = useState("Muhammad Aslam");
@@ -317,31 +322,58 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Chiniot Route Zone (Chiniot Route Zone) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Chiniot Route Zone *</label>
               <select
                 value={zoneArea}
                 onChange={(e) => setZoneArea(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none"
               >
-                <option value="Mohallah Rehman Abad & Muslim Bazaar, Chiniot">Mohallah Rehman Abad & Muslim Bazaar, Chiniot</option>
-                <option value="Chenab Colony & Lahore Road, Chiniot">Chenab Colony & Lahore Road, Chiniot</option>
-                <option value="Jhang Road & Katchery, Chiniot">Jhang Road & Katchery, Chiniot</option>
-                <option value="Railway Road & Mohallah Aali, Chiniot">Railway Road & Mohallah Aali, Chiniot</option>
-                <option value="Faisalabad Road Chiniot Circle">Faisalabad Road Chiniot Circle</option>
+                {dynamicRoutes.map((z) => (
+                  <option key={z.id} value={z.name}>
+                    {z.name} ({z.city})
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className="sm:col-span-3">
-              <label className="block font-bold text-slate-700 mb-1">Complete Address (Complete Address) *</label>
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-700">Complete Address *</label>
+                <button
+                  type="button"
+                  onClick={() => setShowMapPicker(!showMapPicker)}
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>{showMapPicker ? "Hide Map Picker" : "Pin Exact Location on Live Map"}</span>
+                </button>
+              </div>
               <input
                 type="text"
                 required
                 placeholder="e.g. Nusrat Embroidery, Near Desi Masjid, Chiniot"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-600 font-urdu"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-600 font-medium"
               />
             </div>
+
+            {showMapPicker && (
+              <div className="sm:col-span-3 pt-2">
+                <MapLocationPicker
+                  value={gpsLocation}
+                  onChange={(loc) => {
+                    setGpsLocation(loc);
+                    if (loc.aiSuggestedZone) setZoneArea(loc.aiSuggestedZone);
+                  }}
+                  onAddressAutoFill={(autoAddr, zone) => {
+                    if (autoAddr) setAddress(autoAddr);
+                    if (zone) setZoneArea(zone);
+                  }}
+                  defaultCity={city}
+                />
+              </div>
+            )}
           </div>
         </div>
 

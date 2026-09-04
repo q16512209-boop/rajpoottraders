@@ -30,65 +30,77 @@ const LeafletMapInner = dynamic(() => import("./LeafletMapInner"), {
   ),
 });
 
+import { store } from "@/lib/db/store";
+
 interface MapLocationPickerProps {
   value?: GPSLocation;
   onChange: (loc: GPSLocation) => void;
+  onAddressAutoFill?: (address: string, zoneArea?: string) => void;
   defaultCity?: string;
 }
 
-export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: MapLocationPickerProps) {
+export function MapLocationPicker({ value, onChange, onAddressAutoFill, defaultCity = "Chiniot" }: MapLocationPickerProps) {
   const [isDetecting, setIsDetecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [manualAddress, setManualAddress] = useState(value?.address || "");
   const [showCoordinateInputs, setShowCoordinateInputs] = useState(false);
 
+  // Fetch dynamic custom routes from store
+  const dynamicRoutes = store.getRouteZones();
+
   const [currentLoc, setCurrentLoc] = useState<GPSLocation>(() => {
     if (value && value.lat && value.lng) return value;
+    const firstZone = dynamicRoutes[0];
     return {
-      lat: 31.5204,
-      lng: 74.3587,
+      lat: firstZone?.centerLat || 31.7200,
+      lng: firstZone?.centerLng || 72.9789,
       accuracy: 10,
-      address: "Main Commercial Boulevard, Gulberg III, Lahore",
-      mapUrl: "https://www.google.com/maps?q=31.5204,74.3587",
-      aiSuggestedZone: "Route-A (Gulberg / Model Town)",
+      address: firstZone ? `${firstZone.name}, Chiniot` : "Mohallah Rehman Abad, Chiniot",
+      mapUrl: `https://www.google.com/maps?q=${firstZone?.centerLat || 31.72},${firstZone?.centerLng || 72.9789}`,
+      aiSuggestedZone: firstZone?.name || "Mohallah Rehman Abad & Muslim Bazaar",
     };
   });
 
-  // Pakistani major route zones
-  const zoneIntelligence = [
-    { name: "Route-A (Gulberg / Model Town)", lat: 31.5102, lng: 74.3441, landmark: "Liberty Chowk / Model Town Link Rd" },
-    { name: "Route-B (Johar Town / Iqbal Town)", lat: 31.4697, lng: 74.2728, landmark: "Shaukat Khanum Chowk / Main Blvd" },
-    { name: "Route-C (Cantt / DHA Phase 1-6)", lat: 31.4826, lng: 74.4098, landmark: "DHA Y-Block Commercial / Ring Road" },
-    { name: "Route-D (Shahdara / Old City)", lat: 31.5925, lng: 74.3095, landmark: "Ravi Toll Plaza / Circular Road" },
-    { name: "Faisalabad City Hub", lat: 31.4181, lng: 73.0776, landmark: "Clock Tower Circle / Katchery Bazar" },
-  ];
-
   const detectAiZone = (lat: number, lng: number) => {
-    let closest = zoneIntelligence[0];
+    if (!dynamicRoutes || dynamicRoutes.length === 0) {
+      return { name: "Mohallah Rehman Abad & Muslim Bazaar", city: "Chiniot", landmark: "Main Bazaar" };
+    }
+    let closest = dynamicRoutes[0];
     let minDist = 999999;
-    for (const z of zoneIntelligence) {
-      const dist = Math.sqrt(Math.pow(lat - z.lat, 2) + Math.pow(lng - z.lng, 2));
+    for (const z of dynamicRoutes) {
+      const zLat = z.centerLat || 31.7200;
+      const zLng = z.centerLng || 72.9789;
+      const dist = Math.sqrt(Math.pow(lat - zLat, 2) + Math.pow(lng - zLng, 2));
       if (dist < minDist) {
         minDist = dist;
         closest = z;
       }
     }
-    return closest;
+    return {
+      name: closest.name,
+      city: closest.city,
+      landmark: closest.description || closest.name,
+    };
   };
 
   const handleMapPinSelected = (lat: number, lng: number) => {
     const matchedZone = detectAiZone(lat, lng);
+    const autoAddress = `${matchedZone.name}, ${matchedZone.city}, Punjab (GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)})`;
     const updatedLoc: GPSLocation = {
       lat,
       lng,
       accuracy: 8,
-      address: manualAddress || `Near ${matchedZone.landmark}, ${matchedZone.name}`,
+      address: autoAddress,
       mapUrl: `https://www.google.com/maps?q=${lat},${lng}`,
       detectedAt: new Date().toISOString(),
       aiSuggestedZone: matchedZone.name,
     };
     setCurrentLoc(updatedLoc);
+    setManualAddress(autoAddress);
     onChange(updatedLoc);
+    if (onAddressAutoFill) {
+      onAddressAutoFill(autoAddress, matchedZone.name);
+    }
   };
 
   const handleDetectLiveGps = () => {
@@ -103,19 +115,24 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const matchedZone = detectAiZone(latitude, longitude);
+        const autoAddress = `House/Shop Near ${matchedZone.name}, ${matchedZone.city} (Live GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
 
         const newLoc: GPSLocation = {
           lat: latitude,
           lng: longitude,
           accuracy: Math.round(accuracy),
-          address: manualAddress || `Live GPS Captured (Near ${matchedZone.landmark})`,
+          address: autoAddress,
           mapUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
           detectedAt: new Date().toISOString(),
           aiSuggestedZone: matchedZone.name,
         };
 
         setCurrentLoc(newLoc);
+        setManualAddress(autoAddress);
         onChange(newLoc);
+        if (onAddressAutoFill) {
+          onAddressAutoFill(autoAddress, matchedZone.name);
+        }
         setIsDetecting(false);
       },
       (error) => {
@@ -126,18 +143,25 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
     );
   };
 
-  const handleApplyZonePreset = (zone: (typeof zoneIntelligence)[0]) => {
+  const handleApplyZonePreset = (zone: (typeof dynamicRoutes)[0]) => {
+    const zLat = zone.centerLat || 31.7200;
+    const zLng = zone.centerLng || 72.9789;
+    const autoAddress = `${zone.name}, ${zone.city}, Punjab`;
     const newLoc: GPSLocation = {
-      lat: zone.lat,
-      lng: zone.lng,
+      lat: zLat,
+      lng: zLng,
       accuracy: 25,
-      address: manualAddress || `Zone Hub: ${zone.landmark}`,
-      mapUrl: `https://www.google.com/maps?q=${zone.lat},${zone.lng}`,
+      address: autoAddress,
+      mapUrl: `https://www.google.com/maps?q=${zLat},${zLng}`,
       detectedAt: new Date().toISOString(),
       aiSuggestedZone: zone.name,
     };
     setCurrentLoc(newLoc);
+    setManualAddress(autoAddress);
     onChange(newLoc);
+    if (onAddressAutoFill) {
+      onAddressAutoFill(autoAddress, zone.name);
+    }
   };
 
   return (
@@ -256,18 +280,19 @@ export function MapLocationPicker({ value, onChange, defaultCity = "Lahore" }: M
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {zoneIntelligence.map((zone) => (
+          {dynamicRoutes.map((zone) => (
             <button
-              key={zone.name}
+              key={zone.id}
               type="button"
               onClick={() => handleApplyZonePreset(zone)}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-1.5 ${
                 currentLoc.aiSuggestedZone === zone.name
-                  ? "bg-emerald-700 text-white border-emerald-800 shadow-sm"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                  : "bg-white text-slate-700 border-slate-200 hover:border-emerald-500"
               }`}
             >
-              {zone.name.split(" (")[0]} ({zone.landmark.split(" / ")[0]})
+              <MapPin className="w-3 h-3 shrink-0" />
+              <span>{zone.name}</span>
             </button>
           ))}
         </div>

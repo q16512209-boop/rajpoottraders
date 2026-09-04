@@ -28,6 +28,9 @@ import {
   MessageSquare,
   Wrench,
   CheckSquare,
+  BarChart3,
+  MapPin,
+  ShoppingCart,
 } from "lucide-react";
 
 export default function PortalDashboard() {
@@ -334,47 +337,61 @@ export default function PortalDashboard() {
             <h3 className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-700">
               Quick Operations & Shortcuts
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-xs">
               <Link
-                href="/portal/plans/new"
-                className="p-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all"
+                href="/portal/reports"
+                className="p-3 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-2xl border border-purple-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
               >
-                <Plus className="w-5 h-5 text-emerald-700" />
-                <span>New Plan</span>
+                <BarChart3 className="w-5 h-5 text-purple-700" />
+                <span>Reports & Targets</span>
+              </Link>
+              <Link
+                href="/portal/routes"
+                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
+              >
+                <MapPin className="w-5 h-5 text-emerald-700" />
+                <span>Custom Routes</span>
+              </Link>
+              <Link
+                href="/portal/orders"
+                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-2xl border border-blue-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
+              >
+                <ShoppingCart className="w-5 h-5 text-blue-700" />
+                <span>Field Orders</span>
               </Link>
               <Link
                 href="/portal/customers/legacy-entry"
-                className="p-3.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-2xl border border-blue-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all"
+                className="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
               >
-                <UserPlus className="w-5 h-5 text-blue-700" />
+                <UserPlus className="w-5 h-5 text-amber-700" />
                 <span>Old Khata Entry</span>
               </Link>
               <Link
                 href="/portal/claims"
-                className="p-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all"
+                className="p-3 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-2xl border border-rose-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
               >
-                <Wrench className="w-5 h-5 text-amber-700" />
-                <span>Claims & Returns</span>
+                <Wrench className="w-5 h-5 text-rose-700" />
+                <span>Claims & Wapsi</span>
               </Link>
               <Link
                 href="/portal/recovery"
-                className="p-3.5 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-2xl border border-purple-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all"
+                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
               >
-                <Bike className="w-5 h-5 text-purple-700" />
+                <Bike className="w-5 h-5 text-emerald-700" />
                 <span>Field Recovery</span>
               </Link>
               <Link
                 href="/portal/expenses"
-                className="p-3.5 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-2xl border border-rose-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all"
+                className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-900 rounded-2xl border border-slate-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
               >
-                <DollarSign className="w-5 h-5 text-rose-700" />
+                <DollarSign className="w-5 h-5 text-slate-700" />
                 <span>Add Expense</span>
               </Link>
               <Link
                 href="/portal/handovers"
-                className="p-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all"
+                className="p-3 bg-teal-50 hover:bg-teal-100 text-teal-900 rounded-2xl border border-teal-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
               >
-                <CheckCircle2 className="w-5 h-5 text-amber-700" />
+                <CheckCircle2 className="w-5 h-5 text-teal-700" />
                 <span>Cash Handovers</span>
               </Link>
             </div>

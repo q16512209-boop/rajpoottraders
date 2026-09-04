@@ -103,6 +103,8 @@ export interface Product {
   popularInstallmentPlans?: { months: number; downPayment: number; monthly: number }[];
   isRefurbishedSeized?: boolean;
   originalContractId?: string;
+  condition?: "NEW" | "USED_REFURBISHED" | "DEFECTIVE_DAMAGED";
+  defectiveReason?: string;
 }
 
 export interface InstallmentScheduleItem {
@@ -344,7 +346,74 @@ export interface IClaimRequest {
   requestedByName: string;
   requesterRole: UserRole;
   status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "RESOLVED";
+  resolutionType?: "REPAIRED_ON_SPOT" | "REPLACED_WITH_NEW" | "RETURNED_WAPSI_CANCELLED" | "REJECTED" | "OFFICE_INSPECTION";
+  replacementProductId?: string;
+  replacementProductTitle?: string;
+  replacementSerial?: string;
+  defectiveInventoryAction?: "SEND_TO_DEFECTIVE_STORE" | "REFURBISH_FOR_RESALE" | "DISCARD_SCRAP";
+  custodyStatus?: "WITH_CUSTOMER" | "WITH_RECOVERY_OFFICER" | "RECEIVED_AT_SHOP" | "RESOLVED";
   resolutionNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface IRouteZone {
+  id: string;
+  tenantId: string;
+  name: string;
+  city: string;
+  assignedCollectorId?: string;
+  assignedCollectorName?: string;
+  description?: string;
+  centerLat?: number;
+  centerLng?: number;
+  activeCustomerCount?: number;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface IStaffTarget {
+  id: string;
+  tenantId: string;
+  staffId: string;
+  staffName: string;
+  staffRole: UserRole;
+  targetType: "SALES_AMOUNT" | "RECOVERY_AMOUNT" | "NEW_CUSTOMERS";
+  targetValue: number;
+  periodType: "DAILY_5_DAYS" | "FIFTEEN_DAYS" | "MONTHLY" | "CUSTOM";
+  startDate: string;
+  endDate: string;
+  status: "ACTIVE" | "COMPLETED" | "EXPIRED";
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface IFieldOrder {
+  id: string;
+  tenantId: string;
+  orderNumber: string;
+  customerId?: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  productId: string;
+  productTitle: string;
+  quantity: number;
+  bookedBy: string;
+  bookedByName: string;
+  bookedByRole: UserRole;
+  paymentPreference: "CASH" | "INSTALLMENT";
+  downPaymentOffer?: number;
+  proposedInstallmentFrequency?: InstallmentFrequency;
+  notes?: string;
+  status: "BOOKED_PENDING" | "APPROVED_FOR_DISPATCH" | "OUT_FOR_DELIVERY" | "DELIVERED_COMPLETED" | "CANCELLED";
+  dispatchedWithOfficerId?: string;
+  dispatchedWithOfficerName?: string;
+  deliveredAt?: string;
+  convertedPlanId?: string;
+  convertedSaleReceiptId?: string;
   createdAt: string;
   updatedAt?: string;
 }

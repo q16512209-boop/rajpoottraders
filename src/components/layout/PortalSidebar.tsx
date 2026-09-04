@@ -27,6 +27,9 @@ import {
   X,
   UserPlus,
   Package,
+  BarChart3,
+  MapPin,
+  ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { UserRole } from "@/lib/db/types";
@@ -56,6 +59,8 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
       title: "Core Operations",
       links: [
         { href: "/portal", label: "Dashboard Overview", icon: LayoutDashboard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY", "CUSTOMER"] },
+        { href: "/portal/reports", label: "Owner Reports & Targets", icon: BarChart3, guideKey: "TREASURY", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
+        { href: "/portal/routes", label: "Custom Routes & Zones", icon: MapPin, guideKey: "ROUTE_SHEET", roles: ["SUPER_ADMIN", "OWNER"] },
         { href: "/portal/products", label: "Products Catalog & Inventory", icon: Package, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
         { href: "/portal/users", label: "Staff & Credentials Management", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER"] },
         { href: "/portal/import", label: "Excel Bulk Importer", icon: Upload, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
@@ -80,6 +85,7 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
     {
       title: "Operations & KYC (Tier 2)",
       links: [
+        { href: "/portal/orders", label: "Field Order Bookings", icon: ShoppingCart, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
         { href: "/portal/customers", label: "KYC Vault & Defaulter Radar", icon: Users, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
         { href: "/portal/customers/legacy-entry", label: "Fast Old Khata Entry", icon: UserCheck, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
         { href: "/portal/customers/new", label: "Register Customer & Guarantors", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },

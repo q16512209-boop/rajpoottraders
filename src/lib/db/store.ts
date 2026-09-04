@@ -29,6 +29,10 @@ import {
   Guarantor,
   InstallmentScheduleItem,
   IClaimRequest,
+  IRouteZone,
+  IStaffTarget,
+  IFieldOrder,
+  GPSLocation,
 } from "./types";
 import { ChainedLedgerBlock, computeBlockHash, verifyLedgerChain, LedgerEntryPayload } from "../crypto/hash-chain";
 import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
@@ -68,6 +72,132 @@ class AppStore {
       requesterRole: "FIELD_RECOVERY",
       status: "PENDING_APPROVAL",
       createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    },
+  ];
+  private routeZones: IRouteZone[] = [
+    {
+      id: "zone_chn_01",
+      tenantId: "tenant_chiniot",
+      name: "Mohallah Rehman Abad & Muslim Bazaar",
+      city: "Chiniot",
+      assignedCollectorId: "usr_recovery_bilal",
+      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
+      description: "Central Bazaar, Muslim Bazaar, and Mohallah Rehman Abad residential lane.",
+      centerLat: 31.7200,
+      centerLng: 72.9789,
+      activeCustomerCount: 42,
+      status: "ACTIVE",
+      createdAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString(),
+    },
+    {
+      id: "zone_chn_02",
+      tenantId: "tenant_chiniot",
+      name: "Chenab Colony & Lahore Road",
+      city: "Chiniot",
+      assignedCollectorId: "usr_recovery_bilal",
+      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
+      description: "Chenab Colony, Bypass, and Lahore Road commercial market.",
+      centerLat: 31.7250,
+      centerLng: 72.9850,
+      activeCustomerCount: 28,
+      status: "ACTIVE",
+      createdAt: new Date(Date.now() - 3600000 * 24 * 25).toISOString(),
+    },
+    {
+      id: "zone_chn_03",
+      tenantId: "tenant_chiniot",
+      name: "Jhang Road & Katchery",
+      city: "Chiniot",
+      assignedCollectorId: "usr_recovery_bilal",
+      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
+      description: "District Courts area, Jhang Road commercial strip, and New Abadi.",
+      centerLat: 31.7150,
+      centerLng: 72.9650,
+      activeCustomerCount: 19,
+      status: "ACTIVE",
+      createdAt: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
+    },
+    {
+      id: "zone_chn_04",
+      tenantId: "tenant_chiniot",
+      name: "Railway Road & Mohallah Aali",
+      city: "Chiniot",
+      assignedCollectorId: "usr_recovery_bilal",
+      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
+      description: "Railway Station market, Grain Market, and Mohallah Aali.",
+      centerLat: 31.7280,
+      centerLng: 72.9720,
+      activeCustomerCount: 23,
+      status: "ACTIVE",
+      createdAt: new Date(Date.now() - 3600000 * 24 * 15).toISOString(),
+    },
+    {
+      id: "zone_chn_05",
+      tenantId: "tenant_chiniot",
+      name: "Lalian Road & Rural Zone",
+      city: "Chiniot",
+      assignedCollectorId: "usr_recovery_bilal",
+      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
+      description: "Lalian link road, suburban dairy farms, and outskirts cluster.",
+      centerLat: 31.7400,
+      centerLng: 72.9500,
+      activeCustomerCount: 15,
+      status: "ACTIVE",
+      createdAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
+    },
+  ];
+  private staffTargets: IStaffTarget[] = [
+    {
+      id: "target_demo_01",
+      tenantId: "tenant_chiniot",
+      staffId: "usr_recovery_bilal",
+      staffName: "Bilal Ahmed (Field Recovery)",
+      staffRole: "FIELD_RECOVERY",
+      targetType: "RECOVERY_AMOUNT",
+      targetValue: 250000,
+      periodType: "MONTHLY",
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
+      endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0],
+      status: "ACTIVE",
+      notes: "Monthly recovery target across all active Chiniot routes.",
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "target_demo_02",
+      tenantId: "tenant_chiniot",
+      staffId: "usr_salesman_zaheem",
+      staffName: "Zaheem Salesman",
+      staffRole: "BRANCH_MANAGER",
+      targetType: "SALES_AMOUNT",
+      targetValue: 500000,
+      periodType: "FIFTEEN_DAYS",
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
+      endDate: new Date(new Date().getFullYear(), new Date().getMonth(), 15).toISOString().split("T")[0],
+      status: "ACTIVE",
+      notes: "Mid-month target for Inverter ACs and Electric Irons.",
+      createdAt: new Date().toISOString(),
+    },
+  ];
+  private fieldOrders: IFieldOrder[] = [
+    {
+      id: "ord_demo_01",
+      tenantId: "tenant_chiniot",
+      orderNumber: "ORD-CHN-2026-001",
+      customerName: "Rashid Mahmood",
+      customerPhone: "0301-7894561",
+      customerAddress: "Mohallah Rehman Abad, Street #3, Chiniot",
+      productId: "prod_gfc_fan",
+      productTitle: "GFC 56 inch Deluxe Ceiling Fan",
+      quantity: 1,
+      bookedBy: "usr_recovery_bilal",
+      bookedByName: "Bilal Ahmed (Field Recovery)",
+      bookedByRole: "FIELD_RECOVERY",
+      paymentPreference: "INSTALLMENT",
+      downPaymentOffer: 1500,
+      proposedInstallmentFrequency: "WEEKLY",
+      notes: "Customer wants delivery by Saturday during recovery round.",
+      status: "BOOKED_PENDING",
+      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
     },
   ];
   private isProductionCleanMode: boolean = true;
@@ -1133,6 +1263,458 @@ class AppStore {
     }
 
     return claim;
+  }
+
+  resolveClaimWithReplacement(params: {
+    claimId: string;
+    replacementProductId: string;
+    replacementProductTitle: string;
+    replacementSerial: string;
+    defectiveAction: "SEND_TO_DEFECTIVE_STORE" | "REFURBISH_FOR_RESALE" | "DISCARD_SCRAP";
+    resolutionNotes: string;
+    actor: User;
+  }): IClaimRequest {
+    const claim = this.claimRequests.find((c) => c.id === params.claimId);
+    if (!claim) throw new Error("Claim request not found");
+
+    claim.status = "RESOLVED";
+    claim.resolutionType = "REPLACED_WITH_NEW";
+    claim.replacementProductId = params.replacementProductId;
+    claim.replacementProductTitle = params.replacementProductTitle;
+    claim.replacementSerial = params.replacementSerial;
+    claim.defectiveInventoryAction = params.defectiveAction;
+    claim.custodyStatus = "RESOLVED";
+    claim.resolutionNotes = params.resolutionNotes;
+    claim.updatedAt = new Date().toISOString();
+
+    // 1. Update Installment Plan's IMEI / Serial if linked
+    if (claim.planId) {
+      const plan = this.plans.find((p) => p.id === claim.planId);
+      if (plan) {
+        const oldSerial = plan.imeiSerial;
+        plan.imeiSerial = params.replacementSerial;
+        // Append note to plan
+        const nextScheduleItem = plan.schedule.find((s) => s.status !== "PAID");
+        if (nextScheduleItem) {
+          nextScheduleItem.notes = `[Unit Replaced under Claim #${claim.id}]: Old Serial (${oldSerial}) replaced with New Serial (${params.replacementSerial}).`;
+        }
+      }
+    }
+
+    // 2. Add old defective unit to inventory under defective/used condition
+    const defectiveProd: Product = {
+      id: `prod_def_${Date.now()}`,
+      tenantId: claim.tenantId,
+      title: `${claim.productTitle} (Claim #${claim.id.slice(-4)} Return)`,
+      brand: "Rajpoot Returns",
+      category: "REFURBISHED_SEIZED",
+      cashPrice: 0,
+      minDownPaymentPct: 0,
+      maxTenureMonths: 0,
+      imeiSerialList: [claim.imeiSerial || "DEF-SN"],
+      specs: { "Fault Description": claim.issueDescription, "Return Date": new Date().toISOString().split("T")[0] },
+      inStock: true,
+      stockQuantity: 1,
+      isRefurbishedSeized: true,
+      condition: params.defectiveAction === "REFURBISH_FOR_RESALE" ? "USED_REFURBISHED" : "DEFECTIVE_DAMAGED",
+      defectiveReason: claim.issueDescription,
+    };
+    this.products.unshift(defectiveProd);
+
+    // 3. Ledger audit log
+    this.appendLedgerBlock({
+      id: `tx_claim_repl_${claim.id}_${Date.now()}`,
+      tenantId: claim.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId: claim.planId,
+      customerId: claim.customerId,
+      actorId: params.actor.id,
+      notes: `Warranty Replacement Processed: Customer given new ${params.replacementProductTitle} (SN: ${params.replacementSerial}). Defective unit (SN: ${claim.imeiSerial}) taken into stock (${params.defectiveAction}). By ${params.actor.name}.`,
+    });
+
+    return claim;
+  }
+
+  resolveClaimOnSpot(params: {
+    claimId: string;
+    resolutionNotes: string;
+    actor: User;
+  }): IClaimRequest {
+    const claim = this.claimRequests.find((c) => c.id === params.claimId);
+    if (!claim) throw new Error("Claim request not found");
+
+    claim.status = "RESOLVED";
+    claim.resolutionType = "REPAIRED_ON_SPOT";
+    claim.custodyStatus = "WITH_CUSTOMER";
+    claim.resolutionNotes = params.resolutionNotes;
+    claim.updatedAt = new Date().toISOString();
+
+    this.appendLedgerBlock({
+      id: `tx_claim_spot_${claim.id}_${Date.now()}`,
+      tenantId: claim.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId: claim.planId,
+      customerId: claim.customerId,
+      actorId: params.actor.id,
+      notes: `Claim #${claim.id} resolved same-day at showroom/route: ${params.resolutionNotes}. By ${params.actor.name}.`,
+    });
+
+    return claim;
+  }
+
+  resolveClaimWithReturnWapsi(params: {
+    claimId: string;
+    inventoryCondition: "USED_REFURBISHED" | "DEFECTIVE_DAMAGED";
+    resolutionNotes: string;
+    actor: User;
+  }): IClaimRequest {
+    const claim = this.claimRequests.find((c) => c.id === params.claimId);
+    if (!claim) throw new Error("Claim request not found");
+
+    claim.status = "RESOLVED";
+    claim.resolutionType = "RETURNED_WAPSI_CANCELLED";
+    claim.custodyStatus = "RECEIVED_AT_SHOP";
+    claim.resolutionNotes = params.resolutionNotes;
+    claim.updatedAt = new Date().toISOString();
+
+    // Mark plan completed/cancelled if applicable
+    if (claim.planId) {
+      const plan = this.plans.find((p) => p.id === claim.planId);
+      if (plan) {
+        plan.status = "COMPLETED";
+      }
+    }
+
+    // Add returned unit to inventory
+    const returnProd: Product = {
+      id: `prod_wapsi_${Date.now()}`,
+      tenantId: claim.tenantId,
+      title: `${claim.productTitle} (Customer Wapsi / Return)`,
+      category: "REFURBISHED_SEIZED",
+      cashPrice: 0,
+      minDownPaymentPct: 0,
+      maxTenureMonths: 0,
+      imeiSerialList: [claim.imeiSerial || "WAPSI-SN"],
+      specs: { "Return Reason": claim.issueDescription },
+      inStock: true,
+      stockQuantity: 1,
+      isRefurbishedSeized: true,
+      condition: params.inventoryCondition,
+      defectiveReason: claim.issueDescription,
+    };
+    this.products.unshift(returnProd);
+
+    this.appendLedgerBlock({
+      id: `tx_wapsi_${claim.id}_${Date.now()}`,
+      tenantId: claim.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId: claim.planId,
+      customerId: claim.customerId,
+      actorId: params.actor.id,
+      notes: `Customer Wapsi / Return finalized for Claim #${claim.id}. Item added to store inventory (${params.inventoryCondition}). By ${params.actor.name}.`,
+    });
+
+    return claim;
+  }
+
+  // --- Dynamic Route Zones Management (Owner & Super Admin) ---
+  getRouteZones(tenantId?: string): IRouteZone[] {
+    if (!tenantId) return this.routeZones;
+    return this.routeZones.filter((z) => z.tenantId === tenantId);
+  }
+
+  createRouteZone(actor: User, data: Omit<IRouteZone, "id" | "createdAt" | "updatedAt">): IRouteZone {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner and Super Admin can create custom routes.");
+    }
+    const newZone: IRouteZone = {
+      ...data,
+      id: `zone_chn_${Date.now()}`,
+      activeCustomerCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    this.routeZones.push(newZone);
+
+    this.appendLedgerBlock({
+      id: `tx_zone_${newZone.id}`,
+      tenantId: newZone.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Custom Route Zone created: "${newZone.name}" in ${newZone.city} (Collector: ${newZone.assignedCollectorName || "Unassigned"}). By ${actor.name}.`,
+    });
+
+    return newZone;
+  }
+
+  updateRouteZone(actor: User, id: string, data: Partial<IRouteZone>): IRouteZone {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner and Super Admin can edit routes.");
+    }
+    const zone = this.routeZones.find((z) => z.id === id);
+    if (!zone) throw new Error("Route Zone not found");
+
+    Object.assign(zone, data, { updatedAt: new Date().toISOString() });
+
+    this.appendLedgerBlock({
+      id: `tx_zone_upd_${id}_${Date.now()}`,
+      tenantId: zone.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Route Zone updated: "${zone.name}". By ${actor.name}.`,
+    });
+
+    return zone;
+  }
+
+  deleteRouteZone(actor: User, id: string): boolean {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner and Super Admin can delete routes.");
+    }
+    const idx = this.routeZones.findIndex((z) => z.id === id);
+    if (idx === -1) return false;
+    const removed = this.routeZones.splice(idx, 1)[0];
+
+    this.appendLedgerBlock({
+      id: `tx_zone_del_${id}_${Date.now()}`,
+      tenantId: removed.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Route Zone deleted: "${removed.name}". By ${actor.name}.`,
+    });
+
+    return true;
+  }
+
+  // --- Staff Performance Targets Management ---
+  getStaffTargets(tenantId?: string): IStaffTarget[] {
+    if (!tenantId) return this.staffTargets;
+    return this.staffTargets.filter((t) => t.tenantId === tenantId);
+  }
+
+  createStaffTarget(actor: User, data: Omit<IStaffTarget, "id" | "createdAt" | "updatedAt">): IStaffTarget {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner and Super Admin can set staff targets.");
+    }
+    const newTarget: IStaffTarget = {
+      ...data,
+      id: `target_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    this.staffTargets.unshift(newTarget);
+
+    this.appendLedgerBlock({
+      id: `tx_target_${newTarget.id}`,
+      tenantId: newTarget.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Performance Target assigned to ${newTarget.staffName} (${newTarget.targetType}: ${newTarget.targetValue.toLocaleString()} for ${newTarget.periodType}). By ${actor.name}.`,
+    });
+
+    return newTarget;
+  }
+
+  updateStaffTarget(actor: User, id: string, data: Partial<IStaffTarget>): IStaffTarget {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner can edit targets.");
+    }
+    const target = this.staffTargets.find((t) => t.id === id);
+    if (!target) throw new Error("Staff target not found");
+
+    Object.assign(target, data, { updatedAt: new Date().toISOString() });
+    return target;
+  }
+
+  deleteStaffTarget(actor: User, id: string): boolean {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner can delete targets.");
+    }
+    const idx = this.staffTargets.findIndex((t) => t.id === id);
+    if (idx === -1) return false;
+    this.staffTargets.splice(idx, 1);
+    return true;
+  }
+
+  // --- Field Orders & Bookings ---
+  getFieldOrders(tenantId?: string): IFieldOrder[] {
+    if (!tenantId) return this.fieldOrders;
+    return this.fieldOrders.filter((o) => o.tenantId === tenantId);
+  }
+
+  createFieldOrder(actor: User, data: Omit<IFieldOrder, "id" | "orderNumber" | "status" | "createdAt" | "updatedAt">): IFieldOrder {
+    const newOrder: IFieldOrder = {
+      ...data,
+      id: `ord_${Date.now()}`,
+      orderNumber: `ORD-CHN-${Date.now().toString().slice(-6)}`,
+      status: "BOOKED_PENDING",
+      createdAt: new Date().toISOString(),
+    };
+    this.fieldOrders.unshift(newOrder);
+
+    this.appendLedgerBlock({
+      id: `tx_ord_book_${newOrder.id}`,
+      tenantId: newOrder.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Field Order Booked #${newOrder.orderNumber} for ${newOrder.customerName} (${newOrder.productTitle}) by ${actor.name} (${actor.role}). Preference: ${newOrder.paymentPreference}.`,
+    });
+
+    return newOrder;
+  }
+
+  updateFieldOrderStatus(
+    actor: User,
+    id: string,
+    status: IFieldOrder["status"],
+    options?: { dispatchedWithOfficerId?: string; dispatchedWithOfficerName?: string; notes?: string }
+  ): IFieldOrder {
+    const order = this.fieldOrders.find((o) => o.id === id);
+    if (!order) throw new Error("Order not found");
+
+    order.status = status;
+    if (options?.dispatchedWithOfficerId) order.dispatchedWithOfficerId = options.dispatchedWithOfficerId;
+    if (options?.dispatchedWithOfficerName) order.dispatchedWithOfficerName = options.dispatchedWithOfficerName;
+    if (options?.notes) order.notes = (order.notes ? order.notes + " | " : "") + options.notes;
+    order.updatedAt = new Date().toISOString();
+
+    this.appendLedgerBlock({
+      id: `tx_ord_stat_${id}_${Date.now()}`,
+      tenantId: order.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Field Order #${order.orderNumber} status changed to ${status} by ${actor.name}.`,
+    });
+
+    return order;
+  }
+
+  fulfillFieldOrderAsCashSale(actor: User, orderId: string, walletId: string): { order: IFieldOrder; receiptId: string } {
+    const order = this.fieldOrders.find((o) => o.id === orderId);
+    if (!order) throw new Error("Order not found");
+
+    const product = this.products.find((p) => p.id === order.productId);
+    const saleAmount = product ? product.cashPrice * order.quantity : 10000;
+
+    const targetWallet = this.wallets.find((w) => w.id === walletId) || this.wallets[0];
+    targetWallet.balance += saleAmount;
+
+    order.status = "DELIVERED_COMPLETED";
+    order.deliveredAt = new Date().toISOString();
+    const receiptId = `REC-CASH-${Date.now().toString().slice(-6)}`;
+    order.convertedSaleReceiptId = receiptId;
+    order.updatedAt = new Date().toISOString();
+
+    this.appendLedgerBlock({
+      id: `tx_ord_cash_${order.id}`,
+      tenantId: order.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "PAYMENT_IN",
+      amount: saleAmount,
+      actorId: actor.id,
+      notes: `Field Order #${order.orderNumber} fulfilled as CASH SALE for ${order.customerName} (${order.productTitle} x ${order.quantity}). Rs. ${saleAmount.toLocaleString()} deposited to ${targetWallet.name}. Receipt #${receiptId}.`,
+    });
+
+    return { order, receiptId };
+  }
+
+  fulfillFieldOrderAsInstallment(actor: User, orderId: string, planId: string): IFieldOrder {
+    const order = this.fieldOrders.find((o) => o.id === orderId);
+    if (!order) throw new Error("Order not found");
+
+    order.status = "DELIVERED_COMPLETED";
+    order.deliveredAt = new Date().toISOString();
+    order.convertedPlanId = planId;
+    order.updatedAt = new Date().toISOString();
+
+    this.appendLedgerBlock({
+      id: `tx_ord_inst_${order.id}`,
+      tenantId: order.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId,
+      actorId: actor.id,
+      notes: `Field Order #${order.orderNumber} delivered & converted to Installment Plan #${planId} for ${order.customerName}.`,
+    });
+
+    return order;
+  }
+
+  // --- Live GPS Update on Customer & Plan (Any Role Authorization) ---
+  updateCustomerGps(customerId: string, gps: GPSLocation, newAddress?: string, newLandmark?: string, actorId: string = "system"): Customer {
+    const customer = this.customers.find((c) => c.id === customerId);
+    if (!customer) throw new Error("Customer not found");
+
+    customer.gpsLocation = gps;
+    if (newAddress && newAddress.trim().length > 0) customer.address = newAddress;
+    if (newLandmark && newLandmark.trim().length > 0) customer.landmark = newLandmark;
+
+    // Also update all active installment plans for this customer
+    this.plans
+      .filter((p) => p.customerId === customerId)
+      .forEach((p) => {
+        p.gpsLocation = gps;
+        if (gps.aiSuggestedZone) p.areaZone = gps.aiSuggestedZone;
+      });
+
+    this.appendLedgerBlock({
+      id: `tx_gps_${customerId}_${Date.now()}`,
+      tenantId: customer.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId,
+      customerId,
+      notes: `Customer GPS Pin updated: Lat ${gps.lat.toFixed(6)}, Lng ${gps.lng.toFixed(6)}. Address: ${customer.address}.`,
+    });
+
+    return customer;
+  }
+
+  updatePlanGps(planId: string, gps: GPSLocation, newAddress?: string, actorId: string = "system"): InstallmentPlan {
+    const plan = this.plans.find((p) => p.id === planId);
+    if (!plan) throw new Error("Plan not found");
+
+    plan.gpsLocation = gps;
+    if (gps.aiSuggestedZone) plan.areaZone = gps.aiSuggestedZone;
+
+    // Also update customer record
+    const customer = this.customers.find((c) => c.id === plan.customerId);
+    if (customer) {
+      customer.gpsLocation = gps;
+      if (newAddress) customer.address = newAddress;
+    }
+
+    this.appendLedgerBlock({
+      id: `tx_gps_plan_${planId}_${Date.now()}`,
+      tenantId: plan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId,
+      planId,
+      customerId: plan.customerId,
+      notes: `Plan #${plan.planNumber} GPS location pinned: Lat ${gps.lat.toFixed(6)}, Lng ${gps.lng.toFixed(6)}. Area: ${plan.areaZone}.`,
+    });
+
+    return plan;
   }
 
   // --- Sprint 6: Automated Encrypted Cloud Backup ---

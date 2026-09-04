@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/lib/context/auth-context";
 import { store } from "@/lib/db/store";
-import { IClaimRequest, InstallmentPlan, Customer } from "@/lib/db/types";
+import { IClaimRequest, InstallmentPlan, Customer, Product } from "@/lib/db/types";
 import { formatPhone, formatDate, formatPKR } from "@/lib/formatters";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import {
@@ -21,18 +21,29 @@ import {
   XCircle,
   HelpCircle,
   Filter,
+  RefreshCw,
+  Package,
+  Layers,
+  ArrowRight,
 } from "lucide-react";
 
 export default function ClaimsAndReturnsPage() {
   const { currentUser, currentTenant } = useAuth();
   const [claims, setClaims] = useState<IClaimRequest[]>(() => store.getClaimRequests(currentTenant.id));
   const [plans] = useState<InstallmentPlan[]>(() => store.getPlans(currentTenant.id));
-  const [customers] = useState<Customer[]>(() => store.getCustomers(currentTenant.id));
+  const [products] = useState<Product[]>(() => store.getProducts(currentTenant.id));
 
+  // Modals
   const [showModal, setShowModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<IClaimRequest | null>(null);
-  const [resolutionAction, setResolutionAction] = useState<"APPROVED" | "REJECTED" | "RESOLVED">("APPROVED");
+
+  // Resolution Mode
+  const [resolveType, setResolveType] = useState<"SAME_DAY_REPAIR" | "REPLACE_NEW_UNIT" | "RETURN_WAPSI" | "REJECT">("SAME_DAY_REPAIR");
+  const [replacementProdId, setReplacementProdId] = useState("");
+  const [replacementSerial, setReplacementSerial] = useState("");
+  const [defectiveAction, setDefectiveAction] = useState<"SEND_TO_DEFECTIVE_STORE" | "REFURBISH_FOR_RESALE" | "DISCARD_SCRAP">("SEND_TO_DEFECTIVE_STORE");
+  const [wapsiCondition, setWapsiCondition] = useState<"USED_REFURBISHED" | "DEFECTIVE_DAMAGED">("DEFECTIVE_DAMAGED");
   const [resolutionNotes, setResolutionNotes] = useState("");
 
   // Filter & Search
@@ -53,7 +64,7 @@ export default function ClaimsAndReturnsPage() {
 
   if (!currentUser) return null;
 
-  const isOwnerOrAdmin = currentUser.role === "SUPER_ADMIN" || currentUser.role === "OWNER";
+  const isOwnerOrAdmin = currentUser.role === "SUPER_ADMIN" || currentUser.role === "OWNER" || currentUser.role === "BRANCH_MANAGER";
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlanId(planId);
@@ -112,9 +123,11 @@ export default function ClaimsAndReturnsPage() {
     }
   };
 
-  const handleOpenResolve = (claim: IClaimRequest, action: "APPROVED" | "REJECTED" | "RESOLVED") => {
+  const handleOpenResolve = (claim: IClaimRequest) => {
     setSelectedClaim(claim);
-    setResolutionAction(action);
+    setResolveType("SAME_DAY_REPAIR");
+    setReplacementProdId(products[0]?.id || "");
+    setReplacementSerial(`NEW-SN-${Date.now().toString().slice(-6)}`);
     setResolutionNotes("");
     setShowResolveModal(true);
   };
@@ -123,301 +136,351 @@ export default function ClaimsAndReturnsPage() {
     e.preventDefault();
     if (!selectedClaim) return;
     try {
-      store.updateClaimRequestStatus(selectedClaim.id, resolutionAction, resolutionNotes, currentUser);
+      if (resolveType === "SAME_DAY_REPAIR") {
+        store.resolveClaimOnSpot({
+          claimId: selectedClaim.id,
+          resolutionNotes: resolutionNotes || "Repaired same-day at showroom / route technician.",
+          actor: currentUser,
+        });
+        setMsg({ type: "success", text: `Claim #${selectedClaim.id} marked as REPAIRED & RESOLVED same-day!` });
+      } else if (resolveType === "REPLACE_NEW_UNIT") {
+        const prod = products.find((p) => p.id === replacementProdId);
+        store.resolveClaimWithReplacement({
+          claimId: selectedClaim.id,
+          replacementProductId: prod?.id || "prod_new",
+          replacementProductTitle: prod?.title || "New Replacement Unit",
+          replacementSerial: replacementSerial || `SN-NEW-${Date.now()}`,
+          defectiveAction,
+          resolutionNotes: resolutionNotes || "Replaced with brand new unit.",
+          actor: currentUser,
+        });
+        setMsg({
+          type: "success",
+          text: `Claim #${selectedClaim.id} resolved with New Replacement Unit (SN: ${replacementSerial})! Old unit received into defective stock.`,
+        });
+      } else if (resolveType === "RETURN_WAPSI") {
+        store.resolveClaimWithReturnWapsi({
+          claimId: selectedClaim.id,
+          inventoryCondition: wapsiCondition,
+          resolutionNotes: resolutionNotes || "Item returned by customer and contract finalized.",
+          actor: currentUser,
+        });
+        setMsg({ type: "success", text: `Wapsi / Return finalized! Product added to store stock (${wapsiCondition}).` });
+      } else if (resolveType === "REJECT") {
+        store.updateClaimRequestStatus(selectedClaim.id, "REJECTED", resolutionNotes || "Customer claim rejected due to physical void warranty.", currentUser);
+        setMsg({ type: "success", text: `Claim #${selectedClaim.id} marked as REJECTED.` });
+      }
+
       setClaims([...store.getClaimRequests(currentTenant.id)]);
       setShowResolveModal(false);
       setSelectedClaim(null);
-      setMsg({
-        type: "success",
-        text: `Claim request #${selectedClaim.id} updated to ${resolutionAction}.`,
-      });
     } catch (err: any) {
-      setMsg({ type: "error", text: err.message });
+      setMsg({ type: "error", text: err.message || "Failed to process resolution" });
     }
   };
 
   const filteredClaims = claims.filter((c) => {
     if (typeFilter !== "ALL" && c.type !== typeFilter) return false;
     if (statusFilter !== "ALL" && c.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
+    if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return (
-        c.customerName.toLowerCase().includes(q) ||
-        c.customerPhone.includes(q) ||
-        c.productTitle.toLowerCase().includes(q) ||
-        (c.planNumber && c.planNumber.toLowerCase().includes(q)) ||
-        (c.imeiSerial && c.imeiSerial.toLowerCase().includes(q))
-      );
+      const matchName = c.customerName.toLowerCase().includes(q);
+      const matchPhone = c.customerPhone.includes(q);
+      const matchProd = c.productTitle.toLowerCase().includes(q);
+      const matchSerial = (c.imeiSerial || "").toLowerCase().includes(q);
+      const matchPlan = (c.planNumber || "").toLowerCase().includes(q);
+      return matchName || matchPhone || matchProd || matchSerial || matchPlan;
     }
     return true;
   });
 
-  const pendingCount = claims.filter((c) => c.status === "PENDING_APPROVAL").length;
-  const approvedCount = claims.filter((c) => c.status === "APPROVED").length;
-  const resolvedCount = claims.filter((c) => c.status === "RESOLVED").length;
-
-  const typeLabels: Record<IClaimRequest["type"], { label: string; color: string; icon: any }> = {
-    WARRANTY_CLAIM: { label: "Warranty Claim", color: "bg-amber-100 text-amber-800 border-amber-300", icon: Wrench },
-    RETURN_WAPSI: { label: "Return / Wapsi", color: "bg-rose-100 text-rose-800 border-rose-300", icon: RotateCcw },
-    PRODUCT_ISSUE: { label: "Technical Issue", color: "bg-blue-100 text-blue-800 border-blue-300", icon: ShieldAlert },
-    DISPUTE: { label: "Customer Dispute", color: "bg-purple-100 text-purple-800 border-purple-300", icon: HelpCircle },
-  };
-
-  const statusLabels: Record<IClaimRequest["status"], { label: string; color: string }> = {
-    PENDING_APPROVAL: { label: "Pending Approval", color: "bg-amber-50 text-amber-800 border-amber-200" },
-    APPROVED: { label: "Approved for Replacement", color: "bg-emerald-50 text-emerald-800 border-emerald-200" },
-    REJECTED: { label: "Rejected", color: "bg-rose-50 text-rose-800 border-rose-200" },
-    RESOLVED: { label: "Resolved & Closed", color: "bg-slate-100 text-slate-800 border-slate-300" },
+  const getStatusBadge = (status: IClaimRequest["status"]) => {
+    switch (status) {
+      case "PENDING_APPROVAL":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>Pending Review</span>
+          </span>
+        );
+      case "APPROVED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Approved / Dispatch</span>
+          </span>
+        );
+      case "RESOLVED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+            <Check className="w-3 h-3" />
+            <span>Resolved & Closed</span>
+          </span>
+        );
+      case "REJECTED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+            <XCircle className="w-3 h-3" />
+            <span>Rejected</span>
+          </span>
+        );
+    }
   };
 
   return (
-    <div className="space-y-8 pb-16">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-        <div className="space-y-2">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs uppercase font-extrabold tracking-wider bg-amber-600 text-amber-100 px-3 py-1 rounded-full border border-amber-500/30">
-              Warranty & Returns Portal
+            <span className="px-3 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-300">
+              Customer Support & Lifecycle
             </span>
-            <UrduSpeaker
-              customText="وارنٹی کلیم اور سامان واپسی کی درخواستوں کا پورٹل۔ فیلڈ ریکوری افسر یا سیلز مین خرابی کی رپورٹ درج کر سکتے ہیں اور مالک اسے فوری منظور یا مسترد کر سکتا ہے۔"
-              size="sm"
-              showLabel
-            />
+            <UrduSpeaker customText="وارنٹی کلیم، سامان واپسی اور تکنیکی مسائل کا باقاعدہ حل۔ ریکوری مین فیلڈ سے درخواست کرے گا اور مالک نئی چیز کا تبادلہ یا دکان پر ریپیئر منظور کر سکتا ہے۔" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Warranty Claims & Product Returns (Wapsi)
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Wrench className="w-7 h-7 text-purple-600" />
+            Warranty Claims & Item Returns (Wapsi)
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Log item faults, warranty inspection claims, customer disputes, and voluntary returns from the field with full audit tracking.
+          <p className="text-xs text-slate-500">
+            Log field fault claims, swap defective appliances with new units, or process item returns into store inventory.
           </p>
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all self-start sm:self-auto"
+          onClick={() => {
+            setShowModal(true);
+            setMsg(null);
+          }}
+          className="px-5 py-3 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-xs shrink-0 self-start sm:self-auto"
         >
           <PlusCircle className="w-4 h-4" />
           <span>File Claim / Return Request</span>
         </button>
       </div>
 
+      {/* Alert Notification */}
       {msg && (
-        <div className={`p-4 rounded-2xl text-xs font-bold border flex items-center gap-3 ${
-          msg.type === "success" ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-rose-50 text-rose-900 border-rose-300"
-        }`}>
-          {msg.type === "success" ? <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" /> : <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0" />}
+        <div
+          className={`p-4 rounded-2xl text-xs font-bold border flex items-center justify-between ${
+            msg.type === "success" ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-rose-50 text-rose-900 border-rose-300"
+          }`}
+        >
           <span>{msg.text}</span>
+          <button onClick={() => setMsg(null)} className="text-slate-400 hover:text-slate-700 font-black">
+            ✕
+          </button>
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Total Requests</span>
-            <FileText className="w-4 h-4 text-slate-500" />
+      {/* KPI Counters */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black">
+            <FileText className="w-6 h-6" />
           </div>
-          <p className="text-2xl font-black text-slate-900">{claims.length}</p>
-          <span className="text-[10px] text-slate-500">All recorded field reports</span>
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Claims</span>
+            <strong className="text-2xl font-black text-slate-900">{claims.length}</strong>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-amber-700">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Pending Review</span>
-            <Clock className="w-4 h-4 text-amber-600" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black">
+            <Clock className="w-6 h-6" />
           </div>
-          <p className="text-2xl font-black text-amber-900">{pendingCount}</p>
-          <span className="text-[10px] text-amber-700 font-semibold">Awaiting Owner decision</span>
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Pending Review</span>
+            <strong className="text-2xl font-black text-amber-700">
+              {claims.filter((c) => c.status === "PENDING_APPROVAL").length}
+            </strong>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-emerald-200 bg-emerald-50/30 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-emerald-700">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Approved</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
+            <RefreshCw className="w-6 h-6" />
           </div>
-          <p className="text-2xl font-black text-emerald-900">{approvedCount}</p>
-          <span className="text-[10px] text-emerald-700 font-semibold">Replacement in progress</span>
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Replacements & Wapsi</span>
+            <strong className="text-2xl font-black text-blue-700">
+              {claims.filter((c) => c.type === "RETURN_WAPSI" || c.resolutionType === "REPLACED_WITH_NEW").length}
+            </strong>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Resolved & Closed</span>
-            <ShieldAlert className="w-4 h-4 text-slate-600" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
-          <p className="text-2xl font-black text-slate-900">{resolvedCount}</p>
-          <span className="text-[10px] text-slate-500">Completed cases</span>
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Resolved & Closed</span>
+            <strong className="text-2xl font-black text-emerald-700">
+              {claims.filter((c) => c.status === "RESOLVED").length}
+            </strong>
+          </div>
         </div>
       </div>
 
-      {/* Filters & Directory */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Search by customer name, phone, serial or plan..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-slate-400"
-            />
-          </div>
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2 w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search customer, phone, serial/IMEI, product..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full text-xs font-medium outline-none bg-transparent"
+          />
+        </div>
 
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-slate-400 font-bold">Type:</span>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
+              className="p-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none text-xs"
             >
-              <option value="ALL">All Request Types</option>
-              <option value="WARRANTY_CLAIM">Warranty Claims</option>
-              <option value="RETURN_WAPSI">Returns / Wapsi</option>
-              <option value="PRODUCT_ISSUE">Product Faults</option>
-              <option value="DISPUTE">Customer Disputes</option>
+              <option value="ALL">All Categories</option>
+              <option value="WARRANTY_CLAIM">Warranty Claim</option>
+              <option value="RETURN_WAPSI">Return / Wapsi</option>
+              <option value="PRODUCT_ISSUE">Technical Fault</option>
+              <option value="DISPUTE">Dispute</option>
             </select>
+          </div>
 
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-slate-400 font-bold">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none"
+              className="p-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none text-xs"
             >
               <option value="ALL">All Statuses</option>
-              <option value="PENDING_APPROVAL">Pending Approval</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
+              <option value="PENDING_APPROVAL">Pending Review</option>
               <option value="RESOLVED">Resolved</option>
+              <option value="REJECTED">Rejected</option>
             </select>
           </div>
         </div>
+      </div>
 
-        {filteredClaims.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-xs font-semibold">
-            No warranty claims or return requests found matching your filters.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredClaims.map((claim) => {
-              const typeCfg = typeLabels[claim.type];
-              const statusCfg = statusLabels[claim.status];
-              const TypeIcon = typeCfg.icon;
-
-              return (
-                <div
-                  key={claim.id}
-                  className="p-4 sm:p-5 bg-slate-50/70 hover:bg-slate-50 rounded-2xl border border-slate-200 transition-colors space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border flex items-center gap-1 ${typeCfg.color}`}>
-                        <TypeIcon className="w-3 h-3" />
-                        <span>{typeCfg.label}</span>
-                      </span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusCfg.color}`}>
-                        {statusCfg.label}
-                      </span>
-                      {claim.planNumber && (
-                        <span className="font-mono text-[11px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                          {claim.planNumber}
-                        </span>
-                      )}
-                    </div>
-
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      Filed: {formatDate(claim.createdAt)}
+      {/* Claims Records List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredClaims.map((claim) => (
+          <div
+            key={claim.id}
+            className="bg-white p-5 rounded-3xl border border-slate-200 hover:border-purple-500 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col justify-between"
+          >
+            <div className="space-y-3">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono font-black text-purple-900 bg-purple-100 px-2 py-0.5 rounded-md">
+                      #{claim.id.slice(-6).toUpperCase()}
+                    </span>
+                    <span className="text-[11px] font-extrabold text-slate-500">
+                      {claim.type.replace("_", " ")}
                     </span>
                   </div>
+                  <h3 className="text-base font-black text-slate-900 mt-1">{claim.customerName}</h3>
+                </div>
+                {getStatusBadge(claim.status)}
+              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Customer</span>
-                      <strong className="text-slate-900 text-sm block">{claim.customerName}</strong>
-                      <span className="text-slate-600 font-mono">{formatPhone(claim.customerPhone)}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Product & Serial</span>
-                      <strong className="text-slate-800 block">{claim.productTitle}</strong>
-                      <span className="text-slate-500 font-mono text-[11px]">
-                        {claim.imeiSerial ? `Serial: ${claim.imeiSerial}` : "No Serial Tracked"}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Logged By</span>
-                      <span className="text-slate-800 font-bold block">{claim.requestedByName}</span>
-                      <span className="text-[11px] text-slate-500 capitalize">{claim.requesterRole.replace("_", " ")}</span>
-                    </div>
+              {/* Product & Contract Box */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Product / Item:</span>
+                  <strong className="text-slate-900 font-bold">{claim.productTitle}</strong>
+                </div>
+                {claim.imeiSerial && (
+                  <div className="flex items-center justify-between font-mono text-[11px]">
+                    <span className="text-slate-400 font-sans">Serial / IMEI:</span>
+                    <span className="font-bold text-slate-700">{claim.imeiSerial}</span>
                   </div>
-
-                  {/* Issue Box */}
-                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1 text-xs">
-                    <span className="text-rose-700 font-bold block text-[11px]">Reported Problem / Reason:</span>
-                    <p className="text-slate-800 leading-relaxed">{claim.issueDescription}</p>
-                    {claim.physicalConditionNotes && (
-                      <p className="text-slate-500 text-[11px] pt-1 border-t border-slate-100">
-                        <span className="font-bold">Physical Condition:</span> {claim.physicalConditionNotes}
-                      </p>
-                    )}
-                    {claim.resolutionNotes && (
-                      <p className="text-emerald-800 font-semibold text-[11px] pt-1 border-t border-slate-100 bg-emerald-50/50 p-1.5 rounded">
-                        <span className="font-bold">Manager Resolution:</span> {claim.resolutionNotes}
-                      </p>
-                    )}
+                )}
+                {claim.planNumber && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Khata / Contract:</span>
+                    <span className="font-mono font-bold text-emerald-800">#{claim.planNumber}</span>
                   </div>
+                )}
+              </div>
 
-                  {/* Action Bar for Owner / Super Admin */}
-                  {isOwnerOrAdmin && claim.status === "PENDING_APPROVAL" && (
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => handleOpenResolve(claim, "REJECTED")}
-                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        <span>Reject Request</span>
-                      </button>
-                      <button
-                        onClick={() => handleOpenResolve(claim, "APPROVED")}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Approve Replacement</span>
-                      </button>
-                    </div>
-                  )}
+              {/* Fault Description */}
+              <div className="space-y-1 text-xs">
+                <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block">
+                  Reported Fault Description:
+                </span>
+                <p className="text-slate-800 bg-amber-50/50 p-2.5 rounded-xl border border-amber-200/50 font-medium">
+                  {claim.issueDescription}
+                </p>
+              </div>
 
-                  {isOwnerOrAdmin && claim.status === "APPROVED" && (
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => handleOpenResolve(claim, "RESOLVED")}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Mark as Resolved & Closed</span>
-                      </button>
-                    </div>
+              {claim.physicalConditionNotes && (
+                <p className="text-[11px] text-slate-500 italic">
+                  Physical condition: &ldquo;{claim.physicalConditionNotes}&rdquo;
+                </p>
+              )}
+
+              {/* Resolution Info if resolved */}
+              {claim.resolutionNotes && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs space-y-1">
+                  <span className="text-emerald-900 font-black block">Resolution Decision:</span>
+                  <p className="text-emerald-800 font-medium">{claim.resolutionNotes}</p>
+                  {claim.replacementSerial && (
+                    <span className="text-[10px] font-mono font-bold text-emerald-950 block">
+                      New Replacement Unit Serial: {claim.replacementSerial}
+                    </span>
                   )}
                 </div>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Footer / Actions */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-[11px] text-slate-400">
+                By: <strong>{claim.requestedByName}</strong> • {formatDate(claim.createdAt)}
+              </span>
+
+              {isOwnerOrAdmin && claim.status !== "RESOLVED" && claim.status !== "REJECTED" && (
+                <button
+                  onClick={() => handleOpenResolve(claim)}
+                  className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>Process Resolution</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {filteredClaims.length === 0 && (
+          <div className="col-span-full bg-white p-12 text-center rounded-3xl border border-slate-200 space-y-2">
+            <Wrench className="w-8 h-8 text-slate-300 mx-auto" />
+            <p className="font-bold text-slate-700 text-sm">No claims or return requests found.</p>
+            <p className="text-xs text-slate-400">Click &quot;File Claim / Return Request&quot; above to log a new warranty claim or product return.</p>
           </div>
         )}
       </div>
 
-      {/* MODAL 1: File New Claim / Wapsi Request */}
+      {/* MODAL 1: File New Claim / Return Request */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className="text-[10px] uppercase font-black tracking-wider bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
-                  New Incident Report
+                <span className="text-[10px] uppercase font-extrabold tracking-wider bg-purple-100 text-purple-900 px-2.5 py-0.5 rounded-full border border-purple-300">
+                  New Request Form
                 </span>
-                <h3 className="text-base font-black text-slate-900 mt-1">
-                  File Warranty Claim or Item Return (Wapsi)
-                </h3>
+                <h3 className="text-lg font-black text-slate-900 mt-1">File Warranty Claim / Return</h3>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-1">
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
                 ✕
               </button>
             </div>
@@ -438,18 +501,16 @@ export default function ClaimsAndReturnsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Select Existing Active Contract (Optional)
-                </label>
+                <label className="block text-slate-700 font-bold mb-1">Link to Active Customer Khata (Optional)</label>
                 <select
                   value={selectedPlanId}
                   onChange={(e) => handlePlanSelect(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800 outline-none"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                 >
-                  <option value="">-- Choose from active installment plans --</option>
+                  <option value="">-- Choose Existing Installment Plan --</option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.planNumber} • {p.customerName} ({p.productTitle})
+                      {p.customerName} — {p.productTitle} (#{p.khataNumber || p.planNumber})
                     </option>
                   ))}
                 </select>
@@ -467,13 +528,12 @@ export default function ClaimsAndReturnsPage() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Customer Phone *</label>
+                  <label className="block text-slate-700 font-bold mb-1">Mobile Phone *</label>
                   <input
                     type="tel"
                     required
-                    placeholder="0333-1234567"
+                    placeholder="0300-1234567"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono outline-none"
@@ -483,22 +543,21 @@ export default function ClaimsAndReturnsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Product / Appliance Title *</label>
+                  <label className="block text-slate-700 font-bold mb-1">Product Title *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Super Asia Washing Machine"
+                    placeholder="e.g. Electric Heavy Iron"
                     value={productTitle}
                     onChange={(e) => setProductTitle(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">IMEI / Serial Number</label>
+                  <label className="block text-slate-700 font-bold mb-1">Serial / IMEI (If known)</label>
                   <input
                     type="text"
-                    placeholder="SN-12345678"
+                    placeholder="SN-123456"
                     value={imeiSerial}
                     onChange={(e) => setImeiSerial(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono outline-none"
@@ -507,29 +566,25 @@ export default function ClaimsAndReturnsPage() {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Detailed Issue Description & Customer Statement *
-                </label>
+                <label className="block text-slate-700 font-bold mb-1">Detailed Fault / Issue Description *</label>
                 <textarea
-                  required
                   rows={3}
-                  placeholder="Explain exactly what problem occurred with the appliance or why the customer wants to return it..."
+                  required
+                  placeholder="Explain exactly what is wrong (e.g. not heating up, motor humming, cooling leakage)..."
                   value={issueDescription}
                   onChange={(e) => setIssueDescription(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 outline-none"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Physical Condition & Inspection Remarks
-                </label>
+                <label className="block text-slate-700 font-bold mb-1">Physical Condition Notes</label>
                 <input
                   type="text"
-                  placeholder="e.g. Clean condition, no body dents, original box intact"
+                  placeholder="e.g. Minor body scratch, seal intact, cable fine..."
                   value={physicalConditionNotes}
                   onChange={(e) => setPhysicalConditionNotes(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 outline-none"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none"
                 />
               </div>
 
@@ -543,10 +598,10 @@ export default function ClaimsAndReturnsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Submit Claim Request</span>
+                  <span>Submit Request</span>
                 </button>
               </div>
             </form>
@@ -554,52 +609,120 @@ export default function ClaimsAndReturnsPage() {
         </div>
       )}
 
-      {/* MODAL 2: Manager Resolve / Decision */}
+      {/* MODAL 2: Comprehensive Claim Resolution (Same-day repair, Replacement with New Serial, Wapsi) */}
       {showResolveModal && selectedClaim && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-base font-black text-slate-900">
-                Update Status for Claim #{selectedClaim.id}
-              </h3>
-              <button onClick={() => setShowResolveModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold tracking-wider bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                  Manager Resolution Decision
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">Resolve Claim #{selectedClaim.id.slice(-6)}</h3>
+              </div>
+              <button onClick={() => setShowResolveModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleConfirmResolution} className="space-y-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Target Case</span>
-                <p className="font-bold text-slate-900">{selectedClaim.customerName} • {selectedClaim.productTitle}</p>
-                <p className="text-slate-600">{selectedClaim.issueDescription}</p>
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl space-y-1">
+                <span className="text-purple-900 font-black block">Customer: {selectedClaim.customerName}</span>
+                <span className="text-slate-700 block">Product: {selectedClaim.productTitle} (SN: {selectedClaim.imeiSerial || "N/A"})</span>
+                <span className="text-slate-500 text-[11px] block">Reported: {selectedClaim.issueDescription}</span>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Set Status Decision *</label>
+                <label className="block text-slate-700 font-bold mb-1">Select Resolution Path *</label>
                 <select
-                  value={resolutionAction}
-                  onChange={(e) => setResolutionAction(e.target.value as any)}
+                  value={resolveType}
+                  onChange={(e) => setResolveType(e.target.value as any)}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                 >
-                  <option value="APPROVED">APPROVED (Approve for Replacement / Repair)</option>
-                  <option value="REJECTED">REJECTED (Decline Claim)</option>
-                  <option value="RESOLVED">RESOLVED (Closed & Settled)</option>
+                  <option value="SAME_DAY_REPAIR">1. Showroom / On-Route Same-Day Repair (اسی دن مرمت)</option>
+                  <option value="REPLACE_NEW_UNIT">2. Replace with Brand New Unit (نئی پروڈکٹ کا تبادلہ)</option>
+                  <option value="RETURN_WAPSI">3. Customer Return / Wapsi (سامان واپسی اور کھاتہ کلوز)</option>
+                  <option value="REJECT">4. Reject Claim (مسترد کریں)</option>
                 </select>
               </div>
 
+              {/* Path 1: Replace New Unit Fields */}
+              {resolveType === "REPLACE_NEW_UNIT" && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl space-y-3">
+                  <span className="text-xs font-black text-blue-900 block">New Unit Allocation:</span>
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Select Replacement Product *</label>
+                    <select
+                      value={replacementProdId}
+                      onChange={(e) => setReplacementProdId(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
+                    >
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title} ({p.stockQuantity || 0} in stock)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">New Serial / IMEI Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={replacementSerial}
+                      onChange={(e) => setReplacementSerial(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 rounded-xl font-mono font-bold text-slate-900 outline-none"
+                    />
+                    <span className="text-[10px] text-blue-700 block mt-0.5">Customer&apos;s active khata serial will automatically update to this new number.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">What to do with Old Defective Unit? *</label>
+                    <select
+                      value={defectiveAction}
+                      onChange={(e) => setDefectiveAction(e.target.value as any)}
+                      className="w-full p-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
+                    >
+                      <option value="SEND_TO_DEFECTIVE_STORE">Keep in Shop Defective / Scrap Store (خراب اسٹاک)</option>
+                      <option value="REFURBISH_FOR_RESALE">Repair & Refurbish for Second-hand Resale (استعمال شدہ اسٹاک)</option>
+                      <option value="DISCARD_SCRAP">Discard as Scrap</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Path 2: Return Wapsi */}
+              {resolveType === "RETURN_WAPSI" && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
+                  <span className="text-xs font-black text-amber-950 block">Returned Inventory Intake:</span>
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Store Inventory Condition *</label>
+                    <select
+                      value={wapsiCondition}
+                      onChange={(e) => setWapsiCondition(e.target.value as any)}
+                      className="w-full p-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
+                    >
+                      <option value="DEFECTIVE_DAMAGED">Defective / Damaged Stock (خراب مال)</option>
+                      <option value="USED_REFURBISHED">Used / Refurbished Resale Stock (قابل فروخت استعمال شدہ)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Manager Resolution Remarks *</label>
+                <label className="block text-slate-700 font-bold mb-1">Resolution & Handover Notes *</label>
                 <textarea
+                  rows={2}
                   required
-                  rows={3}
-                  placeholder="State the rationale or action taken (e.g. New piece dispatched from showroom stock)..."
+                  placeholder="e.g. New fan handed to Bilal Recovery Officer to deliver to Akbar Ali..."
                   value={resolutionNotes}
                   onChange={(e) => setResolutionNotes(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 outline-none"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className="flex justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
                   onClick={() => setShowResolveModal(false)}
@@ -609,9 +732,10 @@ export default function ClaimsAndReturnsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl shadow"
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  Confirm Status Change
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm Resolution & Update Stock</span>
                 </button>
               </div>
             </form>

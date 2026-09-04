@@ -22,13 +22,22 @@ import {
   Calendar,
   Clock,
   UserCheck,
+  MapPin,
+  ExternalLink,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
+import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
+import { GPSLocation } from "@/lib/db/types";
 
 export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const { currentTenant, currentUser } = useAuth();
   const [plan, setPlan] = useState(() => store.getPlanById(params.id));
   const allPlans = store.getPlans(currentTenant.id).filter((p) => p.id !== params.id);
+
+  // GPS Modal State
+  const [gpsModalOpen, setGpsModalOpen] = useState(false);
+  const [gpsLocation, setGpsLocation] = useState<GPSLocation | undefined>(plan?.gpsLocation);
+  const [custAddressEdit, setCustAddressEdit] = useState(plan?.areaZone || "");
 
   // Pay Modal State
   const [payModalOpen, setPayModalOpen] = useState(false);
@@ -195,6 +204,22 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
+  const handleSaveGps = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!plan || !gpsLocation) return;
+    try {
+      store.updatePlanGps(plan.id, gpsLocation, custAddressEdit);
+      setPlan({ ...store.getPlanById(plan.id)! });
+      setGpsModalOpen(false);
+      setMsg({
+        type: "success",
+        text: `Customer GPS location pinned and updated successfully! (Coordinates: ${gpsLocation.lat.toFixed(4)}, ${gpsLocation.lng.toFixed(4)})`,
+      });
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to update GPS location" });
+    }
+  };
+
   return (
     <div className="space-y-8 pb-16">
       {/* Top Banner */}
@@ -221,6 +246,14 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setGpsModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
+          >
+            <MapPin className="w-4 h-4 text-amber-300" />
+            <span>Pin / Update GPS Location</span>
+          </button>
+
           {isOwnerOrSuperAdmin && (
             <button
               onClick={handleOpenTransfer}
@@ -286,6 +319,45 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
           <span className="font-urdu leading-relaxed">{msg.text}</span>
         </div>
       )}
+
+      {/* Customer Location & GPS Bar */}
+      <div className="bg-emerald-950 text-white p-4 sm:p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-emerald-800">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-800 flex items-center justify-center text-amber-300 font-black shrink-0">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Assigned Route Zone:</span>
+              <strong className="text-sm font-bold text-white">{plan.areaZone || "Chiniot Route"}</strong>
+            </div>
+            <p className="text-xs text-emerald-200 mt-0.5">
+              {plan.gpsLocation?.address ? plan.gpsLocation.address : "GPS location not pinned yet. Click 'Pin / Update GPS' to drop live map pin."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {plan.gpsLocation?.mapUrl && (
+            <a
+              href={plan.gpsLocation.mapUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3.5 py-2 bg-emerald-900 hover:bg-emerald-800 text-emerald-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-700 transition-colors"
+            >
+              <span>View Map</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+          <button
+            onClick={() => setGpsModalOpen(true)}
+            className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition-all flex items-center gap-1.5"
+          >
+            <MapPin className="w-4 h-4" />
+            <span>Pin Live GPS</span>
+          </button>
+        </div>
+      </div>
 
       {/* Financial Overview Cards (Matching Register) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -690,6 +762,73 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 >
                   <ArrowLeftRight className="w-4 h-4" />
                   <span>Execute Khata Transfer</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: Update Live GPS Location Pin */}
+      {gpsModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold tracking-wider bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                  Live Geolocation Assistant
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">Pin / Update Customer GPS Location</h3>
+              </div>
+              <button onClick={() => setGpsModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGps} className="space-y-4 text-xs">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-0.5">
+                <span className="text-emerald-950 font-black block text-sm">Customer: {plan.customerName} ({plan.customerPhone})</span>
+                <span className="text-emerald-900 font-medium block">Khata #{plan.khataNumber || plan.planNumber} • {plan.productTitle}</span>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">Interactive Map Location Picker</label>
+                <MapLocationPicker
+                  value={gpsLocation}
+                  onChange={(loc) => setGpsLocation(loc)}
+                  onAddressAutoFill={(addr, zone) => {
+                    if (addr) setCustAddressEdit(addr);
+                  }}
+                  defaultCity="Chiniot"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Customer Address & Landmark (Auto-updated from Pin)</label>
+                <input
+                  type="text"
+                  required
+                  value={custAddressEdit}
+                  onChange={(e) => setCustAddressEdit(e.target.value)}
+                  placeholder="e.g. Mohallah Rehman Abad, Street #3, Near Desi Masjid, Chiniot"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setGpsModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save Location Pin to Khata</span>
                 </button>
               </div>
             </form>
