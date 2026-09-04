@@ -25,15 +25,23 @@ import {
   MapPin,
   ExternalLink,
   Package,
+  BookOpen,
+  CheckSquare,
+  Square,
+  Save,
+  Plus,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
-import { GPSLocation } from "@/lib/db/types";
+import { GPSLocation, InstallmentScheduleItem } from "@/lib/db/types";
 
 export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const { currentTenant, currentUser } = useAuth();
   const [plan, setPlan] = useState(() => store.getPlanById(params.id));
   const allPlans = store.getPlans(currentTenant.id).filter((p) => p.id !== params.id);
+
+  // View Mode: "SCHEDULE" | "DIARY_RECONCILE"
+  const [viewMode, setViewMode] = useState<"SCHEDULE" | "DIARY_RECONCILE">("SCHEDULE");
 
   // GPS Modal State
   const [gpsModalOpen, setGpsModalOpen] = useState(false);
@@ -44,7 +52,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [activeInstallmentNo, setActiveInstallmentNo] = useState<number>(1);
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [customPaidDate, setCustomPaidDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
   const [payNotes, setPayNotes] = useState<string>("");
+
+  // Diary Reconciliation Local State
+  const [diaryItems, setDiaryItems] = useState<InstallmentScheduleItem[]>(() => {
+    return plan ? JSON.parse(JSON.stringify(plan.schedule)) : [];
+  });
 
   // Khata Correction Modal State (Owner/SuperAdmin Only)
   const [corrModalOpen, setCorrModalOpen] = useState(false);
@@ -72,9 +86,10 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
   const isOwnerOrSuperAdmin = currentUser.role === "SUPER_ADMIN" || currentUser.role === "OWNER";
 
-  const handleOpenPay = (instNo: number, dueAmount: number) => {
+  const handleOpenPay = (instNo: number, dueAmount: number, itemDueDate: string) => {
     setActiveInstallmentNo(instNo);
     setPaidAmount(dueAmount);
+    setCustomPaidDate(itemDueDate || new Date().toISOString().split("T")[0]);
     setPayNotes("");
     setPayModalOpen(true);
     setMsg(null);
@@ -115,12 +130,65 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         collectedBy: currentUser.name,
         collectorRole: currentUser.role,
         notes: payNotes,
+        customPaidDate,
       });
-      setPlan({ ...store.getPlanById(plan.id)! });
+      const updated = store.getPlanById(plan.id)!;
+      setPlan({ ...updated });
+      setDiaryItems(JSON.parse(JSON.stringify(updated.schedule)));
       setPayModalOpen(false);
-      setMsg({ type: "success", text: `Payment recorded successfully! ${res.allocation.summary} (Receipt #${res.receiptId})` });
+      setMsg({
+        type: "success",
+        text: "Payment recorded successfully for " + customPaidDate + "! " + res.allocation.summary + " (Receipt #" + res.receiptId + ")",
+      });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Payment logging failed" });
+    }
+  };
+
+  const handleDiaryItemChange = (instNo: number, updates: Partial<InstallmentScheduleItem>) => {
+    setDiaryItems((prev) =>
+      prev.map((item) => {
+        if (item.installmentNo === instNo) {
+          const next = { ...item, ...updates };
+          if (updates.status === "PAID" && !next.amountPaid) {
+            next.amountPaid = next.totalDue;
+          }
+          if (updates.status === "PAID" && !next.paidDate) {
+            next.paidDate = next.dueDate;
+          }
+          return next;
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleSaveDiaryReconciliation = () => {
+    try {
+      const entries = diaryItems.map((item) => ({
+        installmentNo: item.installmentNo,
+        paidDate: item.paidDate,
+        amountPaid: Number(item.amountPaid) || 0,
+        status: item.status,
+        notes: item.notes,
+        collectedBy: item.collectedBy || currentUser.name,
+      }));
+
+      const updated = store.reconcileKhataFromDiary({
+        planId: plan.id,
+        entries,
+        reconciledBy: currentUser,
+      });
+
+      setPlan({ ...updated });
+      setDiaryItems(JSON.parse(JSON.stringify(updated.schedule)));
+      setViewMode("SCHEDULE");
+      setMsg({
+        type: "success",
+        text: "Physical Diary Reconciliation saved successfully! All installment dates and balances updated.",
+      });
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to save diary reconciliation." });
     }
   };
 
@@ -141,11 +209,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         editorUser: currentUser,
       });
 
-      setPlan({ ...store.getPlanById(plan.id)! });
+      const updated = store.getPlanById(plan.id)!;
+      setPlan({ ...updated });
+      setDiaryItems(JSON.parse(JSON.stringify(updated.schedule)));
       setCorrModalOpen(false);
       setMsg({
         type: "success",
-        text: `Khata installment #${corrInstNo} corrected successfully! Audit log created.`,
+        text: "Khata installment #" + corrInstNo + " corrected successfully! Audit log created.",
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
@@ -163,11 +233,13 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         updater: currentUser,
       });
 
-      setPlan({ ...store.getPlanById(plan.id)! });
+      const updated = store.getPlanById(plan.id)!;
+      setPlan({ ...updated });
+      setDiaryItems(JSON.parse(JSON.stringify(updated.schedule)));
       setReschedModalOpen(false);
       setMsg({
         type: "success",
-        text: `Installment #${reschedInstNo} due date rescheduled to (${newDueDate}). Route sheet updated.`,
+        text: "Installment #" + reschedInstNo + " due date rescheduled to (" + newDueDate + "). Route sheet updated.",
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
@@ -180,8 +252,12 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       alert("Please select destination khata.");
       return;
     }
+    if (xferAmount <= 0) {
+      alert("Please enter a valid transfer amount.");
+      return;
+    }
     if (!xferReason.trim()) {
-      alert("Please enter transfer reason note.");
+      alert("Please enter a transfer reason for audit trail.");
       return;
     }
 
@@ -194,128 +270,113 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         editorUser: currentUser,
       });
 
-      setPlan({ ...store.getPlanById(plan.id)! });
+      const updated = store.getPlanById(plan.id)!;
+      setPlan({ ...updated });
+      setDiaryItems(JSON.parse(JSON.stringify(updated.schedule)));
       setXferModalOpen(false);
       setMsg({
         type: "success",
-        text: `Successfully transferred ${formatPKR(xferAmount)} from misposted khata to destination khata.`,
+        text: "Payment of " + formatPKR(xferAmount) + " successfully transferred to Destination Khata! Both ledgers updated.",
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
     }
   };
 
-  const handleSaveGps = (e: React.FormEvent) => {
+  const handleSaveGpsModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!plan || !gpsLocation) return;
+    if (!gpsLocation) {
+      alert("Please pin a location on the map first.");
+      return;
+    }
     try {
-      store.updatePlanGps(plan.id, gpsLocation, custAddressEdit);
-      setPlan({ ...store.getPlanById(plan.id)! });
+      store.updatePlanGps(plan.id, gpsLocation, custAddressEdit, currentUser.id);
+      const updated = store.getPlanById(plan.id)!;
+      setPlan({ ...updated });
       setGpsModalOpen(false);
       setMsg({
         type: "success",
-        text: `Customer GPS location pinned and updated successfully! (Coordinates: ${gpsLocation.lat.toFixed(4)}, ${gpsLocation.lng.toFixed(4)})`,
+        text: "Customer & Plan Live GPS Coordinates successfully pinned and updated!",
       });
     } catch (err: any) {
-      setMsg({ type: "error", text: err.message || "Failed to update GPS location" });
+      setMsg({ type: "error", text: err.message || "Failed to update GPS" });
     }
   };
 
+  const totalCollected = plan.schedule.reduce((acc, curr) => acc + (curr.amountPaid || 0), 0);
+  const paidCount = plan.schedule.filter((s) => s.status === "PAID").length;
+  const remainingCount = Math.max(0, plan.schedule.length - paidCount);
+
   return (
-    <div className="space-y-8 pb-16">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+    <div className="space-y-6 pb-20 max-w-7xl mx-auto">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-mono bg-emerald-100 text-emerald-900 px-3 py-1 rounded-lg font-black border border-emerald-300">
-              Khata #{plan.khataNumber || plan.planNumber}
+            <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-600 text-emerald-50 px-3 py-1 rounded-full border border-emerald-400/30">
+              Khata #{plan.khataNumber || plan.planNumber.slice(-4)} • Rajpoot Traders
             </span>
-            <span className="text-xs font-bold bg-slate-900 text-amber-300 px-3 py-1 rounded-lg border border-slate-700 font-urdu">
-              Salesman: {plan.salesmanName || "Zaheem"}
-            </span>
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${getStatusBadgeClass(plan.status)}`}>
+            <span className={"px-3 py-0.5 rounded-full text-[10px] font-bold border " + getStatusBadgeClass(plan.status)}>
               {plan.status}
             </span>
-            <UrduSpeaker customText="اقساط معاہدہ کی تفصیلات، قسط وصولی، تاریخ تبدیلی یا کھاتہ تصحیح۔" size="sm" showLabel />
+            <UrduSpeaker
+              customText={"کھاتہ نمبر " + (plan.khataNumber || "") + "، خریدار " + plan.customerName + "۔ اگر ڈائری کے مطابق تاریخ یا قسط میچ کرنی ہے تو ڈائری میچنگ موڈ استعمال کریں۔"}
+              size="sm"
+              showLabel
+            />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 font-urdu">
-            Product Title: {plan.productTitle}
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+            Khata #{plan.khataNumber || "—"} — {plan.customerName}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5 font-urdu">
-            Customer: <strong className="text-slate-900">{plan.customerName}</strong> ({formatCNIC(plan.customerCnic)}) • Phone: <strong className="text-slate-900">{plan.customerPhone}</strong>
+          <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
+            Salesman: <strong className="text-amber-300">{plan.salesmanName || "Zaheem"}</strong> • Phone: {plan.customerPhone} • Product: {plan.productTitle}
           </p>
         </div>
 
+        {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setGpsModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
-          >
-            <MapPin className="w-4 h-4 text-amber-300" />
-            <span>Pin / Update GPS Location</span>
-          </button>
-
-          {isOwnerOrSuperAdmin && (
-            <button
-              onClick={handleOpenTransfer}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow transition-colors"
-            >
-              <ArrowLeftRight className="w-4 h-4" />
-              <span>Transfer Misposted Payment</span>
-            </button>
-          )}
-
-          {plan.status === "COMPLETED_EARLY_SETTLED" && plan.settlementRecordId && (
-            <Link
-              href={`/portal/print/noc/${plan.settlementRecordId}`}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow transition-colors"
-            >
-              <Receipt className="w-4 h-4 text-amber-300" />
-              <span>Print Official NOC</span>
-            </Link>
-          )}
-
           {plan.status === "ACTIVE" && (
             <>
+              <button
+                type="button"
+                onClick={() => setViewMode(viewMode === "SCHEDULE" ? "DIARY_RECONCILE" : "SCHEDULE")}
+                className={"flex items-center gap-1.5 px-4 py-2.5 font-bold text-xs rounded-xl shadow transition-all " + (viewMode === "DIARY_RECONCILE" ? "bg-amber-400 text-slate-950 border-2 border-amber-300" : "bg-emerald-800 hover:bg-emerald-700 text-white border border-emerald-600")}
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>{viewMode === "DIARY_RECONCILE" ? "Exit Diary Match" : "📖 Match with Diary (ڈائری میچنگ)"}</span>
+              </button>
+
               <Link
-                href={`/portal/plans/${plan.id}/settle`}
+                href={"/portal/plans/" + plan.id + "/settle"}
                 className="flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-xs rounded-xl shadow transition-colors"
               >
                 <DollarSign className="w-4 h-4 text-amber-300" />
                 <span>Early Settlement & Rebate</span>
               </Link>
-
-              <Link
-                href={`/portal/plans/${plan.id}/repossess`}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors"
-              >
-                <AlertTriangle className="w-4 h-4 text-rose-600" />
-                <span>Repossess Item</span>
-              </Link>
             </>
           )}
 
           <Link
-            href={`/portal/print/contract/${plan.id}`}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
+            href={"/portal/print/contract/" + plan.id}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-colors border border-slate-700"
           >
             <FileText className="w-4 h-4 text-amber-300" />
             <span>Print Legal Agreement</span>
           </Link>
           <Link
-            href={`/portal/print/receipt/${plan.id}`}
+            href={"/portal/print/receipt/" + plan.id}
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl shadow transition-colors"
           >
             <Receipt className="w-4 h-4" />
-            <span>Print Thermal Receipt</span>
+            <span>Thermal Receipt</span>
           </Link>
         </div>
       </div>
 
       {msg && (
-        <div className={`p-4 rounded-xl text-xs font-bold border flex items-center gap-2 ${
-          msg.type === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-rose-50 text-rose-800 border-rose-200"
-        }`}>
+        <div
+          className={"p-4 rounded-xl text-xs font-bold border flex items-center gap-2 " + (msg.type === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-rose-50 text-rose-800 border-rose-200")}
+        >
           {msg.type === "success" ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
           <span className="font-urdu leading-relaxed">{msg.text}</span>
         </div>
@@ -360,27 +421,33 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* Financial Overview Cards (Matching Register) */}
+      {/* Financial Overview Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Installment Schedule</span>
           <strong className="text-lg font-black text-slate-900">
             {formatPKR(plan.monthlyInstallment)} {plan.installmentFrequency === "WEEKLY" ? "/ Week" : "/ Month"}
           </strong>
+          <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
+            {paidCount} / {plan.schedule.length} Paid ({remainingCount} Left)
+          </span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Down Payment</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Advance Down Payment</span>
           <strong className="text-lg font-bold text-emerald-700">{formatPKR(plan.downPayment)}</strong>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Collected at Contract Start</span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Short Balance / Arrears</span>
-          <strong className={`text-lg font-black ${plan.accumulatedShortArrears > 0 ? "text-rose-700" : "text-slate-900"}`}>
-            {formatPKR(plan.accumulatedShortArrears)}
-          </strong>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Total Collected So Far</span>
+          <strong className="text-lg font-black text-emerald-800">{formatPKR(totalCollected + plan.downPayment)}</strong>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Installments + Advance</span>
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Total Price (Total Price)</span>
+          <span className="text-[10px] font-bold uppercase text-slate-400 block font-urdu">Total Financed Value</span>
           <strong className="text-lg font-bold text-slate-900">{formatPKR(plan.totalFinanced)}</strong>
+          <span className={"text-[10px] font-bold block mt-0.5 " + (plan.accumulatedShortArrears > 0 ? "text-rose-600" : "text-slate-400")}>
+            Short Arrears: {formatPKR(plan.accumulatedShortArrears)}
+          </span>
         </div>
       </div>
 
@@ -417,160 +484,302 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* Amortization Schedule Table (Exact Register Format) */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
-          <div>
-            <h2 className="text-base font-black text-slate-900 font-urdu">
-              Installment Ledger Schedule ({plan.schedule.length} Installments) • Collection Day: {plan.collectionDayName || "Saturday"}
-            </h2>
-            <p className="text-xs text-slate-500 font-urdu">
-              Official ledger records, payment collection history, short arrears, and collector audit trail
-            </p>
+      {/* VIEW MODE 1: PHYSICAL DIARY RECONCILIATION */}
+      {viewMode === "DIARY_RECONCILE" && (
+        <div className="bg-gradient-to-br from-amber-50/70 via-white to-emerald-50/50 rounded-3xl border-2 border-amber-400 p-6 sm:p-8 shadow-lg space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-amber-200 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-6 h-6 text-amber-700" />
+                <h2 className="text-lg font-black text-slate-900">
+                  Physical Diary Reconciliation Mode (ڈائری کھاتہ میچنگ موڈ)
+                </h2>
+              </div>
+              <p className="text-xs text-slate-600 font-urdu">
+                اپنی فزیکل رجسٹر ڈائری سامنے رکھیں اور ہر قسط کی اصل وصولی کی تاریخ اور رقم درج کریں۔ اگر کسٹمر نے جمعہ کی بجائے ہفتہ کو دی ہو تو تاریخ یہاں تبدیل کریں۔
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode("SCHEDULE")}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDiaryReconciliation}
+                className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save All Diary Entries (تمام اندراج محفوظ کریں)</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg font-urdu">
-              Collection Cycle: Every {plan.collectionIntervalDays || 7} Days
-            </span>
+          <div className="overflow-x-auto bg-white rounded-2xl border border-amber-200 shadow-sm">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-amber-100/60 border-b border-amber-200 text-amber-950 font-black text-[11px]">
+                  <th className="py-3 px-3">#</th>
+                  <th className="py-3 px-3">Scheduled Date</th>
+                  <th className="py-3 px-3">Actual Paid Date (ڈائری تاریخ)</th>
+                  <th className="py-3 px-3">Amount Due</th>
+                  <th className="py-3 px-3">Amount Paid (وصولی)</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3">Diary Notes / Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {diaryItems.map((item) => (
+                  <tr key={item.installmentNo} className={item.status === "PAID" ? "bg-emerald-50/40" : "hover:bg-slate-50"}>
+                    <td className="py-3 px-3 font-mono font-bold text-slate-900">
+                      Qist #{item.installmentNo}
+                    </td>
+                    <td className="py-3 px-3 text-slate-500 font-mono">
+                      {formatDate(item.dueDate)}
+                    </td>
+                    <td className="py-3 px-3">
+                      <input
+                        type="date"
+                        value={item.paidDate || item.dueDate}
+                        onChange={(e) => handleDiaryItemChange(item.installmentNo, { paidDate: e.target.value })}
+                        className="p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900"
+                      />
+                    </td>
+                    <td className="py-3 px-3 font-mono font-bold text-slate-800">
+                      {formatPKR(item.totalDue)}
+                    </td>
+                    <td className="py-3 px-3">
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.amountPaid || 0}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          handleDiaryItemChange(item.installmentNo, {
+                            amountPaid: val,
+                            status: val >= item.totalDue ? "PAID" : val > 0 ? "SHORT_PAID" : "PENDING",
+                          });
+                        }}
+                        className="w-24 p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono font-black text-emerald-900"
+                      />
+                    </td>
+                    <td className="py-3 px-3">
+                      <select
+                        value={item.status}
+                        onChange={(e) =>
+                          handleDiaryItemChange(item.installmentNo, {
+                            status: e.target.value as any,
+                            amountPaid: e.target.value === "PAID" ? item.totalDue : e.target.value === "PENDING" ? 0 : item.amountPaid,
+                          })
+                        }
+                        className="p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold"
+                      >
+                        <option value="PAID">PAID (وصول)</option>
+                        <option value="SHORT_PAID">SHORT (کم)</option>
+                        <option value="PENDING">PENDING (باقی)</option>
+                        <option value="OVERDUE">OVERDUE (تاخیر)</option>
+                      </select>
+                    </td>
+                    <td className="py-3 px-3">
+                      <input
+                        type="text"
+                        placeholder="e.g. Promised Friday, paid Saturday"
+                        value={item.notes || ""}
+                        onChange={(e) => handleDiaryItemChange(item.installmentNo, { notes: e.target.value })}
+                        className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-urdu"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSaveDiaryReconciliation}
+              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-lg flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save & Update Khata Ledger</span>
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-black text-[11px] font-urdu">
-                <th className="py-3 px-3">#</th>
-                <th className="py-3 px-3">Due Date</th>
-                <th className="py-3 px-3">Due Amount</th>
-                <th className="py-3 px-3 text-emerald-800">Paid (PKR)</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3">Collector / Notes</th>
-                <th className="py-3 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {plan.schedule.map((item) => (
-                <tr key={item.installmentNo} className="hover:bg-slate-50/80">
-                  <td className="py-3 px-3 font-bold text-slate-900 font-mono">
-                    {item.installmentNo}
-                  </td>
-                  <td className="py-3 px-3 text-slate-700 font-bold font-mono">
-                    {formatDate(item.dueDate)}
-                  </td>
-                  <td className="py-3 px-3 font-black text-slate-900">
-                    {formatPKR(item.totalDue)}
-                  </td>
-                  <td className="py-3 px-3 font-black text-emerald-800 text-sm">
-                    {item.amountPaid > 0 ? formatPKR(item.amountPaid) : "-"}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-500 text-[11px]">
-                    {item.collectedBy || item.notes || "-"}
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {item.status !== "PAID" ? (
+      {/* VIEW MODE 2: STANDARD AMORTIZATION SCHEDULE TABLE */}
+      {viewMode === "SCHEDULE" && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+            <div>
+              <h2 className="text-base font-black text-slate-900 font-urdu flex items-center gap-2">
+                <span>Installment Ledger Schedule ({plan.schedule.length} Installments)</span>
+                <span className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-sans font-bold">
+                  Collection Day: {plan.collectionDayName || "Saturday"}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 font-urdu">
+                Official ledger records, payment collection history, short arrears, and collector audit trail
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode("DIARY_RECONCILE")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Match with Diary (ڈائری میچ کریں)</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-black text-[11px] font-urdu">
+                  <th className="py-3 px-3">#</th>
+                  <th className="py-3 px-3">Scheduled Due Date</th>
+                  <th className="py-3 px-3">Due Amount</th>
+                  <th className="py-3 px-3 text-emerald-800">Paid (PKR)</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3">Payment Date / Remarks</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {plan.schedule.map((item) => (
+                  <tr key={item.installmentNo} className="hover:bg-slate-50/80">
+                    <td className="py-3 px-3 font-bold text-slate-900 font-mono">
+                      {item.installmentNo}
+                    </td>
+                    <td className="py-3 px-3 text-slate-700 font-bold font-mono">
+                      {formatDate(item.dueDate)}
+                    </td>
+                    <td className="py-3 px-3 font-black text-slate-900">
+                      {formatPKR(item.totalDue)}
+                    </td>
+                    <td className="py-3 px-3 font-black text-emerald-800 text-sm">
+                      {item.amountPaid > 0 ? formatPKR(item.amountPaid) : "-"}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={"px-2 py-0.5 rounded-full text-[10px] font-bold border " + getStatusBadgeClass(item.status)}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-500 text-[11px]">
+                      {item.paidDate && <span className="font-mono text-emerald-700 font-bold block">Paid: {formatDate(item.paidDate)}</span>}
+                      <span>{item.collectedBy ? item.collectedBy + " • " : ""}{item.notes || "-"}</span>
+                    </td>
+                    <td className="py-3 px-3 text-right space-x-1 whitespace-nowrap">
+                      {item.status !== "PAID" && plan.status === "ACTIVE" && (
                         <button
-                          onClick={() => handleOpenPay(item.installmentNo, item.totalDue)}
-                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg shadow transition-colors"
+                          onClick={() => handleOpenPay(item.installmentNo, item.totalDue - item.amountPaid, item.dueDate)}
+                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-colors"
                         >
-                          Log Payment
+                          Record Qist (قسط وصول)
                         </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-mono font-semibold">
-                          {item.receiptId || "PAID"}
-                        </span>
                       )}
 
-                      {/* Reschedule Date Button (For Salesman / Recovery Man) */}
-                      {item.status !== "PAID" && (
-                        <button
-                          onClick={() => handleOpenReschedule(item)}
-                          title="Reschedule Due Date / Collection Day"
-                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg border border-blue-200 transition-colors"
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleOpenReschedule(item)}
+                        className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium"
+                        title="Reschedule Due Date (تبدیلی تاریخ)"
+                      >
+                        Reschedule
+                      </button>
 
-                      {/* Owner Khata Correction Button */}
                       {isOwnerOrSuperAdmin && (
                         <button
                           onClick={() => handleOpenCorrection(item)}
-                          title="Owner Khata Correction & Audit"
-                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg border border-slate-300 transition-colors"
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-xs font-medium border border-amber-200"
+                          title="Owner Correction (درستگی کھاتہ)"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                          Edit
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* MODAL 1: Standard Payment Logger */}
+      {/* Pay / Record Single Qist Modal */}
       {payModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-emerald-600" />
-                Record Installment Payment (Inst #{activeInstallmentNo})
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-black text-slate-900">
+                Record Payment for Qist #{activeInstallmentNo}
               </h3>
               <button
                 onClick={() => setPayModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
               >
-                ✕
+                Close
               </button>
             </div>
 
             <form onSubmit={handleRecordPayment} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-600 font-bold mb-1">Amount Paid (PKR) *</label>
+                <label className="block font-bold text-slate-700 mb-1">Actual Collection Date (وصولی کی تاریخ) *</label>
+                <input
+                  type="date"
+                  required
+                  value={customPaidDate}
+                  onChange={(e) => setCustomPaidDate(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-400 font-urdu block mt-0.5">
+                  اگر قسط مقررہ تاریخ کے بعد (مثلاً ہفتہ کو) ملی ہے تو وہی تاریخ منتخب کریں۔
+                </span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Amount Received (وصول شدہ رقم - Rs.) *</label>
                 <input
                   type="number"
                   required
-                  min={100}
+                  min={1}
                   value={paidAmount}
                   onChange={(e) => setPaidAmount(Number(e.target.value))}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-base font-black text-slate-900 font-mono outline-none focus:border-emerald-600"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-emerald-900 text-lg outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-600 font-bold mb-1">Payment Receipt Note</label>
+                <label className="block font-bold text-slate-700 mb-1">Diary Note / Remarks (اختیاری نوٹ)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Paid at shop counter or collected by field officer"
+                  placeholder="e.g. Customer promised Friday, paid on Saturday"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-urdu outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
                   onClick={() => setPayModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow"
+                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow"
                 >
-                  Record Payment
+                  Save Payment (محفوظ کریں)
                 </button>
               </div>
             </form>
@@ -578,62 +787,58 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* MODAL 2: Date Rescheduler (For Customer Requested Day Changes) */}
+      {/* Reschedule Modal */}
       {reschedModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-black tracking-wider bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full border border-blue-300">
-                  Reschedule Installment Due Date
-                </span>
-                <h3 className="text-base font-black text-slate-900 mt-1">
-                  Reschedule Due Date (Inst #{reschedInstNo})
-                </h3>
-              </div>
-              <button onClick={() => setReschedModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
-                ✕
+              <h3 className="text-base font-black text-slate-900">
+                Reschedule Installment #{reschedInstNo}
+              </h3>
+              <button
+                onClick={() => setReschedModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                Close
               </button>
             </div>
 
             <form onSubmit={handleConfirmReschedule} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">New Due Date *</label>
+                <label className="block font-bold text-slate-700 mb-1">New Due Date *</label>
                 <input
                   type="date"
                   required
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 text-sm outline-none focus:border-blue-600"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Reschedule Reason *</label>
+                <label className="block font-bold text-slate-700 mb-1">Reason for Reschedule *</label>
                 <input
                   type="text"
                   required
                   value={reschedReason}
                   onChange={(e) => setReschedReason(e.target.value)}
-                  placeholder="e.g. Customer requested salary day alignment..."
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-urdu outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
                   onClick={() => setReschedModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
+                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save New Due Date</span>
+                  Update Due Date
                 </button>
               </div>
             </form>
@@ -641,228 +846,131 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* MODAL 3: Owner Khata Correction & Ledger Edit */}
+      {/* Khata Correction Modal */}
       {corrModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-black tracking-wider bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
-                  Owner Khata Correction Tool
-                </span>
-                <h3 className="text-base font-black text-slate-900 mt-1">
-                  Correct Installment #{corrInstNo} ({plan.customerName})
-                </h3>
-              </div>
-              <button onClick={() => setCorrModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
-                ✕
+              <h3 className="text-base font-black text-slate-900">
+                Correct Installment #{corrInstNo} (Owner Access)
+              </h3>
+              <button
+                onClick={() => setCorrModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                Close
               </button>
             </div>
 
             <form onSubmit={handleConfirmCorrection} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Corrected Amount Paid (Rs.) *</label>
+                <label className="block font-bold text-slate-700 mb-1">New Paid Amount (Rs.) *</label>
                 <input
                   type="number"
                   required
                   min={0}
                   value={corrAmount}
                   onChange={(e) => setCorrAmount(Number(e.target.value))}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-black text-slate-900 text-base outline-none focus:border-amber-600"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Installment Status *</label>
+                <label className="block font-bold text-slate-700 mb-1">New Status *</label>
                 <select
                   value={corrStatus}
                   onChange={(e) => setCorrStatus(e.target.value as any)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none"
                 >
-                  <option value="PAID">PAID (Fully Paid)</option>
-                  <option value="SHORT_PAID">SHORT_PAID (Partial / Short Payment)</option>
-                  <option value="PENDING">PENDING (Unpaid / Due)</option>
-                  <option value="OVERDUE">OVERDUE (Defaulted / Overdue)</option>
+                  <option value="PAID">PAID</option>
+                  <option value="SHORT_PAID">SHORT_PAID</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="OVERDUE">OVERDUE</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Correction & Adjustment Reason *</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={corrReason}
-                  onChange={(e) => setCorrReason(e.target.value)}
-                  placeholder="e.g. Officer miskeyed 5000 instead of 3000 or cash adjustment..."
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-amber-600 font-urdu"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCorrModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Update & Save Khata Record</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: Transfer Payment from Wrong Khata to Correct Khata */}
-      {xferModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-black tracking-wider bg-purple-100 text-purple-900 px-2.5 py-0.5 rounded-full border border-purple-300">
-                  Transfer Misallocated Payment
-                </span>
-                <h3 className="text-base font-black text-slate-900 mt-1">
-                  Move Payment to Another Customer Khata
-                </h3>
-              </div>
-              <button onClick={() => setXferModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmTransfer} className="space-y-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border space-y-1">
-                <span className="text-slate-500 block text-[11px]">Source Khata (Misposted Account):</span>
-                <strong className="text-slate-900 block font-bold">{plan.customerName} ({plan.planNumber})</strong>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Destination Khata (Target Customer Account) *</label>
-                <select
-                  value={targetPlanId}
-                  onChange={(e) => setTargetPlanId(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
-                >
-                  {allPlans.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.customerName} — {p.productTitle} (Khata #{p.khataNumber || p.planNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Amount to Transfer (PKR) *</label>
-                <input
-                  type="number"
-                  required
-                  min={100}
-                  value={xferAmount}
-                  onChange={(e) => setXferAmount(Number(e.target.value))}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-black text-slate-900 text-base outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Transfer & Audit Reason *</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={xferReason}
-                  onChange={(e) => setXferReason(e.target.value)}
-                  placeholder="e.g. Officer mistakenly credited Khata #33 instead of Khata #13..."
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none font-urdu"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setXferModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
-                >
-                  <ArrowLeftRight className="w-4 h-4" />
-                  <span>Execute Khata Transfer</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 5: Update Live GPS Location Pin */}
-      {gpsModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-extrabold tracking-wider bg-emerald-100 text-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                  Live Geolocation Assistant
-                </span>
-                <h3 className="text-lg font-black text-slate-900 mt-1">Pin / Update Customer GPS Location</h3>
-              </div>
-              <button onClick={() => setGpsModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveGps} className="space-y-4 text-xs">
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-0.5">
-                <span className="text-emerald-950 font-black block text-sm">Customer: {plan.customerName} ({plan.customerPhone})</span>
-                <span className="text-emerald-900 font-medium block">Khata #{plan.khataNumber || plan.planNumber} • {plan.productTitle}</span>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1.5">Interactive Map Location Picker</label>
-                <MapLocationPicker
-                  value={gpsLocation}
-                  onChange={(loc) => setGpsLocation(loc)}
-                  onAddressAutoFill={(addr, zone) => {
-                    if (addr) setCustAddressEdit(addr);
-                  }}
-                  defaultCity="Chiniot"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Customer Address & Landmark (Auto-updated from Pin)</label>
+                <label className="block font-bold text-slate-700 mb-1">Reason for Correction *</label>
                 <input
                   type="text"
                   required
-                  value={custAddressEdit}
-                  onChange={(e) => setCustAddressEdit(e.target.value)}
-                  placeholder="e.g. Mohallah Rehman Abad, Street #3, Near Desi Masjid, Chiniot"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 outline-none"
+                  placeholder="e.g. Corrected mistaken collector entry"
+                  value={corrReason}
+                  onChange={(e) => setCorrReason(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-urdu outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
-                  onClick={() => setGpsModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  onClick={() => setCorrModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Location Pin to Khata</span>
+                  Save Correction
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* GPS Location Modal */}
+      {gpsModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-700" />
+                <span>Pin Live GPS for {plan.customerName}</span>
+              </h3>
+              <button
+                onClick={() => setGpsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGpsModal} className="space-y-4 text-xs">
+              <MapLocationPicker
+                value={gpsLocation}
+                onChange={(loc) => setGpsLocation(loc)}
+                onAddressAutoFill={(autoAddr, zone) => {
+                  if (autoAddr) setCustAddressEdit(autoAddr);
+                }}
+                defaultCity="Chiniot"
+              />
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Customer Street Address</label>
+                <input
+                  type="text"
+                  value={custAddressEdit}
+                  onChange={(e) => setCustAddressEdit(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setGpsModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow"
+                >
+                  Save GPS Location
                 </button>
               </div>
             </form>

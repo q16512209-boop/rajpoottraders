@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -15,12 +15,17 @@ export default function PlansPage() {
 
   const filtered = plans.filter((p) => {
     const matchStatus = filterStatus === "ALL" || p.status === filterStatus;
+    const q = search.toLowerCase().trim();
     const matchSearch =
-      search === "" ||
-      p.planNumber.toLowerCase().includes(search.toLowerCase()) ||
-      p.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      p.customerCnic.includes(search) ||
-      p.productTitle.toLowerCase().includes(search.toLowerCase());
+      q === "" ||
+      p.planNumber.toLowerCase().includes(q) ||
+      (p.khataNumber && p.khataNumber.toLowerCase().includes(q)) ||
+      (p.khataNumber && ("khata " + p.khataNumber.toLowerCase()).includes(q)) ||
+      (p.khataNumber && ("#" + p.khataNumber.toLowerCase()).includes(q)) ||
+      p.customerName.toLowerCase().includes(q) ||
+      p.customerCnic.includes(q) ||
+      (p.salesmanName && p.salesmanName.toLowerCase().includes(q)) ||
+      p.productTitle.toLowerCase().includes(q);
     return matchStatus && matchSearch;
   });
 
@@ -33,20 +38,29 @@ export default function PlansPage() {
             Hire-Purchase Management
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
-            Active Installment Plans & Arrears
+            Active Installment Plans & Khata Registry
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Tracking amortization schedules, rolling short payments, and legal agreements.
+            Tracking amortization schedules, physical diary reconciliation, rolling short payments, and legal agreements.
           </p>
         </div>
 
-        <Link
-          href="/portal/plans/new"
-          className="flex items-center gap-2 px-5 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
-        >
-          <Plus className="w-4 h-4 text-amber-300" />
-          <span>Create New Installment Plan</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/portal/customers/legacy-entry"
+            className="flex items-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow transition-all border border-amber-400"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Fast Old Khata Entry</span>
+          </Link>
+          <Link
+            href="/portal/plans/new"
+            className="flex items-center gap-2 px-4 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition-colors"
+          >
+            <Plus className="w-4 h-4 text-amber-300" />
+            <span>Create New Plan</span>
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filter */}
@@ -54,10 +68,10 @@ export default function PlansPage() {
         <div className="relative flex-1 w-full">
           <input
             type="text"
-            placeholder="Search by Plan #, Customer Name, CNIC, or Product..."
+            placeholder="Search by Khata # (e.g. 6), Plan #, Customer Name, Salesman, or CNIC..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-emerald-600"
+            className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-emerald-600 font-urdu"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
         </div>
@@ -85,11 +99,11 @@ export default function PlansPage() {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-extrabold text-[10px]">
-                <th className="py-3 px-4">Plan #</th>
+                <th className="py-3 px-4">Khata / Plan #</th>
                 <th className="py-3 px-4">Customer (Kharedar)</th>
                 <th className="py-3 px-4">Product / Serial</th>
                 <th className="py-3 px-4">Financed Total</th>
-                <th className="py-3 px-4">Monthly Due</th>
+                <th className="py-3 px-4">Installment Due</th>
                 <th className="py-3 px-4">Short Arrears</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -99,23 +113,24 @@ export default function PlansPage() {
               {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/80">
                   <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                    <Link href={`/portal/plans/${p.id}`} className="hover:text-emerald-700">
-                      {p.planNumber}
+                    <Link href={`/portal/plans/${p.id}`} className="hover:text-emerald-700 block">
+                      {p.khataNumber ? <span className="bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded-md font-black mr-1 text-[11px]">Khata #{p.khataNumber}</span> : null}
+                      <span className="text-[11px] text-slate-500 block">{p.planNumber}</span>
                     </Link>
                   </td>
                   <td className="py-3.5 px-4">
-                    <strong className="text-slate-900 block">{p.customerName}</strong>
+                    <strong className="text-slate-900 block font-urdu">{p.customerName}</strong>
                     <span className="text-slate-400 font-mono text-[11px]">{formatCNIC(p.customerCnic)}</span>
                   </td>
                   <td className="py-3.5 px-4">
                     <span className="font-semibold text-slate-800 block truncate max-w-[200px]">{p.productTitle}</span>
-                    <span className="text-slate-400 font-mono text-[10px]">IMEI: {p.imeiSerial}</span>
+                    <span className="text-slate-400 font-mono text-[10px]">Salesman: {p.salesmanName || "Zaheem"}</span>
                   </td>
                   <td className="py-3.5 px-4 font-semibold text-slate-700">
                     {formatPKR(p.totalFinanced)}
                   </td>
                   <td className="py-3.5 px-4 font-black text-slate-900">
-                    {formatPKR(p.monthlyInstallment)}
+                    {formatPKR(p.monthlyInstallment)} <span className="text-[10px] text-slate-400 font-normal">/{p.installmentFrequency === "WEEKLY" ? "Wk" : "Mo"}</span>
                   </td>
                   <td className="py-3.5 px-4">
                     {p.accumulatedShortArrears > 0 ? (
@@ -131,18 +146,13 @@ export default function PlansPage() {
                       {p.status}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-right space-x-2">
+                  <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                     <Link
                       href={`/portal/plans/${p.id}`}
-                      className="px-2.5 py-1 bg-slate-900 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
                     >
-                      Schedule
-                    </Link>
-                    <Link
-                      href={`/portal/print/contract/${p.id}`}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-[11px]"
-                    >
-                      Stamp Paper
+                      <span>Khata & Diary</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </td>
                 </tr>

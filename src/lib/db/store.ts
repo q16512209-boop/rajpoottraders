@@ -639,6 +639,7 @@ class AppStore {
     collectorRole?: string;
     targetWalletType?: "FIELD_IN_TRANSIT" | "COUNTER_TILL" | "OWNER_POCKET" | "DIGITAL_BANK";
     notes?: string;
+    customPaidDate?: string;
   }) {
     const plan = this.plans.find((p) => p.id === params.planId);
     if (!plan) throw new Error("Installment plan not found");
@@ -654,7 +655,7 @@ class AppStore {
     );
 
     scheduleItem.amountPaid = params.amountPaid;
-    scheduleItem.paidDate = new Date().toISOString();
+    scheduleItem.paidDate = params.customPaidDate || new Date().toISOString();
     scheduleItem.status = allocation.status === "SHORT_PAID" ? "SHORT_PAID" : "PAID";
     scheduleItem.receiptId = `RCPT-${Date.now().toString().slice(-6)}`;
     scheduleItem.collectedBy = params.collectedBy;
@@ -686,7 +687,7 @@ class AppStore {
       planId: plan.id,
       customerId: plan.customerId,
       actorId: params.collectedBy,
-      notes: `Installment #${params.installmentNo} collection for Plan ${plan.planNumber}. ${allocation.summary}`,
+      notes: `Installment #${params.installmentNo} collection for Plan ${plan.planNumber}. Paid on ${scheduleItem.paidDate.split("T")[0]}. ${allocation.summary}`,
     });
 
     return {
@@ -696,6 +697,57 @@ class AppStore {
       receiptId: scheduleItem.receiptId,
       ledgerBlock: block,
     };
+  }
+
+  // --- Fast Diary Reconciliation Engine ---
+  reconcileKhataFromDiary(params: {
+    planId: string;
+    entries: {
+      installmentNo: number;
+      paidDate?: string;
+      amountPaid: number;
+      status: "PAID" | "SHORT_PAID" | "PENDING" | "OVERDUE";
+      notes?: string;
+      collectedBy?: string;
+    }[];
+    reconciledBy: User;
+  }): InstallmentPlan {
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Installment plan not found");
+
+    let totalCollectedNow = 0;
+    let accumulatedShort = 0;
+
+    params.entries.forEach((entry) => {
+      const item = plan.schedule.find((s) => s.installmentNo === entry.installmentNo);
+      if (item) {
+        item.amountPaid = entry.amountPaid;
+        item.status = entry.status;
+        if (entry.paidDate) item.paidDate = entry.paidDate;
+        if (entry.notes) item.notes = entry.notes;
+        if (entry.collectedBy) item.collectedBy = entry.collectedBy;
+
+        if (entry.status === "SHORT_PAID") {
+          accumulatedShort += Math.max(0, item.totalDue - entry.amountPaid);
+        }
+      }
+    });
+
+    plan.accumulatedShortArrears = accumulatedShort;
+
+    this.appendLedgerBlock({
+      id: `tx_diary_rec_${Date.now()}`,
+      tenantId: plan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      planId: plan.id,
+      customerId: plan.customerId,
+      actorId: params.reconciledBy.id,
+      notes: `Physical Diary Reconciliation for ${plan.customerName} (Khata #${plan.khataNumber || plan.planNumber}) by ${params.reconciledBy.name} (${params.reconciledBy.role}).`,
+    });
+
+    return plan;
   }
 
   // --- Treasury & Multi-Wallet Split ---

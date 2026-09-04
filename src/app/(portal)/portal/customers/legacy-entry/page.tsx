@@ -23,6 +23,9 @@ import {
   Calculator,
   Layers,
   Sparkles,
+  BookOpen,
+  ArrowRight,
+  RotateCcw,
 } from "lucide-react";
 
 interface ProductLineItem {
@@ -93,16 +96,19 @@ export default function LegacyCustomerEntryPage() {
   const [monthlyInstallment, setMonthlyInstallment] = useState<number>(500);
   const [totalInstallmentsCount, setTotalInstallmentsCount] = useState<number>(13);
 
-  // Past & Remaining State (Smart Two-Way Linked)
-  const [monthsAlreadyPaid, setMonthsAlreadyPaid] = useState<number>(5);
-  const [remainingInstallmentsCount, setRemainingInstallmentsCount] = useState<number>(8);
-  const [totalPaidInPast, setTotalPaidInPast] = useState<number>(2500);
-  const [remainingBalance, setRemainingBalance] = useState<number>(4000);
+  // Past & Remaining State (Defaulted to 0 paid so staff can onboard fast and match diary later)
+  const [monthsAlreadyPaid, setMonthsAlreadyPaid] = useState<number>(0);
+  const [remainingInstallmentsCount, setRemainingInstallmentsCount] = useState<number>(13);
+  const [totalPaidInPast, setTotalPaidInPast] = useState<number>(0);
+  const [remainingBalance, setRemainingBalance] = useState<number>(6300);
   const [pendingShortArrears, setPendingShortArrears] = useState<number>(0);
   const [nextDueDate, setNextDueDate] = useState<string>("2026-09-05");
 
+  const [showDetailedPastCalc, setShowDetailedPastCalc] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [savedSuccessRecord, setSavedSuccessRecord] = useState<{ planId: string; planNumber: string; khataNumber: string; customerName: string } | null>(null);
 
   if (!currentUser) return null;
 
@@ -200,19 +206,6 @@ export default function LegacyCustomerEntryPage() {
     setRemainingBalance(remBal);
   };
 
-  const handleRemainingBalanceChange = (balVal: number) => {
-    const safeBal = Math.max(0, balVal);
-    setRemainingBalance(safeBal);
-
-    if (monthlyInstallment > 0) {
-      const estimatedRemCount = Math.min(totalInstallmentsCount, Math.ceil(safeBal / monthlyInstallment));
-      setRemainingInstallmentsCount(estimatedRemCount);
-      const safePaid = Math.max(0, totalInstallmentsCount - estimatedRemCount);
-      setMonthsAlreadyPaid(safePaid);
-      setTotalPaidInPast(safePaid * monthlyInstallment);
-    }
-  };
-
   const handleTotalInstallmentsChange = (totalCount: number) => {
     const safeTotal = Math.max(1, totalCount);
     setTotalInstallmentsCount(safeTotal);
@@ -251,6 +244,30 @@ export default function LegacyCustomerEntryPage() {
     const safeArr = Math.max(0, arr);
     setPendingShortArrears(safeArr);
     setRemainingBalance(remainingInstallmentsCount * monthlyInstallment + safeArr);
+  };
+
+  const handleResetForNextCustomer = () => {
+    const nextNum = String(Number(khataNumber) + 1 || "");
+    setKhataNumber(nextNum);
+    setFullName("");
+    setFatherName("");
+    setCnic("");
+    setPhone("");
+    setSecondaryPhone("");
+    setAddress("");
+    setG1Name("");
+    setG1Phone("");
+    setG1Cnic("");
+    setG1Relation("Neighbor");
+    setG2Name("");
+    setG2Phone("");
+    setG2Cnic("");
+    setMonthsAlreadyPaid(0);
+    setTotalPaidInPast(0);
+    setPendingShortArrears(0);
+    setSavedSuccessRecord(null);
+    setMsg(null);
+    setLoading(false);
   };
 
   const compositeTitle = productItems.map((p) => p.title + (p.quantity > 1 ? " (x" + p.quantity + ")" : "")).join(" + ");
@@ -316,14 +333,13 @@ export default function LegacyCustomerEntryPage() {
         store.updateCustomerGps(res.customer.id, gpsLocation, address, zoneArea, currentUser.id);
       }
 
-      setMsg({
-        type: "success",
-        text: "Legacy Khata #" + khataNumber + " for customer \"" + res.customer.fullName + "\" (" + res.plan.planNumber + ") with " + productItems.length + " product(s) successfully registered!",
+      setSavedSuccessRecord({
+        planId: res.plan.id,
+        planNumber: res.plan.planNumber,
+        khataNumber,
+        customerName: res.customer.fullName,
       });
-
-      setTimeout(() => {
-        router.push("/portal/plans/" + res.plan.id);
-      }, 1200);
+      setLoading(false);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create legacy record" });
       setLoading(false);
@@ -340,28 +356,81 @@ export default function LegacyCustomerEntryPage() {
               Rajpoot Traders (Regd.) — Chiniot
             </span>
             <UrduSpeaker
-              customText="راجپوت ٹریڈرز چنیوٹ۔ پرانے کھاتے کا خودکار حساب کتاب۔ کتنی قسطیں آ گئی ہیں اور کتنی باقی ہیں، درج کرتے ہی سارا بیلنس خود بن جائے گا۔"
+              customText="راجپوت ٹریڈرز چنیوٹ۔ پرانے کھاتے فوری درج کریں۔ ابھی صرف کسٹمر کی تفصیلات درج کریں، قسطیں بعد میں ڈائری سے میچ کر کے درج کر سکتے ہیں۔"
               size="sm"
               showLabel
             />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2">
-            <Calculator className="w-7 h-7 text-emerald-400 shrink-0" />
-            <span>Smart Auto-Calculated Khata Entry</span>
+            <UserCheck className="w-7 h-7 text-emerald-400 shrink-0" />
+            <span>Fast Customer & Khata Onboarding</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            Mohallah Rehman Abad, Chiniot • Multi-Product Ledger & Real-Time Auto Balance Calculation
+            محلہ رحمن آباد، چنیوٹ • رجسٹر کھاتہ نمبر اور کسٹمر پروفائل کا فوری اندراج
           </p>
         </div>
 
         <Link
-          href="/portal/customers"
+          href="/portal/plans"
           className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-all self-start sm:self-auto border border-slate-700"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>View All Customers</span>
+          <span>View All Khatas</span>
         </Link>
       </div>
+
+      {/* POST-SAVE SUCCESS MODAL / CARD */}
+      {savedSuccessRecord && (
+        <div className="p-6 sm:p-8 bg-gradient-to-br from-emerald-900 to-slate-900 text-white rounded-3xl border-2 border-emerald-400 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            </div>
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 block font-mono">
+                Successfully Saved & Activated
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                Khata #{savedSuccessRecord.khataNumber} for {savedSuccessRecord.customerName}
+              </h2>
+              <p className="text-xs text-slate-300 font-urdu mt-0.5">
+                کھاتہ کامیابی سے محفوظ ہو چکا ہے۔ اب آپ چاہیں تو ڈائری سے قسطیں میچ کریں یا اگلا کھاتہ درج کریں۔
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <Link
+              href={"/portal/plans/" + savedSuccessRecord.planId}
+              className="p-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm rounded-2xl shadow-lg transition-all flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-5 h-5 text-slate-950" />
+                <div className="text-left">
+                  <span className="block font-black text-sm">Match Diary & Record Qistain</span>
+                  <span className="block text-[11px] font-urdu font-normal text-slate-900">ڈائری سامنے رکھ کر قسطیں میچ کریں</span>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleResetForNextCustomer}
+              className="p-4 bg-emerald-700 hover:bg-emerald-600 text-white font-black text-sm rounded-2xl shadow-lg transition-all flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <Plus className="w-5 h-5 text-emerald-200" />
+                <div className="text-left">
+                  <span className="block font-black text-sm">+ Add Next Customer Khata</span>
+                  <span className="block text-[11px] font-urdu font-normal text-emerald-100">اگلا پرانا کسٹمر درج کریں</span>
+                </div>
+              </div>
+              <RotateCcw className="w-4 h-4 text-emerald-200" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {msg && (
         <div
@@ -375,45 +444,6 @@ export default function LegacyCustomerEntryPage() {
           <span className="font-urdu text-sm">{msg.text}</span>
         </div>
       )}
-
-      {/* Real-Time Live Auto-Calculated Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block">Khata # & Salesman</span>
-          <strong className="text-base font-black text-slate-900 font-urdu block truncate">
-            Khata #{khataNumber || "—"} • {salesmanName || "Zaheem"}
-          </strong>
-          <span className="text-[10px] text-emerald-700 font-semibold">{productItems.length} Product(s) in Khata</span>
-        </div>
-
-        <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-300 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-emerald-800 block">Paid So Far (وصول شدہ)</span>
-          <strong className="text-base font-black text-emerald-800">
-            {monthsAlreadyPaid} / {totalInstallmentsCount} Qistain
-          </strong>
-          <span className="text-[10px] text-emerald-700 font-mono block font-bold">
-            Total: {formatPKR(totalPaidInPast + downPayment)}
-          </span>
-        </div>
-
-        <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-300 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-amber-900 block">Remaining Qistain (باقی قسطیں)</span>
-          <strong className="text-base font-black text-amber-900">
-            {remainingInstallmentsCount} Qistain Left
-          </strong>
-          <span className="text-[10px] text-amber-800 font-mono block font-bold">
-            Balance: {formatPKR(remainingBalance)}
-          </span>
-        </div>
-
-        <div className="bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Financed Value</span>
-          <strong className="text-base font-black text-emerald-400 block font-mono">
-            {formatPKR(totalFinanced)}
-          </strong>
-          <span className="text-[10px] text-slate-400 block">Advance: {formatPKR(downPayment)}</span>
-        </div>
-      </div>
 
       {/* Main Entry Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -431,7 +461,7 @@ export default function LegacyCustomerEntryPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Manual Khata Number (کھاتہ نمبر) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Manual Khata Number (رجسٹر کھاتہ نمبر) *</label>
               <input
                 type="text"
                 required
@@ -452,9 +482,6 @@ export default function LegacyCustomerEntryPage() {
                 onChange={(e) => setSalesmanName(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-emerald-600 font-urdu"
               />
-              <span className="text-[10px] text-slate-400 font-urdu block mt-1">
-                شفافیت کے لیے سیلز مین کا نام کھاتے کے ساتھ مستقل منسلک رہے گا۔
-              </span>
             </div>
           </div>
         </div>
@@ -586,17 +613,17 @@ export default function LegacyCustomerEntryPage() {
           </div>
         </div>
 
-        {/* Section 3: Multi-Product Items Support */}
+        {/* Section 3: Product & Financing */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
           <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-emerald-700" />
+              <Package className="w-5 h-5 text-emerald-700" />
               <div>
                 <h2 className="text-base font-black text-slate-900">
-                  3. Product Items in Khata (Multi-Product Support)
+                  3. Product & Financing Details
                 </h2>
                 <span className="text-xs text-slate-500 font-urdu">
-                  اگر گاہک نے ایک سے زیادہ (2 یا زائد) پروڈکٹس لی ہیں تو نیچے ایڈ کریں۔
+                  پروڈکٹ کا نام، قسط کی رقم اور ہفتہ وار شیڈول
                 </span>
               </div>
             </div>
@@ -607,7 +634,7 @@ export default function LegacyCustomerEntryPage() {
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Add 2nd Product / Item</span>
+              <span>+ Add 2nd Product</span>
             </button>
           </div>
 
@@ -629,7 +656,7 @@ export default function LegacyCustomerEntryPage() {
                       className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 p-1 hover:bg-rose-50 rounded-lg"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>Remove Item</span>
+                      <span>Remove</span>
                     </button>
                   )}
                 </div>
@@ -687,51 +714,47 @@ export default function LegacyCustomerEntryPage() {
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Section 4: SMART AUTO-CALCULATED KHATA ENGINE */}
-        <div className="bg-gradient-to-br from-emerald-50/60 via-white to-amber-50/40 rounded-3xl border-2 border-emerald-300/80 p-6 sm:p-8 shadow-md space-y-6">
-          <div className="border-b border-emerald-200/80 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-amber-500" />
-              <div>
-                <h2 className="text-lg font-black text-emerald-950">
-                  4. Smart Khata Auto-Calculator (انتہائی آسان خودکار حساب)
-                </h2>
-                <p className="text-xs text-slate-600 font-urdu">
-                  صرف یہ لکھیں کہ <strong>کتنی قسطیں آ گئی ہیں</strong> یا <strong>کتنی باقی ہیں</strong> — باقی سارا بقایا اور شیڈول سسٹم خود حساب کر لے گا۔
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 text-xs">
             <div>
-              <label className="block font-black text-slate-800 mb-1">Installment Frequency (قسط کی مدت) *</label>
-              <select
-                value={installmentFrequency}
-                onChange={(e) => {
-                  const freq = e.target.value as InstallmentFrequency;
-                  setInstallmentFrequency(freq);
-                  setCollectionIntervalDays(
-                    freq === "WEEKLY" ? 7 : freq === "TEN_DAYS" ? 10 : freq === "FIFTEEN_DAYS" ? 15 : 30
-                  );
-                }}
-                className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
-              >
-                <option value="WEEKLY">Weekly (ہفتہ وار e.g. Rs. 500/week)</option>
-                <option value="TEN_DAYS">Every 10 Days (ہر 10 دن بعد)</option>
-                <option value="FIFTEEN_DAYS">Every 15 Days (ہر 15 دن بعد)</option>
-                <option value="MONTHLY">Monthly (ماہانہ)</option>
-              </select>
+              <label className="block font-bold text-slate-700 mb-1">Total Installments (کل قسطیں) *</label>
+              <input
+                type="number"
+                min={1}
+                value={totalInstallmentsCount}
+                onChange={(e) => handleTotalInstallmentsChange(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 outline-none"
+              />
             </div>
 
             <div>
-              <label className="block font-black text-slate-800 mb-1">Preferred Collection Day (قسط کا دن) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Per Installment Amount (قسط کی رقم - Rs.) *</label>
+              <input
+                type="number"
+                min={50}
+                value={monthlyInstallment}
+                onChange={(e) => handleInstallmentAmountChange(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-emerald-900 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Advance Down Payment (پیشگی - Rs.)</label>
+              <input
+                type="number"
+                min={0}
+                value={downPayment}
+                onChange={(e) => handleDownPaymentChange(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Preferred Collection Day (قسط کا دن) *</label>
               <select
                 value={collectionDayName}
                 onChange={(e) => setCollectionDayName(e.target.value)}
-                className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
               >
                 <option value="Saturday">Saturday (ہفتہ)</option>
                 <option value="Friday">Friday (جمعہ)</option>
@@ -742,135 +765,16 @@ export default function LegacyCustomerEntryPage() {
                 <option value="Thursday">Thursday (جمعرات)</option>
               </select>
             </div>
-
-            <div>
-              <label className="block font-black text-slate-800 mb-1">Next Collection Due Date (اگلی وصولی کی تاریخ) *</label>
-              <input
-                type="date"
-                required
-                value={nextDueDate}
-                onChange={(e) => setNextDueDate(e.target.value)}
-                className="w-full p-3 bg-white border border-emerald-400 rounded-xl font-mono font-bold text-slate-900 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* TWO-WAY REACTIVE CALCULATION HUB */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 bg-white rounded-2xl border border-emerald-200 shadow-sm">
-            <div className="space-y-1">
-              <label className="block font-extrabold text-slate-800 text-xs">
-                Total Aqsat (کل قسطیں) *
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={totalInstallmentsCount}
-                onChange={(e) => handleTotalInstallmentsChange(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-black text-slate-900 text-base outline-none focus:border-emerald-600"
-              />
-              <span className="text-[10px] text-slate-400 font-urdu block">مثلاً 13 ہفتے یا 12 ماہ</span>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block font-extrabold text-slate-800 text-xs">
-                Installment Amount (قسط کی رقم - Rs.) *
-              </label>
-              <input
-                type="number"
-                min={50}
-                value={monthlyInstallment}
-                onChange={(e) => handleInstallmentAmountChange(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-black text-emerald-900 text-base outline-none focus:border-emerald-600"
-              />
-              <span className="text-[10px] text-slate-400 font-urdu block">ہر چکر / ہفتے کی قسط</span>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block font-extrabold text-slate-800 text-xs">
-                Advance Paid (پیشگی / ایڈوانس - Rs.)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={downPayment}
-                onChange={(e) => handleDownPaymentChange(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 text-base outline-none focus:border-emerald-600"
-              />
-              <span className="text-[10px] text-slate-400 font-urdu block">شروع میں دیا گیا ایڈوانس</span>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block font-extrabold text-amber-950 text-xs">
-                Previous Arrears (پچھلا شارٹ بقایا - Rs.)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={pendingShortArrears}
-                onChange={(e) => handleShortArrearsChange(Number(e.target.value))}
-                className="w-full p-3 bg-amber-50/50 border border-amber-300 rounded-xl font-mono font-bold text-amber-950 text-base outline-none"
-              />
-              <span className="text-[10px] text-amber-800 font-urdu block">اگر پچھلی قسط کم آئی تھی</span>
-            </div>
-          </div>
-
-          {/* TWO-WAY REACTIVE INPUT PAIR */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-5 bg-emerald-100/60 border-2 border-emerald-400 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block font-black text-emerald-950 text-sm">
-                  🟢 Kitni Qistain Aa Gayi Hain? (وصول شدہ قسطیں) *
-                </label>
-                <span className="text-xs font-mono font-bold text-emerald-800">
-                  {monthsAlreadyPaid} / {totalInstallmentsCount}
-                </span>
-              </div>
-              <input
-                type="number"
-                min={0}
-                max={totalInstallmentsCount}
-                value={monthsAlreadyPaid}
-                onChange={(e) => handlePaidInstallmentsChange(Number(e.target.value))}
-                className="w-full p-3.5 bg-white border-2 border-emerald-500 rounded-xl font-mono font-black text-emerald-900 text-xl outline-none shadow-sm"
-              />
-              <div className="flex items-center justify-between text-xs text-emerald-900 font-urdu font-bold pt-1">
-                <span>ماضی میں وصول شدہ رقم:</span>
-                <span className="font-mono text-sm">{formatPKR(totalPaidInPast)}</span>
-              </div>
-            </div>
-
-            <div className="p-5 bg-amber-100/60 border-2 border-amber-400 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block font-black text-amber-950 text-sm">
-                  🟡 Kitni Qistain Baqaya Hain? (باقی قسطیں) *
-                </label>
-                <span className="text-xs font-mono font-bold text-amber-900">
-                  {remainingInstallmentsCount} Left
-                </span>
-              </div>
-              <input
-                type="number"
-                min={0}
-                max={totalInstallmentsCount}
-                value={remainingInstallmentsCount}
-                onChange={(e) => handleRemainingInstallmentsChange(Number(e.target.value))}
-                className="w-full p-3.5 bg-white border-2 border-amber-500 rounded-xl font-mono font-black text-amber-950 text-xl outline-none shadow-sm"
-              />
-              <div className="flex items-center justify-between text-xs text-amber-950 font-urdu font-bold pt-1">
-                <span>کل بقایا رقم (بشمول شارٹ):</span>
-                <span className="font-mono text-sm">{formatPKR(remainingBalance)}</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Section 5: Guarantors (2nd is OPTIONAL) */}
+        {/* Section 4: Guarantors (2nd is OPTIONAL) */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-700" />
               <h2 className="text-base font-black text-slate-900">
-                5. Guarantors Information (ضامن تفصیلات)
+                4. Guarantors Information (ضامن تفصیلات)
               </h2>
             </div>
             <span className="text-xs font-urdu text-slate-500">پہلا ضامن لازمی، دوسرا ضامن اختیاری ہے</span>
@@ -966,16 +870,6 @@ export default function LegacyCustomerEntryPage() {
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono outline-none"
                 />
               </div>
-              <div>
-                <label className="block font-medium text-slate-500 mb-1">Relation</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Relative"
-                  value={g2Relation}
-                  onChange={(e) => setG2Relation(e.target.value)}
-                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-urdu"
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -985,7 +879,7 @@ export default function LegacyCustomerEntryPage() {
           <div>
             <h3 className="text-base font-black">Save & Activate Khata in Portal</h3>
             <p className="text-xs text-slate-300 font-urdu">
-              کھاتہ نمبر #{khataNumber} باقاعدہ لیجر اور ریکوری شیڈول میں شامل ہو جائے گا۔
+              کھاتہ نمبر #{khataNumber} باقاعدہ رجسٹر ہو جائے گا۔ اس کے بعد ڈائری سامنے رکھ کر قسطیں تصدیق کر سکتے ہیں۔
             </p>
           </div>
 
@@ -999,7 +893,7 @@ export default function LegacyCustomerEntryPage() {
             ) : (
               <>
                 <CheckCircle2 className="w-5 h-5" />
-                <span>Save Khata & Generate Plan</span>
+                <span>Save Khata #{khataNumber}</span>
               </>
             )}
           </button>
