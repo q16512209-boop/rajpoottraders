@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/auth-context";
 import { store } from "@/lib/db/store";
-import { Product, InstallmentFrequency, GPSLocation } from "@/lib/db/types";
+import { InstallmentFrequency, GPSLocation, IPlanProductItem } from "@/lib/db/types";
 import { formatPKR } from "@/lib/formatters";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
@@ -16,11 +16,24 @@ import {
   ArrowLeft,
   Package,
   ShieldCheck,
-  Calendar,
-  DollarSign,
   UserCheck,
   MapPin,
+  Plus,
+  Trash2,
+  Calculator,
+  Layers,
+  Sparkles,
 } from "lucide-react";
+
+interface ProductLineItem {
+  id: string;
+  productId?: string;
+  title: string;
+  imeiSerial: string;
+  cashPrice: number;
+  installmentPrice: number;
+  quantity: number;
+}
 
 export default function LegacyCustomerEntryPage() {
   const router = useRouter();
@@ -55,23 +68,36 @@ export default function LegacyCustomerEntryPage() {
   const [g2Cnic, setG2Cnic] = useState("");
   const [g2Relation, setG2Relation] = useState("");
 
-  // Product & Khata
-  const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || "");
-  const [productTitle, setProductTitle] = useState(products[0]?.title || "Heavy Weight Electric Iron");
-  const [imeiSerial, setImeiSerial] = useState("SN-IST-0006");
-  const [totalFinanced, setTotalFinanced] = useState<number>(6800);
-  const [downPayment, setDownPayment] = useState<number>(500);
-  
+  // Multi-Product Line Items
+  const initialProduct = products[0];
+  const [productItems, setProductItems] = useState<ProductLineItem[]>([
+    {
+      id: "item_1",
+      productId: initialProduct?.id || "p1",
+      title: initialProduct?.title || "Heavy Weight Electric Iron",
+      imeiSerial: "SN-IST-0006",
+      cashPrice: initialProduct?.cashPrice || 5800,
+      installmentPrice: initialProduct?.installmentPrice || 6800,
+      quantity: 1,
+    },
+  ]);
+
   // Frequency & Schedule Day
   const [installmentFrequency, setInstallmentFrequency] = useState<InstallmentFrequency>("WEEKLY");
   const [collectionDayName, setCollectionDayName] = useState("Saturday");
   const [collectionIntervalDays, setCollectionIntervalDays] = useState<number>(7);
+
+  // Core Financial Fields
+  const [totalFinanced, setTotalFinanced] = useState<number>(6800);
+  const [downPayment, setDownPayment] = useState<number>(500);
   const [monthlyInstallment, setMonthlyInstallment] = useState<number>(500);
   const [totalInstallmentsCount, setTotalInstallmentsCount] = useState<number>(13);
-  
-  // Past Ledger
+
+  // Past & Remaining State (Smart Two-Way Linked)
   const [monthsAlreadyPaid, setMonthsAlreadyPaid] = useState<number>(5);
-  const [totalPaidInPast, setTotalPaidInPast] = useState<number>(4500);
+  const [remainingInstallmentsCount, setRemainingInstallmentsCount] = useState<number>(8);
+  const [totalPaidInPast, setTotalPaidInPast] = useState<number>(2500);
+  const [remainingBalance, setRemainingBalance] = useState<number>(4000);
   const [pendingShortArrears, setPendingShortArrears] = useState<number>(0);
   const [nextDueDate, setNextDueDate] = useState<string>("2026-09-05");
 
@@ -80,24 +106,155 @@ export default function LegacyCustomerEntryPage() {
 
   if (!currentUser) return null;
 
-  // Handle Product Select
-  const handleProductChange = (prodId: string) => {
-    setSelectedProductId(prodId);
-    const p = products.find((x) => x.id === prodId);
-    if (p) {
-      setProductTitle(p.title);
-      setTotalFinanced(p.installmentPrice || p.cashPrice * 1.2);
-      setDownPayment(p.defaultDownPayment || 500);
-      setMonthlyInstallment(p.defaultInstallmentAmount || 500);
-      setInstallmentFrequency(p.defaultFrequency || "WEEKLY");
-      setTotalInstallmentsCount(p.defaultTotalInstallments || 13);
-      setCollectionIntervalDays(p.defaultFrequency === "WEEKLY" ? 7 : (p.defaultFrequency === "TEN_DAYS" ? 10 : 30));
+  // Sync multi-product totals
+  const recalculateFromItems = (items: ProductLineItem[]) => {
+    const sumInstallment = items.reduce((acc, item) => acc + item.installmentPrice * item.quantity, 0);
+    setTotalFinanced(sumInstallment);
+
+    const defCount = totalInstallmentsCount || 13;
+    const defDown = Math.round(sumInstallment * 0.1);
+    setDownPayment(defDown);
+    const balanceFinanced = Math.max(0, sumInstallment - defDown);
+    const instAmount = Math.ceil(balanceFinanced / (defCount || 1));
+    setMonthlyInstallment(instAmount);
+
+    const paidAmount = monthsAlreadyPaid * instAmount;
+    setTotalPaidInPast(paidAmount);
+    const remCount = Math.max(0, defCount - monthsAlreadyPaid);
+    setRemainingInstallmentsCount(remCount);
+    setRemainingBalance(remCount * instAmount + pendingShortArrears);
+  };
+
+  const handleAddProductItem = () => {
+    const defaultProd = products[productItems.length % products.length] || products[0];
+    const newItem: ProductLineItem = {
+      id: "item_" + Date.now(),
+      productId: defaultProd?.id,
+      title: defaultProd?.title || "Orient 56 Inch Ceiling Fan",
+      imeiSerial: "SN-" + Date.now().toString().slice(-6),
+      cashPrice: defaultProd?.cashPrice || 9500,
+      installmentPrice: defaultProd?.installmentPrice || 11500,
+      quantity: 1,
+    };
+    const updated = [...productItems, newItem];
+    setProductItems(updated);
+    recalculateFromItems(updated);
+  };
+
+  const handleRemoveProductItem = (id: string) => {
+    if (productItems.length <= 1) {
+      alert("At least 1 product item is required in the khata.");
+      return;
+    }
+    const updated = productItems.filter((i) => i.id !== id);
+    setProductItems(updated);
+    recalculateFromItems(updated);
+  };
+
+  const handleUpdateProductItem = (id: string, updates: Partial<ProductLineItem>) => {
+    const updated = productItems.map((item) => {
+      if (item.id === id) {
+        const next = { ...item, ...updates };
+        if (updates.productId && updates.productId !== item.productId) {
+          const p = products.find((x) => x.id === updates.productId);
+          if (p) {
+            next.title = p.title;
+            next.cashPrice = p.cashPrice;
+            next.installmentPrice = p.installmentPrice || p.cashPrice * 1.2;
+          }
+        }
+        return next;
+      }
+      return item;
+    });
+    setProductItems(updated);
+    recalculateFromItems(updated);
+  };
+
+  // --- SMART 2-WAY CALCULATION ENGINE ---
+  const handlePaidInstallmentsChange = (paidVal: number) => {
+    const safePaid = Math.max(0, Math.min(totalInstallmentsCount, paidVal));
+    setMonthsAlreadyPaid(safePaid);
+
+    const safeRem = Math.max(0, totalInstallmentsCount - safePaid);
+    setRemainingInstallmentsCount(safeRem);
+
+    const pastPaid = safePaid * monthlyInstallment;
+    setTotalPaidInPast(pastPaid);
+
+    const remBal = safeRem * monthlyInstallment + pendingShortArrears;
+    setRemainingBalance(remBal);
+  };
+
+  const handleRemainingInstallmentsChange = (remVal: number) => {
+    const safeRem = Math.max(0, Math.min(totalInstallmentsCount, remVal));
+    setRemainingInstallmentsCount(safeRem);
+
+    const safePaid = Math.max(0, totalInstallmentsCount - safeRem);
+    setMonthsAlreadyPaid(safePaid);
+
+    const pastPaid = safePaid * monthlyInstallment;
+    setTotalPaidInPast(pastPaid);
+
+    const remBal = safeRem * monthlyInstallment + pendingShortArrears;
+    setRemainingBalance(remBal);
+  };
+
+  const handleRemainingBalanceChange = (balVal: number) => {
+    const safeBal = Math.max(0, balVal);
+    setRemainingBalance(safeBal);
+
+    if (monthlyInstallment > 0) {
+      const estimatedRemCount = Math.min(totalInstallmentsCount, Math.ceil(safeBal / monthlyInstallment));
+      setRemainingInstallmentsCount(estimatedRemCount);
+      const safePaid = Math.max(0, totalInstallmentsCount - estimatedRemCount);
+      setMonthsAlreadyPaid(safePaid);
+      setTotalPaidInPast(safePaid * monthlyInstallment);
     }
   };
 
-  // Auto-calculate remaining balance
-  const remainingCount = Math.max(0, totalInstallmentsCount - monthsAlreadyPaid);
-  const remainingExpected = Math.max(0, (totalFinanced - downPayment - totalPaidInPast) + pendingShortArrears);
+  const handleTotalInstallmentsChange = (totalCount: number) => {
+    const safeTotal = Math.max(1, totalCount);
+    setTotalInstallmentsCount(safeTotal);
+
+    const safeRem = Math.max(0, safeTotal - monthsAlreadyPaid);
+    setRemainingInstallmentsCount(safeRem);
+
+    const safeFinanced = safeTotal * monthlyInstallment + downPayment;
+    setTotalFinanced(safeFinanced);
+
+    setRemainingBalance(safeRem * monthlyInstallment + pendingShortArrears);
+  };
+
+  const handleInstallmentAmountChange = (amt: number) => {
+    const safeAmt = Math.max(10, amt);
+    setMonthlyInstallment(safeAmt);
+
+    const safeFinanced = totalInstallmentsCount * safeAmt + downPayment;
+    setTotalFinanced(safeFinanced);
+
+    const pastPaid = monthsAlreadyPaid * safeAmt;
+    setTotalPaidInPast(pastPaid);
+
+    const remBal = remainingInstallmentsCount * safeAmt + pendingShortArrears;
+    setRemainingBalance(remBal);
+  };
+
+  const handleDownPaymentChange = (dp: number) => {
+    const safeDp = Math.max(0, dp);
+    setDownPayment(safeDp);
+    const safeFinanced = totalInstallmentsCount * monthlyInstallment + safeDp;
+    setTotalFinanced(safeFinanced);
+  };
+
+  const handleShortArrearsChange = (arr: number) => {
+    const safeArr = Math.max(0, arr);
+    setPendingShortArrears(safeArr);
+    setRemainingBalance(remainingInstallmentsCount * monthlyInstallment + safeArr);
+  };
+
+  const compositeTitle = productItems.map((p) => p.title + (p.quantity > 1 ? " (x" + p.quantity + ")" : "")).join(" + ");
+  const compositeSerial = productItems.map((p) => p.imeiSerial || "SN-NA").join(", ");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +262,17 @@ export default function LegacyCustomerEntryPage() {
     setMsg(null);
 
     try {
+      const formattedItems: IPlanProductItem[] = productItems.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productTitle: item.title,
+        imeiSerial: item.imeiSerial,
+        quantity: item.quantity,
+        cashPrice: item.cashPrice,
+        installmentPrice: item.installmentPrice,
+        condition: "NEW",
+      }));
+
       const res = store.createLegacyKhataCustomer({
         tenantId: currentTenant.id,
         khataNumber,
@@ -125,9 +293,10 @@ export default function LegacyCustomerEntryPage() {
         guarantor2Phone: g2Phone || undefined,
         guarantor2Cnic: g2Cnic || undefined,
         guarantor2Relation: g2Relation || undefined,
-        productId: selectedProductId || undefined,
-        productTitle,
-        imeiSerial: imeiSerial || undefined,
+        productId: productItems[0]?.productId || undefined,
+        productTitle: compositeTitle || "Product",
+        imeiSerial: compositeSerial,
+        items: formattedItems,
         totalFinanced: Number(totalFinanced),
         downPayment: Number(downPayment),
         durationMonths: Number(totalInstallmentsCount),
@@ -143,13 +312,17 @@ export default function LegacyCustomerEntryPage() {
         createdBy: currentUser.name,
       });
 
+      if (gpsLocation) {
+        store.updateCustomerGps(res.customer.id, gpsLocation, address, zoneArea, currentUser.id);
+      }
+
       setMsg({
         type: "success",
-        text: `Legacy Khata #${khataNumber} for customer "${res.customer.fullName}" (${res.plan.planNumber}) successfully added to active records!`,
+        text: "Legacy Khata #" + khataNumber + " for customer \"" + res.customer.fullName + "\" (" + res.plan.planNumber + ") with " + productItems.length + " product(s) successfully registered!",
       });
 
       setTimeout(() => {
-        router.push(`/portal/plans/${res.plan.id}`);
+        router.push("/portal/plans/" + res.plan.id);
       }, 1200);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create legacy record" });
@@ -166,13 +339,18 @@ export default function LegacyCustomerEntryPage() {
             <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-600 text-emerald-50 px-3 py-1 rounded-full border border-emerald-400/30">
               Rajpoot Traders (Regd.) — Chiniot
             </span>
-            <UrduSpeaker customText="راجپوت ٹریڈرز محلہ رحمن آباد چنیوٹ۔ پرانے رجسٹرز اور ڈائریوں کا کھاتہ درج کریں۔" size="sm" showLabel />
+            <UrduSpeaker
+              customText="راجپوت ٹریڈرز چنیوٹ۔ پرانے کھاتے کا خودکار حساب کتاب۔ کتنی قسطیں آ گئی ہیں اور کتنی باقی ہیں، درج کرتے ہی سارا بیلنس خود بن جائے گا۔"
+              size="sm"
+              showLabel
+            />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Fast Khata Entry Form — Chiniot Branch
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2">
+            <Calculator className="w-7 h-7 text-emerald-400 shrink-0" />
+            <span>Smart Auto-Calculated Khata Entry</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-urdu leading-relaxed">
-            Mohallah Rehman Abad, Chiniot • Tel: 0311-4813850 • Khata Number, Salesman Name, and Collection Schedule
+            Mohallah Rehman Abad, Chiniot • Multi-Product Ledger & Real-Time Auto Balance Calculation
           </p>
         </div>
 
@@ -186,31 +364,54 @@ export default function LegacyCustomerEntryPage() {
       </div>
 
       {msg && (
-        <div className={`p-4 rounded-2xl text-xs font-bold border flex items-center gap-3 ${
-          msg.type === "success" ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-rose-50 text-rose-900 border-rose-300"
-        }`}>
-          {msg.type === "success" ? <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" /> : <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0" />}
+        <div
+          className={"p-4 rounded-2xl text-xs font-bold border flex items-center gap-3 " + (msg.type === "success" ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-rose-50 text-rose-900 border-rose-300")}
+        >
+          {msg.type === "success" ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0" />
+          )}
           <span className="font-urdu text-sm">{msg.text}</span>
         </div>
       )}
 
-      {/* Live Financial Summary Banner */}
+      {/* Real-Time Live Auto-Calculated Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold uppercase text-slate-400 block">Khata # & Salesman</span>
-          <strong className="text-base font-black text-slate-900 font-urdu">Khata #{khataNumber} • {salesmanName}</strong>
+          <strong className="text-base font-black text-slate-900 font-urdu block truncate">
+            Khata #{khataNumber || "—"} • {salesmanName || "Zaheem"}
+          </strong>
+          <span className="text-[10px] text-emerald-700 font-semibold">{productItems.length} Product(s) in Khata</span>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-emerald-700 block">Paid Installments</span>
-          <strong className="text-base font-black text-emerald-700">{monthsAlreadyPaid} / {totalInstallmentsCount} Paid</strong>
+
+        <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-300 shadow-sm">
+          <span className="text-[10px] font-bold uppercase text-emerald-800 block">Paid So Far (وصول شدہ)</span>
+          <strong className="text-base font-black text-emerald-800">
+            {monthsAlreadyPaid} / {totalInstallmentsCount} Qistain
+          </strong>
+          <span className="text-[10px] text-emerald-700 font-mono block font-bold">
+            Total: {formatPKR(totalPaidInPast + downPayment)}
+          </span>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Collected (with Advance)</span>
-          <strong className="text-base font-black text-slate-800">{formatPKR(totalPaidInPast + downPayment)}</strong>
+
+        <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-300 shadow-sm">
+          <span className="text-[10px] font-bold uppercase text-amber-900 block">Remaining Qistain (باقی قسطیں)</span>
+          <strong className="text-base font-black text-amber-900">
+            {remainingInstallmentsCount} Qistain Left
+          </strong>
+          <span className="text-[10px] text-amber-800 font-mono block font-bold">
+            Balance: {formatPKR(remainingBalance)}
+          </span>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-amber-300 bg-amber-50/50 shadow-sm">
-          <span className="text-[10px] font-bold uppercase text-amber-900 block">Remaining Balance</span>
-          <strong className="text-base font-black text-amber-900">{formatPKR(remainingExpected)}</strong>
+
+        <div className="bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 shadow-sm">
+          <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Financed Value</span>
+          <strong className="text-base font-black text-emerald-400 block font-mono">
+            {formatPKR(totalFinanced)}
+          </strong>
+          <span className="text-[10px] text-slate-400 block">Advance: {formatPKR(downPayment)}</span>
         </div>
       </div>
 
@@ -218,16 +419,19 @@ export default function LegacyCustomerEntryPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Khata Header & Salesman */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
-          <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-emerald-700" />
-            <h2 className="text-base font-black text-slate-900">
-              1. Khata Number & Salesman Information
-            </h2>
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-emerald-700" />
+              <h2 className="text-base font-black text-slate-900">
+                1. Khata Number & Salesman Information
+              </h2>
+            </div>
+            <span className="text-xs font-urdu text-slate-500">ڈائری / رجسٹر کھاتہ نمبر اور سیلز مین</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Khata Number (Manual Register #) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Manual Khata Number (کھاتہ نمبر) *</label>
               <input
                 type="text"
                 required
@@ -239,7 +443,7 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Salesman Name *</label>
+              <label className="block font-bold text-slate-700 mb-1">Salesman Name (سیلز مین کا نام) *</label>
               <input
                 type="text"
                 required
@@ -248,23 +452,28 @@ export default function LegacyCustomerEntryPage() {
                 onChange={(e) => setSalesmanName(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-emerald-600 font-urdu"
               />
-              <span className="text-[10px] text-slate-400 font-urdu block mt-1">System records this salesman on the plan for audit transparency.</span>
+              <span className="text-[10px] text-slate-400 font-urdu block mt-1">
+                شفافیت کے لیے سیلز مین کا نام کھاتے کے ساتھ مستقل منسلک رہے گا۔
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Section 2: Customer Profile */}
+        {/* Section 2: Customer Profile & Live Map */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
-          <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-emerald-700" />
-            <h2 className="text-base font-black text-slate-900">
-              2. Customer Information & Residence
-            </h2>
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-emerald-700" />
+              <h2 className="text-base font-black text-slate-900">
+                2. Customer Profile & Residence Address
+              </h2>
+            </div>
+            <span className="text-xs font-urdu text-slate-500">گاہک کا نام، شناختی کارڈ اور پتہ</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Customer Full Name *</label>
+              <label className="block font-bold text-slate-700 mb-1">Customer Full Name (گاہک کا پورا نام) *</label>
               <input
                 type="text"
                 required
@@ -276,7 +485,7 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Father's Name *</label>
+              <label className="block font-bold text-slate-700 mb-1">Father's Name (والد کا نام) *</label>
               <input
                 type="text"
                 required
@@ -288,7 +497,7 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">CNIC Number *</label>
+              <label className="block font-bold text-slate-700 mb-1">CNIC Number (شناختی کارڈ) *</label>
               <input
                 type="text"
                 required
@@ -300,7 +509,7 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Customer Mobile Phone *</label>
+              <label className="block font-bold text-slate-700 mb-1">Customer Mobile Phone (موبائل نمبر) *</label>
               <input
                 type="tel"
                 required
@@ -312,7 +521,7 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">City (City) *</label>
+              <label className="block font-bold text-slate-700 mb-1">City (شہر) *</label>
               <input
                 type="text"
                 value={city}
@@ -322,7 +531,7 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Chiniot Route Zone *</label>
+              <label className="block font-bold text-slate-700 mb-1">Chiniot Route Zone (روٹ علاقہ) *</label>
               <select
                 value={zoneArea}
                 onChange={(e) => setZoneArea(e.target.value)}
@@ -336,16 +545,16 @@ export default function LegacyCustomerEntryPage() {
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-3">
               <div className="flex items-center justify-between mb-1">
-                <label className="block font-bold text-slate-700">Complete Address *</label>
+                <label className="block font-bold text-slate-700">Complete Address (مکمل رہائشی پتہ) *</label>
                 <button
                   type="button"
                   onClick={() => setShowMapPicker(!showMapPicker)}
-                  className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1.5 px-3 py-1 bg-emerald-50 rounded-lg border border-emerald-200"
                 >
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{showMapPicker ? "Hide Map Picker" : "Pin Exact Location on Live Map"}</span>
+                  <span>{showMapPicker ? "Hide Map Picker" : "Pin Location on Map & Auto-Fill Address"}</span>
                 </button>
               </div>
               <input
@@ -377,214 +586,303 @@ export default function LegacyCustomerEntryPage() {
           </div>
         </div>
 
-        {/* Section 3: Product, Installment Day & Schedule */}
+        {/* Section 3: Multi-Product Items Support */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
-          <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
-            <Package className="w-5 h-5 text-emerald-700" />
-            <h2 className="text-base font-black text-slate-900">
-              3. Product Details & Collection Schedule
-            </h2>
+          <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-emerald-700" />
+              <div>
+                <h2 className="text-base font-black text-slate-900">
+                  3. Product Items in Khata (Multi-Product Support)
+                </h2>
+                <span className="text-xs text-slate-500 font-urdu">
+                  اگر گاہک نے ایک سے زیادہ (2 یا زائد) پروڈکٹس لی ہیں تو نیچے ایڈ کریں۔
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddProductItem}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Add 2nd Product / Item</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {productItems.map((item, idx) => (
+              <div
+                key={item.id}
+                className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 relative group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-emerald-700" />
+                    Product #{idx + 1}
+                  </span>
+                  {productItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveProductItem(item.id)}
+                      className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 p-1 hover:bg-rose-50 rounded-lg"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove Item</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">Catalog Preset</label>
+                    <select
+                      value={item.productId || ""}
+                      onChange={(e) => handleUpdateProductItem(item.id, { productId: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none"
+                    >
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title} (Rs. {(p.installmentPrice || p.cashPrice * 1.2).toLocaleString()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">Product Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={item.title}
+                      onChange={(e) => handleUpdateProductItem(item.id, { title: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-900 outline-none font-urdu"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">Serial / IMEI #</label>
+                    <input
+                      type="text"
+                      value={item.imeiSerial}
+                      onChange={(e) => handleUpdateProductItem(item.id, { imeiSerial: e.target.value })}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">Installment Price (Rs.) *</label>
+                    <input
+                      type="number"
+                      min={500}
+                      value={item.installmentPrice}
+                      onChange={(e) =>
+                        handleUpdateProductItem(item.id, { installmentPrice: Number(e.target.value) })
+                      }
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Section 4: SMART AUTO-CALCULATED KHATA ENGINE */}
+        <div className="bg-gradient-to-br from-emerald-50/60 via-white to-amber-50/40 rounded-3xl border-2 border-emerald-300/80 p-6 sm:p-8 shadow-md space-y-6">
+          <div className="border-b border-emerald-200/80 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-amber-500" />
+              <div>
+                <h2 className="text-lg font-black text-emerald-950">
+                  4. Smart Khata Auto-Calculator (انتہائی آسان خودکار حساب)
+                </h2>
+                <p className="text-xs text-slate-600 font-urdu">
+                  صرف یہ لکھیں کہ <strong>کتنی قسطیں آ گئی ہیں</strong> یا <strong>کتنی باقی ہیں</strong> — باقی سارا بقایا اور شیڈول سسٹم خود حساب کر لے گا۔
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Select from Catalog (Select from Catalog)</label>
-              <select
-                value={selectedProductId}
-                onChange={(e) => handleProductChange(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none"
-              >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} (Cash: {formatPKR(p.cashPrice)} • Installment: {formatPKR(p.installmentPrice || p.cashPrice * 1.2)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Product Title (Product Title) *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Electric Iron or Ceiling Fan"
-                value={productTitle}
-                onChange={(e) => setProductTitle(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-emerald-600 font-urdu"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Total Price (Total Price - Rs.) *</label>
-              <input
-                type="number"
-                required
-                min={500}
-                value={totalFinanced}
-                onChange={(e) => setTotalFinanced(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 outline-none focus:border-emerald-600"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Advance Down Payment (Down Payment - Rs.) *</label>
-              <input
-                type="number"
-                required
-                min={0}
-                value={downPayment}
-                onChange={(e) => setDownPayment(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-emerald-800 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Installment Frequency (Installment Frequency) *</label>
+              <label className="block font-black text-slate-800 mb-1">Installment Frequency (قسط کی مدت) *</label>
               <select
                 value={installmentFrequency}
                 onChange={(e) => {
                   const freq = e.target.value as InstallmentFrequency;
                   setInstallmentFrequency(freq);
-                  setCollectionIntervalDays(freq === "WEEKLY" ? 7 : (freq === "TEN_DAYS" ? 10 : (freq === "FIFTEEN_DAYS" ? 15 : 30)));
+                  setCollectionIntervalDays(
+                    freq === "WEEKLY" ? 7 : freq === "TEN_DAYS" ? 10 : freq === "FIFTEEN_DAYS" ? 15 : 30
+                  );
                 }}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
+                className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
               >
-                <option value="WEEKLY">Weekly (e.g. Rs. 500/week)</option>
-                <option value="TEN_DAYS">Every 10 Days</option>
-                <option value="FIFTEEN_DAYS">Every 15 Days</option>
-                <option value="MONTHLY">Monthly</option>
+                <option value="WEEKLY">Weekly (ہفتہ وار e.g. Rs. 500/week)</option>
+                <option value="TEN_DAYS">Every 10 Days (ہر 10 دن بعد)</option>
+                <option value="FIFTEEN_DAYS">Every 15 Days (ہر 15 دن بعد)</option>
+                <option value="MONTHLY">Monthly (ماہانہ)</option>
               </select>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Installment Amount (Installment Amount - Rs.) *</label>
-              <input
-                type="number"
-                required
-                min={100}
-                value={monthlyInstallment}
-                onChange={(e) => setMonthlyInstallment(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 outline-none"
-              />
-            </div>
-
-            {/* Collection Day & Cycle */}
-            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
-              <label className="block font-black text-emerald-950">Preferred Collection Day *</label>
+              <label className="block font-black text-slate-800 mb-1">Preferred Collection Day (قسط کا دن) *</label>
               <select
                 value={collectionDayName}
                 onChange={(e) => setCollectionDayName(e.target.value)}
-                className="w-full p-2.5 bg-white border border-emerald-300 rounded-xl font-bold text-emerald-900 outline-none font-urdu"
+                className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
               >
-                <option value="Saturday">Saturday</option>
-                <option value="Friday">Friday</option>
-                <option value="Sunday">Sunday</option>
-                <option value="Monday">Monday</option>
-                <option value="Tuesday">Tuesday</option>
-                <option value="Wednesday">Wednesday</option>
-                <option value="Thursday">Thursday</option>
+                <option value="Saturday">Saturday (ہفتہ)</option>
+                <option value="Friday">Friday (جمعہ)</option>
+                <option value="Sunday">Sunday (اتوار)</option>
+                <option value="Monday">Monday (سوموار)</option>
+                <option value="Tuesday">Tuesday (منگل)</option>
+                <option value="Wednesday">Wednesday (بدھ)</option>
+                <option value="Thursday">Thursday (جمعرات)</option>
               </select>
-              <span className="text-[10px] text-emerald-700 font-urdu block">
-                The field recovery route list will be scheduled on this day.
-              </span>
-            </div>
-
-            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
-              <label className="block font-black text-emerald-950">Collection Interval (Cycle Days) *</label>
-              <input
-                type="number"
-                required
-                min={1}
-                value={collectionIntervalDays}
-                onChange={(e) => setCollectionIntervalDays(Number(e.target.value))}
-                className="w-full p-2.5 bg-white border border-emerald-300 rounded-xl font-mono font-black text-emerald-900 outline-none"
-              />
-              <span className="text-[10px] text-emerald-700 font-urdu block">e.g. Every 7 days (weekly), 10 days, or 30 days (monthly).</span>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Total Installments Count *</label>
-              <input
-                type="number"
-                required
-                min={1}
-                value={totalInstallmentsCount}
-                onChange={(e) => setTotalInstallmentsCount(Number(e.target.value))}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
-              />
-            </div>
-
-            {/* Historical Entries */}
-            <div className="p-4 bg-emerald-100/50 border border-emerald-300 rounded-2xl space-y-2">
-              <label className="block font-black text-emerald-950">Already Paid Installments (in Register) *</label>
-              <input
-                type="number"
-                required
-                min={0}
-                max={totalInstallmentsCount}
-                value={monthsAlreadyPaid}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setMonthsAlreadyPaid(val);
-                  setTotalPaidInPast(val * monthlyInstallment);
-                }}
-                className="w-full p-2.5 bg-white border border-emerald-400 rounded-xl font-black text-emerald-900 text-base font-mono outline-none"
-              />
-              <span className="text-[10px] text-emerald-800 font-urdu block">Number of installments already paid in old manual register.</span>
-            </div>
-
-            <div className="p-4 bg-emerald-100/50 border border-emerald-300 rounded-2xl space-y-2">
-              <label className="block font-black text-emerald-950">Total Past Amount Collected (PKR) *</label>
-              <input
-                type="number"
-                required
-                min={0}
-                value={totalPaidInPast}
-                onChange={(e) => setTotalPaidInPast(Number(e.target.value))}
-                className="w-full p-2.5 bg-white border border-emerald-400 rounded-xl font-black text-emerald-900 text-base font-mono outline-none"
-              />
-            </div>
-
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
-              <label className="block font-black text-amber-950">Previous Short Arrears (PKR)</label>
-              <input
-                type="number"
-                min={0}
-                value={pendingShortArrears}
-                onChange={(e) => setPendingShortArrears(Number(e.target.value))}
-                className="w-full p-2.5 bg-white border border-amber-300 rounded-xl font-black text-amber-900 text-base font-mono outline-none"
-              />
-              <span className="text-[10px] text-amber-800 font-urdu block">If any previous installment was partially paid, arrears will auto-add.</span>
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Next Collection Due Date *</label>
+              <label className="block font-black text-slate-800 mb-1">Next Collection Due Date (اگلی وصولی کی تاریخ) *</label>
               <input
                 type="date"
                 required
                 value={nextDueDate}
                 onChange={(e) => setNextDueDate(e.target.value)}
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none focus:border-emerald-600"
+                className="w-full p-3 bg-white border border-emerald-400 rounded-xl font-mono font-bold text-slate-900 outline-none"
               />
+            </div>
+          </div>
+
+          {/* TWO-WAY REACTIVE CALCULATION HUB */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5 bg-white rounded-2xl border border-emerald-200 shadow-sm">
+            <div className="space-y-1">
+              <label className="block font-extrabold text-slate-800 text-xs">
+                Total Aqsat (کل قسطیں) *
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={totalInstallmentsCount}
+                onChange={(e) => handleTotalInstallmentsChange(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-black text-slate-900 text-base outline-none focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-400 font-urdu block">مثلاً 13 ہفتے یا 12 ماہ</span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block font-extrabold text-slate-800 text-xs">
+                Installment Amount (قسط کی رقم - Rs.) *
+              </label>
+              <input
+                type="number"
+                min={50}
+                value={monthlyInstallment}
+                onChange={(e) => handleInstallmentAmountChange(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-black text-emerald-900 text-base outline-none focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-400 font-urdu block">ہر چکر / ہفتے کی قسط</span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block font-extrabold text-slate-800 text-xs">
+                Advance Paid (پیشگی / ایڈوانس - Rs.)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={downPayment}
+                onChange={(e) => handleDownPaymentChange(Number(e.target.value))}
+                className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 text-base outline-none focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-400 font-urdu block">شروع میں دیا گیا ایڈوانس</span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block font-extrabold text-amber-950 text-xs">
+                Previous Arrears (پچھلا شارٹ بقایا - Rs.)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={pendingShortArrears}
+                onChange={(e) => handleShortArrearsChange(Number(e.target.value))}
+                className="w-full p-3 bg-amber-50/50 border border-amber-300 rounded-xl font-mono font-bold text-amber-950 text-base outline-none"
+              />
+              <span className="text-[10px] text-amber-800 font-urdu block">اگر پچھلی قسط کم آئی تھی</span>
+            </div>
+          </div>
+
+          {/* TWO-WAY REACTIVE INPUT PAIR */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-5 bg-emerald-100/60 border-2 border-emerald-400 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block font-black text-emerald-950 text-sm">
+                  🟢 Kitni Qistain Aa Gayi Hain? (وصول شدہ قسطیں) *
+                </label>
+                <span className="text-xs font-mono font-bold text-emerald-800">
+                  {monthsAlreadyPaid} / {totalInstallmentsCount}
+                </span>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={totalInstallmentsCount}
+                value={monthsAlreadyPaid}
+                onChange={(e) => handlePaidInstallmentsChange(Number(e.target.value))}
+                className="w-full p-3.5 bg-white border-2 border-emerald-500 rounded-xl font-mono font-black text-emerald-900 text-xl outline-none shadow-sm"
+              />
+              <div className="flex items-center justify-between text-xs text-emerald-900 font-urdu font-bold pt-1">
+                <span>ماضی میں وصول شدہ رقم:</span>
+                <span className="font-mono text-sm">{formatPKR(totalPaidInPast)}</span>
+              </div>
+            </div>
+
+            <div className="p-5 bg-amber-100/60 border-2 border-amber-400 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block font-black text-amber-950 text-sm">
+                  🟡 Kitni Qistain Baqaya Hain? (باقی قسطیں) *
+                </label>
+                <span className="text-xs font-mono font-bold text-amber-900">
+                  {remainingInstallmentsCount} Left
+                </span>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={totalInstallmentsCount}
+                value={remainingInstallmentsCount}
+                onChange={(e) => handleRemainingInstallmentsChange(Number(e.target.value))}
+                className="w-full p-3.5 bg-white border-2 border-amber-500 rounded-xl font-mono font-black text-amber-950 text-xl outline-none shadow-sm"
+              />
+              <div className="flex items-center justify-between text-xs text-amber-950 font-urdu font-bold pt-1">
+                <span>کل بقایا رقم (بشمول شارٹ):</span>
+                <span className="font-mono text-sm">{formatPKR(remainingBalance)}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Section 4: Guarantor (2nd is OPTIONAL) */}
+        {/* Section 5: Guarantors (2nd is OPTIONAL) */}
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-5">
-          <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-emerald-700" />
-            <h2 className="text-base font-black text-slate-900">
-              4. Guarantors (Guarantor 2 is Optional)
-            </h2>
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-700" />
+              <h2 className="text-base font-black text-slate-900">
+                5. Guarantors Information (ضامن تفصیلات)
+              </h2>
+            </div>
+            <span className="text-xs font-urdu text-slate-500">پہلا ضامن لازمی، دوسرا ضامن اختیاری ہے</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
-            {/* Guarantor 1 */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <span className="font-black text-emerald-800 block text-xs">Guarantor 1 (Mandatory) *</span>
+              <span className="font-black text-emerald-800 block text-xs">
+                Guarantor 1 (ضامن نمبر 1 — لازمی) *
+              </span>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Guarantor Full Name *</label>
+                <label className="block font-bold text-slate-600 mb-1">Guarantor Name *</label>
                 <input
                   type="text"
                   required
@@ -595,7 +893,7 @@ export default function LegacyCustomerEntryPage() {
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Mobile Phone Number *</label>
+                <label className="block font-bold text-slate-600 mb-1">Mobile Phone *</label>
                 <input
                   type="tel"
                   required
@@ -606,79 +904,105 @@ export default function LegacyCustomerEntryPage() {
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">CNIC Number</label>
+                <label className="block font-bold text-slate-600 mb-1">CNIC Number *</label>
                 <input
                   type="text"
+                  required
                   placeholder="33202-1234567-1"
                   value={g1Cnic}
                   onChange={(e) => setG1Cnic(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono outline-none"
                 />
               </div>
-            </div>
-
-            {/* Guarantor 2 (OPTIONAL) */}
-            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-600 block text-xs">Guarantor 2 (Optional)</span>
-                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">Optional</span>
-              </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Guarantor 2 Full Name (If any)</label>
+                <label className="block font-bold text-slate-600 mb-1">Relation / Profession *</label>
                 <input
                   type="text"
-                  placeholder="Optional..."
+                  required
+                  placeholder="e.g. Neighbor / Shopkeeper"
+                  value={g1Relation}
+                  onChange={(e) => setG1Relation(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-urdu"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50/50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-600 block text-xs">
+                  Guarantor 2 (ضامن نمبر 2 — اختیاری)
+                </span>
+                <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">
+                  Optional
+                </span>
+              </div>
+              <div>
+                <label className="block font-medium text-slate-500 mb-1">Guarantor Name</label>
+                <input
+                  type="text"
+                  placeholder="Optional second guarantor"
                   value={g2Name}
                   onChange={(e) => setG2Name(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-urdu"
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Mobile Phone Number</label>
+                <label className="block font-medium text-slate-500 mb-1">Mobile Phone</label>
                 <input
                   type="tel"
-                  placeholder="Optional..."
+                  placeholder="03xx-xxxxxxx"
                   value={g2Phone}
                   onChange={(e) => setG2Phone(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono outline-none"
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">CNIC Number</label>
+                <label className="block font-medium text-slate-500 mb-1">CNIC Number</label>
                 <input
                   type="text"
-                  placeholder="Optional..."
+                  placeholder="33202-xxxxxxx-x"
                   value={g2Cnic}
                   onChange={(e) => setG2Cnic(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-mono outline-none"
+                />
+              </div>
+              <div>
+                <label className="block font-medium text-slate-500 mb-1">Relation</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Relative"
+                  value={g2Relation}
+                  onChange={(e) => setG2Relation(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-urdu"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-3xl border border-slate-200 shadow-sm">
-          <div className="text-xs text-slate-500 font-urdu">
-            Remaining installments will be activated instantly on the recovery officer route sheet.
+        {/* Submit Action */}
+        <div className="p-6 bg-slate-900 rounded-3xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+          <div>
+            <h3 className="text-base font-black">Save & Activate Khata in Portal</h3>
+            <p className="text-xs text-slate-300 font-urdu">
+              کھاتہ نمبر #{khataNumber} باقاعدہ لیجر اور ریکوری شیڈول میں شامل ہو جائے گا۔
+            </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Link
-              href="/portal/customers"
-              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl text-center flex-1 sm:flex-none"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{loading ? "Saving Khata..." : "Save & Activate Khata"}</span>
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-sm tracking-wide transition-all shadow-lg hover:shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <span>Saving Khata...</span>
+            ) : (
+              <>
+                <CheckCircle2 className="w-5 h-5" />
+                <span>Save Khata & Generate Plan</span>
+              </>
+            )}
+          </button>
         </div>
       </form>
     </div>

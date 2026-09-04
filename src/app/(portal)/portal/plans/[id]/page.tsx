@@ -24,6 +24,7 @@ import {
   UserCheck,
   MapPin,
   ExternalLink,
+  Package,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
@@ -382,6 +383,39 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
           <strong className="text-lg font-bold text-slate-900">{formatPKR(plan.totalFinanced)}</strong>
         </div>
       </div>
+
+      {/* Multi-Product Items Breakdown (If contract contains multiple items) */}
+      {plan.items && plan.items.length > 0 && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+              <Package className="w-4 h-4 text-emerald-700" />
+              <span>Contract Products & Serial Registry ({plan.items.length} Items)</span>
+            </h3>
+            <span className="text-xs text-slate-500 font-urdu">تمام اشیاء کے سیریل نمبرز اور قیمتیں</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {plan.items.map((item, idx) => (
+              <div key={item.id || idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Item #{idx + 1}
+                  </span>
+                  <strong className="text-xs font-mono font-bold text-slate-900">
+                    {formatPKR(item.installmentPrice * item.quantity)}
+                  </strong>
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 truncate">{item.productTitle}</h4>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                  <span>SN: {item.imeiSerial || "N/A"}</span>
+                  <span>Qty: {item.quantity}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Amortization Schedule Table (Exact Register Format) */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-4">

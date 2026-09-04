@@ -122,6 +122,18 @@ export interface InstallmentScheduleItem {
   notes?: string;
 }
 
+export interface IPlanProductItem {
+  id: string;
+  productId?: string;
+  productTitle: string;
+  imeiSerial?: string;
+  quantity: number;
+  cashPrice: number;
+  installmentPrice: number;
+  condition?: "NEW" | "USED_REFURBISHED" | "DEFECTIVE_DAMAGED";
+  settledOrReturned?: boolean;
+}
+
 export interface InstallmentPlan {
   id: string;
   planNumber: string;
@@ -136,6 +148,7 @@ export interface InstallmentPlan {
   productId: string;
   productTitle: string;
   imeiSerial: string;
+  items?: IPlanProductItem[]; // Multi-product items support (e.g. 2 or more products on one contract)
   cashPrice: number;
   downPayment: number;
   markupRatePct: number;
@@ -202,6 +215,9 @@ export interface ISettlementRecord {
   clearedAt: string;
   nocCertificateId: string;
   targetWalletId: string;
+  productTitles?: string; // e.g. "Electric Iron & Ceiling Fan (2 Items)"
+  settledPlanIds?: string[]; // Multiple plans settled in consolidated NOC
+  itemAdjustments?: { itemTitle: string; action: "SETTLED" | "RETURNED_WAPSI" | "RETAINED"; adjustmentAmount: number }[];
 }
 
 export interface IPTPLog {
@@ -313,6 +329,7 @@ export interface LegacyCustomerInput {
   productId?: string;
   productTitle: string;
   imeiSerial?: string;
+  items?: IPlanProductItem[]; // Multiple items / products in legacy khata
   totalFinanced: number;
   downPayment: number;
   durationMonths: number;

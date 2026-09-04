@@ -1108,6 +1108,112 @@ class AppStore {
     return { plan, settlement };
   }
 
+  settleMultiplePlansEarly(params: {
+    planIds: string[];
+    rebatePercentage: number;
+    approvedBy: string;
+    targetWalletId: string;
+    actorId: string;
+  }): { plans: InstallmentPlan[]; settlement: ISettlementRecord } {
+    if (!params.planIds || params.planIds.length === 0) {
+      throw new Error("No installment plans selected for settlement.");
+    }
+
+    const plansToSettle = this.plans.filter((p) => params.planIds.includes(p.id));
+    if (plansToSettle.length === 0) throw new Error("Selected plans not found.");
+
+    const targetWallet = this.wallets.find((w) => w.id === params.targetWalletId);
+    if (!targetWallet) throw new Error("Target settlement payment wallet not found.");
+
+    let totalOriginalFinanced = 0;
+    let totalPrincipalPaid = 0;
+    let remainingPrincipal = 0;
+    let totalMarkup = 0;
+    let unearnedMarkup = 0;
+    let rebateDiscountGiven = 0;
+    let accruedPenalties = 0;
+    let finalSettlementPaid = 0;
+    const planNumbers: string[] = [];
+    const productTitles: string[] = [];
+
+    const nocId = `NOC-MULTI-${Date.now().toString().slice(-6)}`;
+
+    plansToSettle.forEach((plan) => {
+      if (plan.status !== "ACTIVE") {
+        throw new Error(`Plan #${plan.planNumber} is in ${plan.status} status and cannot be settled.`);
+      }
+      const calc = calculateEarlySettlement(plan, params.rebatePercentage);
+      totalOriginalFinanced += calc.totalFinanced;
+      totalPrincipalPaid += calc.totalPrincipalPaid;
+      remainingPrincipal += calc.remainingPrincipal;
+      totalMarkup += calc.totalMarkup;
+      unearnedMarkup += calc.unearnedMarkup;
+      rebateDiscountGiven += calc.rebateDiscountGiven;
+      accruedPenalties += calc.accruedPenalties;
+      finalSettlementPaid += calc.finalSettlementAmount;
+
+      planNumbers.push(plan.planNumber);
+      productTitles.push(plan.productTitle);
+    });
+
+    const primaryPlan = plansToSettle[0];
+    const settlement: ISettlementRecord = {
+      id: `set_multi_${Date.now()}`,
+      contractId: primaryPlan.id,
+      planNumber: planNumbers.join(", "),
+      settledPlanIds: params.planIds,
+      productTitles: productTitles.join(" + "),
+      tenantId: primaryPlan.tenantId,
+      customerName: primaryPlan.customerName,
+      totalOriginalFinanced,
+      totalPrincipalPaid,
+      remainingPrincipal,
+      unearnedMarkup,
+      rebatePercentage: params.rebatePercentage,
+      rebateDiscountGiven,
+      accruedPenalties,
+      finalSettlementPaid,
+      approvedBy: params.approvedBy,
+      clearedAt: new Date().toISOString(),
+      nocCertificateId: nocId,
+      targetWalletId: targetWallet.id,
+    };
+
+    this.settlements.unshift(settlement);
+
+    // Update all selected plans
+    plansToSettle.forEach((plan) => {
+      plan.status = "COMPLETED_EARLY_SETTLED";
+      plan.settlementRecordId = settlement.id;
+      plan.accumulatedShortArrears = 0;
+      plan.schedule.forEach((s) => {
+        if (s.status !== "PAID") {
+          s.status = "PAID";
+          s.paidDate = new Date().toISOString();
+          s.notes = `Consolidated early settlement with ${params.rebatePercentage}% profit rebate (NOC #${nocId})`;
+        }
+      });
+    });
+
+    // Credit Target Wallet with consolidated final settlement cash
+    targetWallet.balance += finalSettlementPaid;
+    targetWallet.updatedAt = new Date().toISOString();
+
+    // Append Blockchain Ledger Block
+    this.appendLedgerBlock({
+      id: `tx_set_${settlement.id}`,
+      tenantId: primaryPlan.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "EARLY_SETTLEMENT",
+      amount: finalSettlementPaid,
+      toWallet: targetWallet.id,
+      actorId: params.actorId,
+      notes: `Consolidated Early Settlement for ${primaryPlan.customerName} (Plans: ${planNumbers.join(", ")}). Total Paid: Rs. ${finalSettlementPaid.toLocaleString()} with Rs. ${rebateDiscountGiven.toLocaleString()} profit rebate. NOC: ${nocId}`,
+    });
+
+    return { plans: plansToSettle, settlement };
+  }
+
   // --- Sprint 6: Promise to Pay (PTP) Scheduling ---
   getPTPLogs(tenantId?: string): IPTPLog[] {
     if (!tenantId) return this.ptpLogs;
@@ -2025,6 +2131,7 @@ class AppStore {
       productId: data.productId || `prod_leg_${Date.now()}`,
       productTitle: data.productTitle,
       imeiSerial: serialNo,
+      items: data.items && data.items.length > 0 ? data.items : undefined,
       cashPrice: Math.round(data.totalFinanced * 0.85),
       downPayment: data.downPayment,
       markupRatePct: 15,
