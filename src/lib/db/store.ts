@@ -38,8 +38,58 @@ import { ChainedLedgerBlock, computeBlockHash, verifyLedgerChain, LedgerEntryPay
 import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
 import { decryptField, encryptField } from "../crypto/aes";
 import { ImportedCustomerRow } from "../excel/excel-helper";
+import { syncEntityToCloud, loadLocalSnapshot } from "./live-sync";
 
-class AppStore {
+export class AppStore {
+  constructor() {
+    if (typeof window !== 'undefined') {
+      loadLocalSnapshot(this);
+    }
+  }
+
+  // --- Export & Import Full State for MongoDB Sync ---
+  exportFullState() {
+    return {
+      tenants: this.tenants,
+      users: this.users,
+      customers: this.customers,
+      products: this.products,
+      plans: this.plans,
+      wallets: this.wallets,
+      handovers: this.handovers,
+      expenses: this.expenses,
+      routeZones: this.routeZones,
+      claimRequests: this.claimRequests,
+      repossessions: this.repossessions,
+      settlements: this.settlements,
+      ptpLogs: this.ptpLogs,
+      articles: this.articles,
+      staffTargets: this.staffTargets,
+      fieldOrders: this.fieldOrders,
+      ledgerChain: this.ledgerChain,
+    };
+  }
+
+  importFullState(data: Partial<ReturnType<AppStore["exportFullState"]>>) {
+    if (Array.isArray(data.tenants) && data.tenants.length > 0) this.tenants = data.tenants;
+    if (Array.isArray(data.users) && data.users.length > 0) this.users = data.users;
+    if (Array.isArray(data.customers) && data.customers.length > 0) this.customers = data.customers;
+    if (Array.isArray(data.products) && data.products.length > 0) this.products = data.products;
+    if (Array.isArray(data.plans) && data.plans.length > 0) this.plans = data.plans;
+    if (Array.isArray(data.wallets) && data.wallets.length > 0) this.wallets = data.wallets;
+    if (Array.isArray(data.handovers) && data.handovers.length > 0) this.handovers = data.handovers;
+    if (Array.isArray(data.expenses) && data.expenses.length > 0) this.expenses = data.expenses;
+    if (Array.isArray(data.routeZones) && data.routeZones.length > 0) this.routeZones = data.routeZones;
+    if (Array.isArray(data.claimRequests) && data.claimRequests.length > 0) this.claimRequests = data.claimRequests;
+    if (Array.isArray(data.repossessions) && data.repossessions.length > 0) this.repossessions = data.repossessions;
+    if (Array.isArray(data.settlements) && data.settlements.length > 0) this.settlements = data.settlements;
+    if (Array.isArray(data.ptpLogs) && data.ptpLogs.length > 0) this.ptpLogs = data.ptpLogs;
+    if (Array.isArray(data.articles) && data.articles.length > 0) this.articles = data.articles;
+    if (Array.isArray(data.staffTargets) && data.staffTargets.length > 0) this.staffTargets = data.staffTargets;
+    if (Array.isArray(data.fieldOrders) && data.fieldOrders.length > 0) this.fieldOrders = data.fieldOrders;
+    if (Array.isArray(data.ledgerChain) && data.ledgerChain.length > 0) this.ledgerChain = data.ledgerChain;
+  }
+
   private tenants: Tenant[] = [...initialTenants];
   private users: User[] = [...initialUsers];
   private customers: Customer[] = [...initialCustomers];
@@ -491,6 +541,7 @@ class AppStore {
         };
 
         this.plans.unshift(plan);
+    syncEntityToCloud("plans", plan);
       }
 
       importedCount++;
@@ -531,6 +582,7 @@ class AppStore {
         : undefined,
     };
     this.customers.unshift(newCust);
+    syncEntityToCloud("customers", newCust);
     return newCust;
   }
 
@@ -610,6 +662,7 @@ class AppStore {
     };
 
     this.plans.unshift(newPlan);
+    syncEntityToCloud("plans", newPlan);
 
     const counterTill = this.wallets.find((w) => w.tenantId === planData.tenantId && w.type === "COUNTER_TILL") || this.wallets[0];
     if (counterTill && planData.downPayment > 0) {
@@ -747,6 +800,7 @@ class AppStore {
       notes: `Physical Diary Reconciliation for ${plan.customerName} (Khata #${plan.khataNumber || plan.planNumber}) by ${params.reconciledBy.name} (${params.reconciledBy.role}).`,
     });
 
+    syncEntityToCloud("plans", plan); // diary
     return plan;
   }
 
@@ -1376,6 +1430,7 @@ class AppStore {
       createdAt: new Date().toISOString(),
     };
     this.claimRequests.unshift(newClaim);
+    syncEntityToCloud("claimRequests", newClaim);
 
     // Append Blockchain Ledger audit block
     this.appendLedgerBlock({
@@ -1405,6 +1460,7 @@ class AppStore {
     claim.status = status;
     claim.resolutionNotes = resolutionNotes;
     claim.updatedAt = new Date().toISOString();
+    syncEntityToCloud("claimRequests", claim);
 
     if (actor) {
       this.appendLedgerBlock({
@@ -1598,6 +1654,7 @@ class AppStore {
       createdAt: new Date().toISOString(),
     };
     this.routeZones.push(newZone);
+    syncEntityToCloud("routeZones", newZone);
 
     this.appendLedgerBlock({
       id: `tx_zone_${newZone.id}`,
@@ -1620,6 +1677,7 @@ class AppStore {
     if (!zone) throw new Error("Route Zone not found");
 
     Object.assign(zone, data, { updatedAt: new Date().toISOString() });
+    syncEntityToCloud("routeZones", zone);
 
     this.appendLedgerBlock({
       id: `tx_zone_upd_${id}_${Date.now()}`,
@@ -2044,6 +2102,7 @@ class AppStore {
       tenantId: creator.tenantId,
     };
     this.products.unshift(newProduct);
+    syncEntityToCloud("products", newProduct);
     return newProduct;
   }
 
@@ -2130,6 +2189,7 @@ class AppStore {
       createdAt: data.startDate || new Date().toISOString(),
     };
     this.customers.unshift(customer);
+    syncEntityToCloud("customers", customer);
 
     // Build schedule based on frequency (Weekly, 10-Days, Monthly)
     const schedule: InstallmentScheduleItem[] = [];
