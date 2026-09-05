@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/auth-context";
@@ -8,6 +8,7 @@ import { store } from "@/lib/db/store";
 import { GPSLocation } from "@/lib/db/types";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
+import { subscribeToSyncStatus, SyncStatus } from "@/lib/db/live-sync";
 import {
   UserPlus,
   CheckCircle2,
@@ -22,12 +23,21 @@ import {
   RotateCcw,
   Sparkles,
   Zap,
+  Cloud,
 } from "lucide-react";
 
 export default function LegacyCustomerEntryPage() {
   const router = useRouter();
   const { currentTenant, currentUser } = useAuth();
   const dynamicRoutes = store.getRouteZones(currentTenant?.id);
+
+  // Sync state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ connected: false, isSyncing: false, pendingQueueCount: 0 });
+
+  useEffect(() => {
+    const unsub = subscribeToSyncStatus((s) => setSyncStatus(s));
+    return () => unsub();
+  }, []);
 
   // Khata & Salesman
   const [khataNumber, setKhataNumber] = useState("6");
@@ -177,6 +187,17 @@ export default function LegacyCustomerEntryPage() {
               <Zap className="w-3.5 h-3.5" />
               <span>Fast Khata Entry • Chiniot</span>
             </span>
+
+            <span
+              className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                syncStatus.connected
+                  ? "bg-emerald-900/60 text-emerald-300 border-emerald-500/50"
+                  : "bg-amber-900/60 text-amber-300 border-amber-500/50"
+              }`}
+            >
+              {syncStatus.connected ? "🟢 MongoDB Live" : "🟡 Local Buffer (Cloud Pending)"}
+            </span>
+
             <UrduSpeaker
               customText="راجپوت ٹریڈرز چنیوٹ۔ پرانے کھاتے فوری درج کریں۔ ابھی صرف کسٹمر اور ضامن کی تفصیلات درج کریں، قسطیں بعد میں ڈائری سے میچ کر کے درج کر سکتے ہیں۔"
               size="sm"
@@ -209,9 +230,20 @@ export default function LegacyCustomerEntryPage() {
               <CheckCircle2 className="w-8 h-8 text-emerald-400" />
             </div>
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 block font-mono">
-                Successfully Saved & Activated
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 block font-mono">
+                  Successfully Saved & Activated
+                </span>
+                <span
+                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                    syncStatus.connected
+                      ? "bg-emerald-800 text-emerald-200"
+                      : "bg-amber-800 text-amber-200"
+                  }`}
+                >
+                  {syncStatus.connected ? "☁️ MongoDB Synced" : "💾 Saved in Offline Queue"}
+                </span>
+              </div>
               <h2 className="text-xl sm:text-2xl font-black text-white">
                 Khata #{savedSuccessRecord.khataNumber} for {savedSuccessRecord.customerName}
               </h2>
