@@ -38,12 +38,13 @@ import { ChainedLedgerBlock, computeBlockHash, verifyLedgerChain, LedgerEntryPay
 import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
 import { decryptField, encryptField } from "../crypto/aes";
 import { ImportedCustomerRow } from "../excel/excel-helper";
-import { syncEntityToCloud, loadLocalSnapshot } from "./live-sync";
+import { syncEntityToCloud, loadLocalSnapshot, startBackgroundAutoSync } from "./live-sync";
 
 export class AppStore {
   constructor() {
     if (typeof window !== 'undefined') {
       loadLocalSnapshot(this);
+      startBackgroundAutoSync(this);
     }
   }
 

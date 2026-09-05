@@ -46,7 +46,7 @@ export default function DataManagementPage() {
   // MongoDB Diagnostics
   const [dbStatus, setDbStatus] = useState<MongoDiagnostic | null>(null);
   const [checkingDb, setCheckingDb] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ connected: false, isSyncing: false });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ connected: false, isSyncing: false, pendingQueueCount: 0 });
 
   // Custom URI Update
   const [customUriInput, setCustomUriInput] = useState("");
