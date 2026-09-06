@@ -31,7 +31,18 @@ function updateStatus(newStatus: Partial<SyncStatus>) {
   syncStatusListeners.forEach((cb) => cb(currentSyncStatus));
 }
 
-// Auto-sync entity directly to MongoDB (Live save)
+// Clear all localStorage cache completely after successful cloud push
+export function clearLocalStorageCache() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(PENDING_QUEUE_KEY);
+    updateStatus({ pendingQueueCount: 0 });
+    console.log("[LiveSync] LocalStorage cache emptied to prevent duplicates.");
+  } catch (e) {}
+}
+
+// Live save directly to MongoDB
 export async function syncEntityToCloud(collection: string, data: any, action: "UPSERT" | "DELETE" = "UPSERT") {
   if (typeof window === "undefined") return;
 
@@ -55,8 +66,8 @@ export async function syncEntityToCloud(collection: string, data: any, action: "
         lastSyncedAt: new Date().toISOString(),
         error: undefined,
       });
-      // Also update backup snapshot
-      saveLocalSnapshot();
+      // Empty localstorage after successful push to prevent duplicates
+      clearLocalStorageCache();
     } else {
       updateStatus({
         connected: false,
@@ -97,7 +108,8 @@ export async function pushFullStoreToMongo(store: AppStore): Promise<{ success: 
         lastSyncedAt: new Date().toISOString(),
         error: undefined,
       });
-      saveLocalSnapshot();
+      // Empty localstorage immediately on successful push
+      clearLocalStorageCache();
       return { success: true, message: result.message };
     } else {
       updateStatus({
@@ -117,7 +129,7 @@ export async function pushFullStoreToMongo(store: AppStore): Promise<{ success: 
   }
 }
 
-// Pull fresh database snapshot directly from MongoDB and hydrate store (Live fetch)
+// Live fetch directly from MongoDB and hydrate store
 export async function pullStoreFromMongo(store: AppStore): Promise<{ success: boolean; error?: string; counts?: any }> {
   if (typeof window === "undefined") return { success: false, error: "Client-only" };
 
@@ -128,7 +140,8 @@ export async function pullStoreFromMongo(store: AppStore): Promise<{ success: bo
 
     if (result.success && result.data) {
       store.importFullState(result.data);
-      saveLocalSnapshot();
+      // Empty localstorage so memory holds clean live database state only
+      clearLocalStorageCache();
       updateStatus({
         connected: true,
         isSyncing: false,
@@ -154,34 +167,14 @@ export async function pullStoreFromMongo(store: AppStore): Promise<{ success: bo
   }
 }
 
-// Backup snapshot for offline field recovery officer
-export function saveLocalSnapshot() {
-  if (typeof window === "undefined") return;
-  try {
-    const { store } = require("./store");
-    const state = store.exportFullState();
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {}
-}
-
-export function loadLocalSnapshot(store: AppStore): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      store.importFullState(parsed);
-      return true;
-    }
-  } catch (e) {}
-  return false;
-}
-
-// Auto-sync worker (fetches live MongoDB data on start and syncs periodically)
+// Auto-sync worker: fetches live MongoDB data on start and syncs periodically
 let autoSyncInterval: any = null;
 export function startBackgroundAutoSync(store: AppStore) {
   if (typeof window === "undefined") return;
   if (autoSyncInterval) return;
+
+  // Clear any old stale localStorage immediately
+  clearLocalStorageCache();
 
   // 1. Live Fetch from MongoDB immediately on load
   pullStoreFromMongo(store).catch(() => {});
