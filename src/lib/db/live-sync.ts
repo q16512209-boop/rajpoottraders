@@ -13,7 +13,7 @@ export interface SyncStatus {
 
 let syncStatusListeners: ((status: SyncStatus) => void)[] = [];
 let currentSyncStatus: SyncStatus = {
-  connected: false,
+  connected: true,
   isSyncing: false,
   pendingQueueCount: 0,
 };
@@ -31,84 +31,10 @@ function updateStatus(newStatus: Partial<SyncStatus>) {
   syncStatusListeners.forEach((cb) => cb(currentSyncStatus));
 }
 
-// Queue management for offline / auto-retry resilience
-function getPendingQueue(): { collection: string; data: any; action: string; timestamp: number }[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(PENDING_QUEUE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function savePendingQueue(queue: any[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(queue));
-    updateStatus({ pendingQueueCount: queue.length });
-  } catch (e) {}
-}
-
-function enqueuePendingItem(collection: string, data: any, action: "UPSERT" | "DELETE" = "UPSERT") {
-  const queue = getPendingQueue();
-  const id = data.id || data.planNumber || data.cnic || data.hash;
-  // Remove existing duplicate for same id if already in queue
-  const filtered = queue.filter((item) => (item.data.id || item.data.planNumber) !== id);
-  filtered.push({ collection, data, action, timestamp: Date.now() });
-  savePendingQueue(filtered);
-}
-
-// Process pending queue automatically in background
-export async function processPendingQueue() {
-  if (typeof window === "undefined") return;
-  const queue = getPendingQueue();
-  if (queue.length === 0) return;
-
-  for (let i = 0; i < queue.length; i++) {
-    const item = queue[i];
-    try {
-      const res = await fetch("/api/db/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: item.action,
-          collection: item.collection,
-          data: item.data,
-        }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        // Remove item from queue
-        const currentQ = getPendingQueue();
-        const updatedQ = currentQ.filter((x) => x.timestamp !== item.timestamp);
-        savePendingQueue(updatedQ);
-        updateStatus({
-          connected: true,
-          lastSyncedAt: new Date().toISOString(),
-          error: undefined,
-        });
-      } else {
-        // Still not connected / auth error, break and retry on next interval
-        break;
-      }
-    } catch (err) {
-      break;
-    }
-  }
-}
-
-// Auto-sync entity to cloud (Runs on every add/edit anywhere in app)
+// Auto-sync entity directly to MongoDB (Live save)
 export async function syncEntityToCloud(collection: string, data: any, action: "UPSERT" | "DELETE" = "UPSERT") {
   if (typeof window === "undefined") return;
 
-  // 1. Save local snapshot immediately for 100% zero data loss
-  saveLocalSnapshot();
-
-  // 2. Add to pending queue
-  enqueuePendingItem(collection, data, action);
-
-  // 3. Immediately attempt push to MongoDB
   try {
     updateStatus({ isSyncing: true });
     const res = await fetch("/api/db/sync", {
@@ -123,30 +49,26 @@ export async function syncEntityToCloud(collection: string, data: any, action: "
 
     const result = await res.json();
     if (result.success) {
-      // Remove from pending queue
-      const queue = getPendingQueue();
-      const id = data.id || data.planNumber;
-      const updatedQ = queue.filter((x) => (x.data.id || x.data.planNumber) !== id);
-      savePendingQueue(updatedQ);
-
       updateStatus({
         connected: true,
         isSyncing: false,
         lastSyncedAt: new Date().toISOString(),
         error: undefined,
       });
+      // Also update backup snapshot
+      saveLocalSnapshot();
     } else {
       updateStatus({
         connected: false,
         isSyncing: false,
-        error: result.error || "MongoDB syncing in queue",
+        error: result.error,
       });
     }
   } catch (err: any) {
     updateStatus({
       connected: false,
       isSyncing: false,
-      error: err.message || "Network offline, queued for auto-push",
+      error: err.message,
     });
   }
 }
@@ -169,14 +91,13 @@ export async function pushFullStoreToMongo(store: AppStore): Promise<{ success: 
 
     const result = await res.json();
     if (result.success) {
-      saveLocalSnapshot();
-      savePendingQueue([]);
       updateStatus({
         connected: true,
         isSyncing: false,
         lastSyncedAt: new Date().toISOString(),
         error: undefined,
       });
+      saveLocalSnapshot();
       return { success: true, message: result.message };
     } else {
       updateStatus({
@@ -196,7 +117,7 @@ export async function pushFullStoreToMongo(store: AppStore): Promise<{ success: 
   }
 }
 
-// Pull fresh database snapshot from MongoDB and hydrate store
+// Pull fresh database snapshot directly from MongoDB and hydrate store (Live fetch)
 export async function pullStoreFromMongo(store: AppStore): Promise<{ success: boolean; error?: string; counts?: any }> {
   if (typeof window === "undefined") return { success: false, error: "Client-only" };
 
@@ -206,16 +127,8 @@ export async function pullStoreFromMongo(store: AppStore): Promise<{ success: bo
     const result = await res.json();
 
     if (result.success && result.data) {
-      // Check if MongoDB actually has records
-      const totalDocs = Object.values(result.counts || {}).reduce((a: any, b: any) => Number(a) + Number(b), 0);
-      if (Number(totalDocs) > 0) {
-        store.importFullState(result.data);
-        saveLocalSnapshot();
-      } else {
-        // If MongoDB is empty, automatically push local state to initialize cloud
-        pushFullStoreToMongo(store);
-      }
-
+      store.importFullState(result.data);
+      saveLocalSnapshot();
       updateStatus({
         connected: true,
         isSyncing: false,
@@ -241,7 +154,7 @@ export async function pullStoreFromMongo(store: AppStore): Promise<{ success: bo
   }
 }
 
-// Save browser localStorage snapshot
+// Backup snapshot for offline field recovery officer
 export function saveLocalSnapshot() {
   if (typeof window === "undefined") return;
   try {
@@ -251,7 +164,6 @@ export function saveLocalSnapshot() {
   } catch (e) {}
 }
 
-// Hydrate from localStorage on initial page load
 export function loadLocalSnapshot(store: AppStore): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -261,23 +173,21 @@ export function loadLocalSnapshot(store: AppStore): boolean {
       store.importFullState(parsed);
       return true;
     }
-  } catch (e) {
-    console.warn("Could not load local snapshot:", e);
-  }
+  } catch (e) {}
   return false;
 }
 
-// Global Background Auto-Sync Worker (runs every 20 seconds in browser)
+// Auto-sync worker (fetches live MongoDB data on start and syncs periodically)
 let autoSyncInterval: any = null;
 export function startBackgroundAutoSync(store: AppStore) {
   if (typeof window === "undefined") return;
   if (autoSyncInterval) return;
 
-  // 1. Initial pull on app launch
+  // 1. Live Fetch from MongoDB immediately on load
   pullStoreFromMongo(store).catch(() => {});
 
-  // 2. Periodic queue processing and health ping
+  // 2. Poll every 15 seconds for live real-time sync across devices
   autoSyncInterval = setInterval(() => {
-    processPendingQueue().catch(() => {});
-  }, 20000);
+    pullStoreFromMongo(store).catch(() => {});
+  }, 15000);
 }

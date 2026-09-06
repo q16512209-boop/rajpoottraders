@@ -7,7 +7,7 @@ export function getMongoUri(): string {
   return (
     process.env.MONGODB_URI ||
     process.env.DATABASE_URL ||
-    "mongodb+srv://q16512209_db_user:taekwondoboy321@cluster0.uwu4cgq.mongodb.net/rajpoot_traders_db?retryWrites=true&w=majority&appName=Cluster0"
+    "mongodb+srv://rajpoot_admin:Rajpoot12345@cluster0.uwu4cgq.mongodb.net/rajpoot_traders_db?retryWrites=true&w=majority"
   );
 }
 
