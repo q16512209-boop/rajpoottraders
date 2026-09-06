@@ -1,14 +1,17 @@
 import { MongoClient, Db } from "mongodb";
 
+const LIVE_URI = "mongodb+srv://rajpoot_admin:Rajpoot12345@cluster0.uwu4cgq.mongodb.net/rajpoot_traders_db?retryWrites=true&w=majority";
+
 let customUri: string | null = null;
 
 export function getMongoUri(): string {
   if (customUri) return customUri;
-  return (
-    process.env.MONGODB_URI ||
-    process.env.DATABASE_URL ||
-    "mongodb+srv://rajpoot_admin:Rajpoot12345@cluster0.uwu4cgq.mongodb.net/rajpoot_traders_db?retryWrites=true&w=majority"
-  );
+  const envUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
+  // If env variable is missing or contains the outdated broken username, use verified LIVE_URI
+  if (!envUri || envUri.includes("q16512209")) {
+    return LIVE_URI;
+  }
+  return envUri;
 }
 
 export function setCustomMongoUri(uri: string) {
