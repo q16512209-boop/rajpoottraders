@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Upload,
   Volume2,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
@@ -20,14 +21,14 @@ interface HeaderProps {
 }
 
 export function PortalHeader({ onMenuToggle }: HeaderProps) {
-  const { currentUser, currentTenant } = useAuth();
+  const { currentUser, currentTenant, availableTenants, switchTenant } = useAuth();
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
 
   if (!currentUser) return null;
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-      {/* Left: Mobile Hamburger & Branch Title */}
+      {/* Left: Mobile Hamburger & Branch Title / Switcher */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
@@ -37,21 +38,38 @@ export function PortalHeader({ onMenuToggle }: HeaderProps) {
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[280px]">
-            {currentTenant.name}
-          </span>
-          <span className="hidden sm:inline-block text-xs px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200">
-            {currentTenant.code}
-          </span>
-        </div>
+        {currentUser.role === "SUPER_ADMIN" ? (
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-emerald-700 shrink-0" />
+            <select
+              value={currentTenant.id}
+              onChange={(e) => switchTenant(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600 max-w-[200px] sm:max-w-[280px]"
+            >
+              {availableTenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.city || t.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[280px]">
+              {currentTenant.name}
+            </span>
+            <span className="hidden sm:inline-block text-xs px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-200">
+              {currentTenant.code}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Right: Master Urdu Voice Toggle + Quick Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Global Urdu Voice Assistant Indicator */}
         <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-xl">
-          <UrduSpeaker customText="راجپوت ٹریڈرز پورٹل میں خوش آمدید۔ آپ کا سسٹم مکمل طور پر تیار ہے۔" size="sm" />
+          <UrduSpeaker customText={`${currentTenant.name} پورٹل میں خوش آمدید۔ آپ کا سسٹم مکمل طور پر تیار ہے۔`} size="sm" />
           <span className="hidden md:inline font-bold text-xs text-emerald-800">
             Voice Guide
           </span>

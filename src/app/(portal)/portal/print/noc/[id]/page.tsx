@@ -68,20 +68,20 @@ export default function NOCPrintPage() {
       {/* Official Certificate Paper Container */}
       <div className="bg-white border-2 border-slate-800 p-8 sm:p-12 shadow-2xl rounded-3xl relative overflow-hidden text-slate-900 printable-card">
         {/* Subtle Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none text-6xl font-black rotate-[-25deg] uppercase">
-          RAJPOOT TRADERS • CLEARED NOC
+        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none text-5xl font-black rotate-[-25deg] uppercase text-center">
+          {currentTenant.customHeader || currentTenant.name} • CLEARED NOC
         </div>
 
         {/* Corporate Header */}
         <div className="text-center space-y-2 border-b-2 border-slate-800 pb-6 relative z-10">
           <div className="w-14 h-14 rounded-2xl bg-emerald-800 text-white font-black text-2xl flex items-center justify-center mx-auto shadow-md">
-            <span className="text-amber-400 font-serif">R</span>T
+            <span className="text-amber-400 font-serif">{currentTenant.name.slice(0, 1)}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-wide text-slate-900 uppercase">
-            RAJPOOT TRADERS
+            {currentTenant.customHeader || currentTenant.name}
           </h1>
           <p className="text-xs font-urdu font-bold text-emerald-800">
-            راجپوت ٹریڈرز — آسان اقساط، الیکٹرانکس و سولر فنانسنگ کارپوریشن
+            {currentTenant.brandHeader || currentTenant.urduBrandName}
           </p>
           <p className="text-[11px] text-slate-500 font-medium">
             {currentTenant.address} • Phone: {currentTenant.contact}

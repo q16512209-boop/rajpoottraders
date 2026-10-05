@@ -32,7 +32,7 @@ export default function LegacyCustomerEntryPage() {
   const dynamicRoutes = store.getRouteZones(currentTenant?.id);
 
   // Sync state
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ connected: false, isSyncing: false, pendingQueueCount: 0 });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ connected: false, isSyncing: false, pendingOfflineCount: 0, pendingQueueCount: 0 });
 
   useEffect(() => {
     const unsub = subscribeToSyncStatus((s) => setSyncStatus(s));

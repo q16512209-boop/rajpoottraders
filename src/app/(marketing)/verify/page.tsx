@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import { store } from "@/lib/db/store";
@@ -24,7 +24,7 @@ export default function VerifyPage() {
         p.planNumber.toLowerCase() === clean ||
         p.customerCnic.includes(clean) ||
         p.customerPhone.includes(clean) ||
-        p.tamperProofHash.toLowerCase().includes(clean) ||
+        (p.tamperProofHash && p.tamperProofHash.toLowerCase().includes(clean)) ||
         p.schedule.some((s) => s.receiptId?.toLowerCase() === clean)
     );
     setResult(match || null);

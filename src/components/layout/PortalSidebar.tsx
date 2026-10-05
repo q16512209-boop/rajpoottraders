@@ -70,6 +70,7 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
     {
       title: "Super Admin & Risk (Tier 0)",
       links: [
+        { href: "/portal/admin/businesses", label: "Manage Businesses & Shops", icon: Building2, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN"] },
         { href: "/portal/admin", label: "Master Oversight & Audit Chain", icon: ShieldCheck, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN"] },
         { href: "/portal/admin/blogs", label: "SEO Blog Post Publisher", icon: FileText, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN"] },
       ],
@@ -113,16 +114,19 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
     <div className="flex flex-col h-full bg-slate-900 text-slate-300">
       {/* Brand Header */}
       <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-bold text-xl shadow-md">
-            <span className="text-amber-300 font-serif">R</span>T
+        <Link href="/portal" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
+            <span className="text-amber-300 font-serif">
+              {currentTenant.name.slice(0, 1)}
+            </span>
+            {currentTenant.name.split(" ")[1]?.slice(0, 1) || "T"}
           </div>
-          <div>
-            <h2 className="text-base font-extrabold text-white tracking-tight">
-              RAJPOOT TRADERS
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight truncate max-w-[160px]">
+              {currentTenant.name}
             </h2>
-            <p className="text-[11px] text-emerald-400 font-medium">
-              Enterprise Portal • v3.0
+            <p className="text-[10px] text-emerald-400 font-medium truncate">
+              {currentTenant.city || currentTenant.code} • Portal v3.0
             </p>
           </div>
         </Link>

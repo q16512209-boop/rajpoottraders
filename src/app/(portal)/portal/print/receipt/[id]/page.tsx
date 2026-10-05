@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -74,10 +74,10 @@ export default function ReceiptPrintPage({ params }: { params: { id: string } })
           {/* Header */}
           <div className="text-center space-y-1 border-b border-dashed border-slate-400 pb-2">
             <h2 className="font-bold text-sm text-slate-950 uppercase tracking-tight">
-              RAJPOOT TRADERS
+              {tenant.customHeader || tenant.name}
             </h2>
             <p className="text-[10px] text-slate-600 font-sans">
-              Easy Installments & Electronics Hub
+              {tenant.brandHeader || "Easy Installments & Electronics Hub"}
             </p>
             <p className="text-[9px] text-slate-500">{tenant.address}</p>
             <p className="text-[9px] text-slate-500">Helpline: {tenant.contact}</p>
@@ -146,10 +146,10 @@ export default function ReceiptPrintPage({ params }: { params: { id: string } })
               </div>
             )}
             <p className="text-[8px] text-slate-400 break-all font-mono">
-              HASH: {plan.tamperProofHash.slice(0, 28)}
+              TX REF: {lastPaidItem.receiptId || plan.planNumber}
             </p>
             <p className="text-[10px] font-sans font-urdu text-slate-800">
-              Thank you for trusting Rajpoot Traders • Official Payment Receipt
+              Thank you for trusting {tenant.name} • Official Payment Receipt
             </p>
             <div className="pt-3 border-t border-slate-300 flex justify-between text-[9px] text-slate-500">
               <span>Operator Sign</span>
@@ -235,8 +235,8 @@ export default function ReceiptPrintPage({ params }: { params: { id: string } })
             <div className="flex items-center gap-3">
               {qrCodeDataUrl && <img src={qrCodeDataUrl} alt="QR" className="w-20 h-20 border p-1 rounded" />}
               <div className="text-[10px] text-slate-500 font-mono">
-                <p className="font-bold text-slate-700">Cryptographically Signed</p>
-                <p>Hash: {plan.tamperProofHash.slice(0, 20)}...</p>
+                <p className="font-bold text-slate-700">Verifiable System Receipt</p>
+                <p>Ref: {lastPaidItem.receiptId || plan.planNumber}</p>
               </div>
             </div>
             <div className="text-center space-y-1">

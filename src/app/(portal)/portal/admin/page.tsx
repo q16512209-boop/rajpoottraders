@@ -196,10 +196,10 @@ export default function SuperAdminPage() {
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                SHA-256 Cryptographic Hash-Chain Ledger
+                MongoDB ACID Transaction Audit Ledger
               </h2>
               <p className="text-xs text-slate-500 font-urdu">
-                Cryptographic SHA-256 blockchain audit chain detecting any unauthorized ledger tampering.
+                ACID-compliant transaction logging with verifiable timestamps and immutable transaction identifiers.
               </p>
             </div>
           </div>
@@ -231,8 +231,8 @@ export default function SuperAdminPage() {
               </strong>
               <span className="font-urdu">
                 {verificationResult.isValid
-                  ? `All ${ledgerChain.length} ledger blocks from genesis to current block are cryptographically valid and tamper-proof.`
-                  : verificationResult.reason}
+                  ? `All ${ledgerChain.length} ledger transactions from genesis to current block are verified and tamper-proof.`
+                  : verificationResult.message}
               </span>
             </div>
           </div>

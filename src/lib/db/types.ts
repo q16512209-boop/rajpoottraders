@@ -5,14 +5,44 @@ export type UserRole =
   | "FIELD_RECOVERY"  // Tier 3: Field Recovery Officer, Route sheets, Partial payments, Handovers
   | "CUSTOMER";       // Tier 4: Self-Service Customer, My Plans, Receipts, Arrears
 
+export interface LedgerTransaction {
+  id: string;
+  tenantId: string;
+  timestamp: string;
+  type: string;
+  amount: number;
+  actorId?: string;
+  toWallet?: string;
+  fromWallet?: string;
+  planId?: string;
+  customerId?: string;
+  notes?: string;
+}
+
+export interface ChainedLedgerBlock {
+  index: number;
+  id: string;
+  timestamp: string;
+  payload: LedgerTransaction;
+  prevHash?: string;
+  hash?: string;
+  signature?: string;
+}
+
+export type LedgerEntryPayload = LedgerTransaction;
+
 export interface Tenant {
   id: string;
   name: string;
   code: string;
+  slug?: string;
   brandHeader: string;
   urduBrandName: string;
   address: string;
+  city?: string;
   contact: string;
+  logoUrl?: string;
+  customHeader?: string;
   status: "ACTIVE" | "SUSPENDED" | "TRIAL";
   ownerName: string;
   ownerEmail: string;
@@ -21,9 +51,12 @@ export interface Tenant {
   createdAt: string;
 }
 
+export type Business = Tenant;
+
 export interface User {
   id: string;
   tenantId: string;
+  businessId?: string;
   name: string;
   email: string;
   password?: string;
@@ -61,6 +94,7 @@ export interface GPSLocation {
 export interface Customer {
   id: string;
   tenantId: string;
+  businessId?: string;
   fullName: string;
   fatherName: string;
   cnic: string;
@@ -84,6 +118,7 @@ export type InstallmentFrequency = "WEEKLY" | "TEN_DAYS" | "FIFTEEN_DAYS" | "MON
 export interface Product {
   id: string;
   tenantId: string;
+  businessId?: string;
   title: string;
   brand?: string;
   category: "HOME_APPLIANCES" | "ELECTRIC_IRONS" | "FANS" | "SMARTPHONES" | "AIR_CONDITIONERS" | "SOLAR_HYBRID" | "MOTORBIKES" | "REFURBISHED_SEIZED";
@@ -120,6 +155,7 @@ export interface InstallmentScheduleItem {
   collectedBy?: string;
   receiptId?: string;
   notes?: string;
+  businessId?: string;
 }
 
 export interface IPlanProductItem {
@@ -139,6 +175,7 @@ export interface InstallmentPlan {
   planNumber: string;
   khataNumber?: string; // e.g. "6" or "کھاتہ نمبر 6"
   tenantId: string;
+  businessId?: string;
   customerId: string;
   customerName: string;
   customerCnic: string;

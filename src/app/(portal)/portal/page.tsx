@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/auth-context";
 import { store } from "@/lib/db/store";
-import { formatPKR, formatDate, formatCNIC, getStatusBadgeClass } from "@/lib/formatters";
+import { formatPKR, formatDate, formatCNIC, formatPhone, getStatusBadgeClass } from "@/lib/formatters";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import {
   Wallet,
@@ -31,20 +31,73 @@ import {
   BarChart3,
   MapPin,
   ShoppingCart,
+  Search,
+  Calendar,
+  RefreshCw,
+  Clock,
+  Phone,
+  Filter,
 } from "lucide-react";
+import {
+  subscribeToSyncStatus,
+  syncOfflineQueueToMongo,
+  SyncStatus,
+  getOfflineQueueCount,
+} from "@/lib/db/live-sync";
+
+type DateFilterType = "TODAY" | "YESTERDAY" | "THIS_MONTH" | "ALL_TIME" | "CUSTOM";
 
 export default function PortalDashboard() {
   const { currentUser, currentTenant } = useAuth();
 
-  if (!currentUser) return null;
+  // State
+  const [plans, setPlans] = useState(() => store.getPlans(currentTenant?.id));
+  const [wallets, setWallets] = useState(() => store.getWallets(currentTenant?.id));
+  const [customers, setCustomers] = useState(() => store.getCustomers(currentTenant?.id));
+  const [handovers, setHandovers] = useState(() => store.getHandovers(currentTenant?.id));
+  const [claims, setClaims] = useState(() => store.getClaimRequests(currentTenant?.id));
+  const [routes, setRoutes] = useState(() => store.getRouteZones(currentTenant?.id));
 
-  const wallets = store.getWallets(currentTenant.id);
-  const plans = store.getPlans(currentTenant.id);
-  const customers = store.getCustomers(currentTenant.id);
-  const handovers = store.getHandovers(currentTenant.id);
-  const expenses = store.getExpenses(currentTenant.id);
-  const claims = store.getClaimRequests(currentTenant.id);
-  const chainVerification = store.verifyChainIntegrity();
+  // Sync & Offline State
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    connected: true,
+    isSyncing: false,
+    pendingOfflineCount: 0,
+  });
+  const [syncToast, setSyncToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Filters
+  const [dateFilter, setDateFilter] = useState<DateFilterType>("TODAY");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Quick Payment Modal
+  const [payModalPlan, setPayModalPlan] = useState<any>(null);
+  const [payAmount, setPayAmount] = useState<number>(0);
+  const [payNotes, setPayNotes] = useState<string>("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+
+  // Subscribe to live sync and offline queue updates
+  useEffect(() => {
+    const unsub = subscribeToSyncStatus((status) => {
+      setSyncStatus(status);
+    });
+    return () => unsub();
+  }, []);
+
+  const refreshData = () => {
+    if (!currentTenant) return;
+    setPlans([...store.getPlans(currentTenant.id)]);
+    setWallets([...store.getWallets(currentTenant.id)]);
+    setCustomers([...store.getCustomers(currentTenant.id)]);
+    setHandovers([...store.getHandovers(currentTenant.id)]);
+    setClaims([...store.getClaimRequests(currentTenant.id)]);
+    setRoutes([...store.getRouteZones(currentTenant.id)]);
+  };
+
+  if (!currentUser || !currentTenant) return null;
 
   const role = currentUser.role;
 
@@ -59,477 +112,670 @@ export default function PortalDashboard() {
     .filter((w) => w.type === "DIGITAL_BANK")
     .reduce((acc, curr) => acc + curr.balance, 0);
 
-  const activePlansCount = plans.filter((p) => p.status === "ACTIVE").length;
-  const totalArrears = plans.reduce((acc, curr) => acc + curr.accumulatedShortArrears, 0);
-  const defaultersCount = customers.filter((c) => c.isDefaulter).length;
-  const pendingHandovers = handovers.filter((h) => h.status === "PENDING");
-  const pendingClaims = claims.filter((c) => c.status === "PENDING_APPROVAL").length;
+  // Date Calculation Helpers
+  const todayStr = new Date().toISOString().split("T")[0];
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+  const currentMonthPrefix = todayStr.substring(0, 7); // e.g. "2026-10"
 
-  // Role Description Badges in English
-  const roleDisplay: Record<string, { label: string; tier: string; desc: string; color: string }> = {
-    SUPER_ADMIN: { label: "Super Admin", tier: "Tier 0", desc: "Complete multi-branch financial oversight & blockchain security control", color: "bg-purple-900/60 text-purple-200 border-purple-600" },
-    OWNER: { label: "Shop Owner", tier: "Tier 1", desc: "Owner pocket treasury, counter till reconciliation, and handover approvals", color: "bg-amber-900/60 text-amber-200 border-amber-600" },
-    BRANCH_MANAGER: { label: "Branch Manager", tier: "Tier 2", desc: "Showroom counter operations, customer KYC verification, and plan setup", color: "bg-blue-900/60 text-blue-200 border-blue-600" },
-    FIELD_RECOVERY: { label: "Field Recovery Officer", tier: "Tier 3", desc: "Motorcycle route collections, receipts, customer registration, and cash handovers", color: "bg-emerald-900/60 text-emerald-200 border-emerald-600" },
-    CUSTOMER: { label: "Customer", tier: "Tier 4", desc: "Installment schedule and verified payment receipts", color: "bg-teal-900/60 text-teal-200 border-teal-600" },
+  // Filter Installments matching Date, Route, and Search
+  const filteredInstallmentRows: Array<{
+    plan: any;
+    inst: any;
+    isOverdue: boolean;
+    isDueToday: boolean;
+  }> = [];
+
+  plans.forEach((plan) => {
+    // Route Filter
+    if (selectedRoute !== "ALL" && plan.areaZone !== selectedRoute) {
+      return;
+    }
+
+    // Search Query Filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        plan.customerName?.toLowerCase().includes(q) ||
+        plan.customerPhone?.includes(q) ||
+        plan.customerCnic?.includes(q) ||
+        plan.planNumber?.toLowerCase().includes(q) ||
+        plan.khataNumber?.toLowerCase().includes(q) ||
+        plan.productTitle?.toLowerCase().includes(q);
+      if (!matchSearch) return;
+    }
+
+    // Check each installment in schedule
+    plan.schedule.forEach((inst: any) => {
+      let dateMatch = false;
+
+      if (dateFilter === "TODAY") {
+        dateMatch = inst.dueDate === todayStr || inst.paidDate === todayStr;
+      } else if (dateFilter === "YESTERDAY") {
+        dateMatch = inst.dueDate === yesterdayStr || inst.paidDate === yesterdayStr;
+      } else if (dateFilter === "THIS_MONTH") {
+        dateMatch = (inst.dueDate && inst.dueDate.startsWith(currentMonthPrefix)) || (inst.paidDate && inst.paidDate.startsWith(currentMonthPrefix));
+      } else if (dateFilter === "ALL_TIME") {
+        dateMatch = true;
+      } else if (dateFilter === "CUSTOM") {
+        const d = inst.paidDate || inst.dueDate;
+        if (customStartDate && customEndDate) {
+          dateMatch = d >= customStartDate && d <= customEndDate;
+        } else if (customStartDate) {
+          dateMatch = d >= customStartDate;
+        } else {
+          dateMatch = true;
+        }
+      }
+
+      if (dateMatch) {
+        filteredInstallmentRows.push({
+          plan,
+          inst,
+          isOverdue: inst.status === "PENDING" && inst.dueDate < todayStr,
+          isDueToday: inst.dueDate === todayStr,
+        });
+      }
+    });
+  });
+
+  // Calculate Key KPI Summary Numbers
+  const todayTarget = plans.reduce((acc, plan) => {
+    const dueItems = plan.schedule.filter((s: any) => s.dueDate === todayStr);
+    return acc + dueItems.reduce((sum: number, s: any) => sum + s.totalDue, 0);
+  }, 0);
+
+  const collectedToday = plans.reduce((acc, plan) => {
+    const paidTodayItems = plan.schedule.filter((s: any) => s.paidDate === todayStr);
+    return acc + paidTodayItems.reduce((sum: number, s: any) => sum + (s.amountPaid || 0), 0);
+  }, 0);
+
+  const remainingDueToday = Math.max(0, todayTarget - collectedToday);
+  const totalArrears = plans.reduce((acc, curr) => acc + curr.accumulatedShortArrears, 0);
+
+  // 1-Click Offline Sync Trigger
+  const handleTriggerOfflineSync = async () => {
+    const result = await syncOfflineQueueToMongo(store);
+    refreshData();
+    setSyncToast({
+      type: result.success ? "success" : "error",
+      message: result.message,
+    });
+    setTimeout(() => setSyncToast(null), 6000);
   };
 
-  const currentRoleInfo = roleDisplay[role] || roleDisplay.SUPER_ADMIN;
+  // Open Receive Payment Modal
+  const handleOpenReceive = (plan: any, isFull: boolean) => {
+    setPayModalPlan(plan);
+    const nextPending = plan.schedule.find((s: any) => s.status !== "PAID") || plan.schedule[0];
+    const expected = nextPending ? nextPending.totalDue - (nextPending.amountPaid || 0) : plan.monthlyInstallment;
+    setPayAmount(isFull ? expected : Math.round(expected / 2));
+    setPayNotes("");
+  };
+
+  // Submit Quick Payment
+  const handleConfirmPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payModalPlan || payAmount <= 0) return;
+    setIsProcessingPayment(true);
+
+    try {
+      const nextPending = payModalPlan.schedule.find((s: any) => s.status !== "PAID") || payModalPlan.schedule[0];
+      const instNo = nextPending ? nextPending.installmentNo : 1;
+      const res = store.recordInstallmentPayment({
+        planId: payModalPlan.id,
+        installmentNo: instNo,
+        amountPaid: payAmount,
+        collectedBy: currentUser.name,
+        targetWalletType: "COUNTER_TILL",
+        notes: payNotes || "Counter collection at showroom",
+      });
+      refreshData();
+      setPayModalPlan(null);
+      setSyncToast({
+        type: "success",
+        message: `ادائیگی موصول ہو گئی: ${formatPKR(payAmount)} برائے ${payModalPlan.customerName} (رسید #${res.receiptId})`,
+      });
+      setTimeout(() => setSyncToast(null), 5000);
+    } catch (err: any) {
+      setSyncToast({
+        type: "error",
+        message: err.message || "Payment processing failed.",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-12">
-      {/* 1. Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 relative overflow-hidden">
-        <div className="space-y-2 relative z-10">
+    <div className="space-y-6 pb-16">
+      {/* 1. TOP FLASHING OFFLINE SYNC BANNER */}
+      {(syncStatus.pendingOfflineCount || 0) > 0 && (
+        <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 text-white p-4 rounded-2xl shadow-lg border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-white text-emerald-800 rounded-xl font-black text-sm">
+              {syncStatus.pendingOfflineCount || 0}
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sm tracking-wide">
+                Pending Offline Recovery Records Detected!
+              </h4>
+              <p className="text-xs text-emerald-100 font-urdu">
+                فیلڈ ریکوری کا ڈیٹا محفوظ ہے۔ 1-کلک سے لائیو کلاؤڈ پر منتقل کریں۔
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleTriggerOfflineSync}
+            disabled={syncStatus.isSyncing}
+            className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-emerald-50 text-emerald-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 text-emerald-700 ${syncStatus.isSyncing ? "animate-spin" : ""}`} />
+            <span>
+              {syncStatus.isSyncing
+                ? "Syncing to MongoDB Atlas..."
+                : `🔄 Sync Pending Offline Data (${syncStatus.pendingOfflineCount || 0} Records)`}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Sync Toast */}
+      {syncToast && (
+        <div
+          className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between shadow-md transition-all ${
+            syncToast.type === "success"
+              ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+              : "bg-rose-50 border-rose-300 text-rose-900"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {syncToast.type === "success" ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+            )}
+            <span>{syncToast.message}</span>
+          </div>
+          <button onClick={() => setSyncToast(null)} className="text-slate-400 hover:text-slate-700 text-xs">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* 2. HEADER BANNER */}
+      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl p-5 sm:p-7 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+        <div className="space-y-1.5 relative z-10">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-700/80 text-emerald-100 px-3 py-1 rounded-full border border-emerald-500/30">
+            <span className="text-xs uppercase font-extrabold tracking-wider bg-emerald-700/80 text-emerald-100 px-3 py-0.5 rounded-full border border-emerald-500/30">
               {currentTenant.name}
             </span>
-            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${currentRoleInfo.color}`}>
-              {currentRoleInfo.tier}: {currentRoleInfo.label}
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-900/60 text-amber-200 border-amber-600">
+              {role === "SUPER_ADMIN" ? "Super Admin" : role === "OWNER" ? "Shop Owner" : "Branch Manager"}
             </span>
-            <UrduSpeaker customText={`خوش آمدید ${currentUser.name}۔ راجپوت ٹریڈرز پورٹل میں آپ کا رول ${currentRoleInfo.label} ہے۔`} size="sm" showLabel />
+            <UrduSpeaker customText={`خوش آمدید ${currentUser.name}۔ راجپوت ٹریڈرز لائیو ریکوری و کھاتہ پورٹل۔`} size="sm" showLabel />
           </div>
-          <h1 className="text-xl sm:text-3xl font-black tracking-tight">
-            Welcome, {currentUser.name}
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight">
+            All-in-One Live Management Dashboard
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            {currentRoleInfo.desc}
+          <p className="text-xs text-slate-300 font-urdu">
+            تمام کھاتہ جات، یومیہ وصولیاں، بقایا جات اور کیش ان ہینڈ ایک ہی سکرین پر۔
           </p>
         </div>
 
-        <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 sm:p-4 flex items-center gap-3 relative z-10 self-start md:self-auto">
-          <div className={`p-2 rounded-xl ${chainVerification.isValid ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "bg-rose-950 text-rose-400 border border-rose-800"}`}>
-            <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 flex items-center gap-3 relative z-10">
+          <div className="p-2 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800">
+            <Database className="w-4 h-4" />
           </div>
           <div className="text-xs">
-            <span className="text-slate-400 block font-medium">SHA-256 Ledger Security</span>
-            <strong className={`font-bold ${chainVerification.isValid ? "text-emerald-400" : "text-rose-400"}`}>
-              {chainVerification.isValid ? "Audit Chain Intact ✓" : "Integrity Alert!"}
-            </strong>
+            <span className="text-slate-400 block font-medium">MongoDB Atlas Cloud</span>
+            <strong className="text-emerald-400 font-bold">Single Source of Truth ✓</strong>
           </div>
         </div>
       </div>
 
-      {/* 2. ROLE SPECIFIC DASHBOARD VIEWS */}
+      {/* 3. TOP SUMMARY CARDS (KPIs) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        {/* Card 1: Today's Recovery Target */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <span>Today's Target</span>
+            <Calendar className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="text-lg sm:text-2xl font-black text-slate-900">
+            {formatPKR(todayTarget)}
+          </div>
+          <p className="text-[11px] text-slate-500 font-urdu">
+            آج کے واجب الادا اقساط
+          </p>
+        </div>
 
-      {/* VIEW A: FIELD RECOVERY OFFICER */}
-      {role === "FIELD_RECOVERY" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl border-2 border-emerald-500 p-5 shadow-sm space-y-2">
-              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">
-                My In-Transit Cash Bag
-              </span>
-              <div className="text-2xl font-black text-slate-900">
-                {formatPKR(myFieldBag)}
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Current unhanded collection cash
-              </p>
-            </div>
+        {/* Card 2: Collected Today */}
+        <div className="bg-white rounded-2xl border-2 border-emerald-500 p-4 sm:p-5 shadow-sm space-y-1 bg-emerald-50/10">
+          <div className="flex items-center justify-between text-emerald-800 text-xs font-bold uppercase tracking-wider">
+            <span>Collected Today</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-lg sm:text-2xl font-black text-emerald-900">
+            {formatPKR(collectedToday)}
+          </div>
+          <p className="text-[11px] text-emerald-700 font-urdu">
+            آج کی کل وصولی
+          </p>
+        </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
-                Assigned Route Zone
-              </span>
-              <div className="text-base font-bold text-emerald-700">
-                {currentUser.assignedRouteZone || "Chiniot Main Center"}
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Primary recovery route
-              </p>
-            </div>
+        {/* Card 3: Remaining Due Today */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <span>Remaining Due</span>
+            <Clock className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-lg sm:text-2xl font-black text-amber-900">
+            {formatPKR(remainingDueToday)}
+          </div>
+          <p className="text-[11px] text-slate-500 font-urdu">
+            آج کی باقی وصولی
+          </p>
+        </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
-                Total Route Visits
-              </span>
-              <div className="text-2xl font-black text-slate-900">
-                {plans.length} Clients
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Active installment accounts
-              </p>
-            </div>
+        {/* Card 4: Short Arrears */}
+        <div className="bg-white rounded-2xl border border-rose-200 bg-rose-50/20 p-4 sm:p-5 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-rose-800 text-xs font-bold uppercase tracking-wider">
+            <span>Total Arrears (بقایا)</span>
+            <AlertTriangle className="w-4 h-4 text-rose-600" />
+          </div>
+          <div className="text-lg sm:text-2xl font-black text-rose-900">
+            {formatPKR(totalArrears)}
+          </div>
+          <p className="text-[11px] text-rose-700 font-urdu">
+            کل بقایا اقساط
+          </p>
+        </div>
 
-            <div className="bg-white rounded-2xl border border-amber-200 bg-amber-50/20 p-5 shadow-sm space-y-2">
-              <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block">
-                Warranty & Returns
-              </span>
-              <div className="text-2xl font-black text-amber-900">
-                {pendingClaims} Pending
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Active product claims
-              </p>
-            </div>
+        {/* Card 5: Cash in Owner Pocket & Till */}
+        <div className="bg-white rounded-2xl border-2 border-amber-300 p-4 sm:p-5 shadow-sm space-y-1 col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between text-amber-800 text-xs font-bold uppercase tracking-wider">
+            <span>Owner Pocket & Till</span>
+            <Wallet className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-lg sm:text-2xl font-black text-slate-900">
+            {formatPKR(ownerPocket + counterTill)}
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Pocket: {formatPKR(ownerPocket)} | Till: {formatPKR(counterTill)}
+          </p>
+        </div>
+      </div>
+
+      {/* 4. MASTER QUICK-FILTER BAR */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Quick Date Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <span className="text-xs font-extrabold uppercase text-slate-400 mr-1 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" /> Date:
+            </span>
+            {(["TODAY", "YESTERDAY", "THIS_MONTH", "ALL_TIME", "CUSTOM"] as DateFilterType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setDateFilter(type)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  dateFilter === type
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                }`}
+              >
+                {type === "TODAY" && "Today (آج)"}
+                {type === "YESTERDAY" && "Yesterday (کل)"}
+                {type === "THIS_MONTH" && "This Month (اس ماہ)"}
+                {type === "ALL_TIME" && "All Time"}
+                {type === "CUSTOM" && "Custom Range"}
+              </button>
+            ))}
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-800">
-              Field Recovery Fast Actions
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
-              <Link
-                href="/portal/recovery"
-                className="p-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all"
-              >
-                <Bike className="w-6 h-6 text-emerald-700" />
-                <span>Mobile Recovery</span>
-              </Link>
-              <Link
-                href="/portal/customers/legacy-entry"
-                className="p-4 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-2xl border border-blue-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all"
-              >
-                <UserPlus className="w-6 h-6 text-blue-700" />
-                <span>Register Customer</span>
-              </Link>
-              <Link
-                href="/portal/claims"
-                className="p-4 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all"
-              >
-                <Wrench className="w-6 h-6 text-amber-700" />
-                <span>Claim & Return</span>
-              </Link>
-              <Link
-                href="/portal/recovery/route-sheet"
-                className="p-4 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-2xl border border-slate-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all"
-              >
-                <Printer className="w-6 h-6 text-slate-700" />
-                <span>Route Sheets</span>
-              </Link>
-              <Link
-                href="/portal/handovers"
-                className="p-4 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all"
-              >
-                <CheckCircle2 className="w-6 h-6 text-amber-700" />
-                <span>Cash Handover</span>
-              </Link>
-              <Link
-                href="/portal/plans"
-                className="p-4 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-2xl border border-slate-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all"
-              >
-                <FileSpreadsheet className="w-6 h-6 text-slate-700" />
-                <span>Client Portfolio</span>
-              </Link>
-            </div>
+          {/* Route Dropdown */}
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-emerald-700 shrink-0" />
+            <select
+              value={selectedRoute}
+              onChange={(e) => setSelectedRoute(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
+            >
+              <option value="ALL">All Routes & Zones ({plans.length} Accounts)</option>
+              <option value="Route-A (Gulberg / Model Town)">Route-A (Gulberg / Model Town)</option>
+              <option value="Route-B (Johar Town / Faisal Town)">Route-B (Johar Town / Faisal Town)</option>
+              <option value="محلہ رحمن آباد و مسلم بازار چنیوٹ">محلہ رحمن آباد و مسلم بازار چنیوٹ</option>
+              <option value="لاہور روڈ و کچہری بازار چنیوٹ">لاہور روڈ و کچہری بازار چنیوٹ</option>
+              <option value="جھنگ روڈ و فیصل آباد روڈ چنیوٹ">جھنگ روڈ و فیصل آباد روڈ چنیوٹ</option>
+            </select>
           </div>
         </div>
-      )}
 
-      {/* VIEW B: CUSTOMER / KHAREDAR */}
-      {role === "CUSTOMER" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-slate-900">
-              Welcome to Your Customer Account
+        {/* Custom Date Pickers (if CUSTOM selected) */}
+        {dateFilter === "CUSTOM" && (
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 text-xs">
+            <span className="font-bold text-slate-600">From Date:</span>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-medium text-slate-800 focus:outline-none"
+            />
+            <span className="font-bold text-slate-600">To Date:</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-medium text-slate-800 focus:outline-none"
+            />
+          </div>
+        )}
+
+        {/* Real-time Search Input */}
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by Customer Name, Phone, CNIC, Plan # (RT-2026-001), Khata #, or Product..."
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:border-emerald-600"
+          />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+        </div>
+      </div>
+
+      {/* 5. LIVE ACTION TABLE */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+          <div>
+            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+              Live Installment Action Ledger ({filteredInstallmentRows.length} Records)
             </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              View your active installment plans, upcoming schedule dates, past payments, and download official stamp paper agreements and receipts.
+            <p className="text-xs text-slate-500 font-urdu">
+              ایک کلک سے مکمل یا جزوی وصولی درج کریں اور فوری رسید پرنٹ کریں۔
             </p>
-            <div className="pt-2">
-              <Link
-                href="/portal/customer-portal"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow"
-              >
-                <Receipt className="w-4 h-4" />
-                <span>View My Plans & Receipts</span>
-              </Link>
-            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              href="/portal/customers/legacy-entry"
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>+ New Khata</span>
+            </Link>
+            <Link
+              href="/portal/recovery/route-sheet"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Route Sheet</span>
+            </Link>
           </div>
         </div>
-      )}
 
-      {/* VIEW C: SUPER ADMIN / OWNER / BRANCH MANAGER */}
-      {(role === "SUPER_ADMIN" || role === "OWNER" || role === "BRANCH_MANAGER") && (
-        <>
-          {/* Multi-Wallet Split Cards */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-emerald-700" />
-                Treasury Multi-Wallet Split
-                <UrduSpeaker guideKey="TREASURY" size="sm" />
-              </h2>
-              {(role === "SUPER_ADMIN" || role === "OWNER") && (
-                <Link href="/portal/treasury" className="text-xs font-bold text-emerald-700 hover:underline">
-                  Manage Wallets →
-                </Link>
-              )}
+        {/* Table Content */}
+        <div className="overflow-x-auto">
+          {filteredInstallmentRows.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <CheckCircle2 className="w-10 h-10 text-slate-300 mx-auto" />
+              <p className="text-sm font-bold text-slate-600">No installments found for the selected filter.</p>
+              <p className="text-xs text-slate-400 font-urdu">منتخب تاریخ یا روٹ میں کوئی قسط زیرِ التواء نہیں ہے۔</p>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {(role === "SUPER_ADMIN" || role === "OWNER") && (
-                <div className="bg-white rounded-2xl border-2 border-amber-200 p-4 sm:p-5 shadow-sm space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-                      Owner Pocket Wallet
-                    </span>
-                    <span className="p-1.5 bg-amber-50 rounded-lg text-amber-700 font-bold text-[11px]">
-                      Physical
-                    </span>
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-900">
-                    {formatPKR(ownerPocket)}
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Physical liquidity held by shop owners
-                  </p>
-                </div>
-              )}
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Counter Till Drawer
-                  </span>
-                  <span className="p-1.5 bg-blue-50 rounded-lg text-blue-700 font-bold text-[11px]">
-                    Showroom
-                  </span>
-                </div>
-                <div className="text-xl sm:text-2xl font-black text-slate-900">
-                  {formatPKR(counterTill)}
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Showroom cash for advance & counter installments
-                </p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Field in-Transit Bags
-                  </span>
-                  <span className="p-1.5 bg-emerald-50 rounded-lg text-emerald-700 font-bold text-[11px]">
-                    Routes
-                  </span>
-                </div>
-                <div className="text-xl sm:text-2xl font-black text-slate-900">
-                  {formatPKR(allFieldInTransit)}
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Total recovery cash on motorcycles
-                </p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Corporate Bank Balances
-                  </span>
-                  <span className="p-1.5 bg-purple-50 rounded-lg text-purple-700 font-bold text-[11px]">
-                    Digital
-                  </span>
-                </div>
-                <div className="text-xl sm:text-2xl font-black text-slate-900">
-                  {formatPKR(bankBalances)}
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Online bank accounts
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Operations Strip */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-4">
-            <h3 className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-700">
-              Quick Operations & Shortcuts
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-xs">
-              <Link
-                href="/portal/reports"
-                className="p-3 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-2xl border border-purple-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <BarChart3 className="w-5 h-5 text-purple-700" />
-                <span>Reports & Targets</span>
-              </Link>
-              <Link
-                href="/portal/routes"
-                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <MapPin className="w-5 h-5 text-emerald-700" />
-                <span>Custom Routes</span>
-              </Link>
-              <Link
-                href="/portal/orders"
-                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-2xl border border-blue-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <ShoppingCart className="w-5 h-5 text-blue-700" />
-                <span>Field Orders</span>
-              </Link>
-              <Link
-                href="/portal/customers/legacy-entry"
-                className="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <UserPlus className="w-5 h-5 text-amber-700" />
-                <span>Old Khata Entry</span>
-              </Link>
-              <Link
-                href="/portal/claims"
-                className="p-3 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-2xl border border-rose-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <Wrench className="w-5 h-5 text-rose-700" />
-                <span>Claims & Wapsi</span>
-              </Link>
-              <Link
-                href="/portal/recovery"
-                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <Bike className="w-5 h-5 text-emerald-700" />
-                <span>Field Recovery</span>
-              </Link>
-              <Link
-                href="/portal/expenses"
-                className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-900 rounded-2xl border border-slate-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <DollarSign className="w-5 h-5 text-slate-700" />
-                <span>Add Expense</span>
-              </Link>
-              <Link
-                href="/portal/handovers"
-                className="p-3 bg-teal-50 hover:bg-teal-100 text-teal-900 rounded-2xl border border-teal-200 font-bold flex flex-col items-center justify-center gap-1.5 text-center transition-all shadow-sm"
-              >
-                <CheckCircle2 className="w-5 h-5 text-teal-700" />
-                <span>Cash Handovers</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Active Installment Portfolio
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-slate-900">
-                {activePlansCount} Contracts
-              </div>
-              <p className="text-[11px] text-emerald-600 font-semibold">
-                On-schedule repayment accounts
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Accumulated Short Arrears
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-rose-600">
-                {formatPKR(totalArrears)}
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Partial payment arrears
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Defaulter Radar
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-rose-700">
-                {defaultersCount} Flagged
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Household & Guarantor cross-checks
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Pending Handovers
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-amber-600">
-                {pendingHandovers.length} Requests
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Awaiting showroom approval
-              </p>
-            </div>
-          </div>
-
-          {/* Recent Plans Table */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                  Recent Installment Agreements
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Latest hire-purchase accounts and ledger balances
-                </p>
-              </div>
-              <Link href="/portal/plans" className="text-xs font-bold text-emerald-700 hover:underline">
-                View All Plans →
-              </Link>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider font-extrabold text-[10px]">
-                    <th className="py-2.5 px-3">Contract / Khata</th>
-                    <th className="py-2.5 px-3">Customer</th>
-                    <th className="py-2.5 px-3">Product Item</th>
-                    <th className="py-2.5 px-3">Terms & Installment</th>
-                    <th className="py-2.5 px-3">Arrears</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {plans.slice(0, 5).map((plan) => (
-                    <tr key={plan.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-3 font-mono">
-                        <strong className="text-slate-900 block">{plan.planNumber}</strong>
+          ) : (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 uppercase font-extrabold tracking-wider text-[11px]">
+                  <th className="p-3.5 pl-5">Customer & Khata</th>
+                  <th className="p-3.5">Product Details</th>
+                  <th className="p-3.5">Route / Zone</th>
+                  <th className="p-3.5">Due Date</th>
+                  <th className="p-3.5 text-right">Expected</th>
+                  <th className="p-3.5 text-right">Paid</th>
+                  <th className="p-3.5 text-center">Status</th>
+                  <th className="p-3.5 pr-5 text-right">Quick Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredInstallmentRows.map(({ plan, inst, isOverdue, isDueToday }, idx) => (
+                  <tr key={`${plan.id}-${inst.installmentNo}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
+                    {/* Customer */}
+                    <td className="p-3.5 pl-5">
+                      <div className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                        {plan.customerName}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+                        <span>{formatPhone(plan.customerPhone)}</span>
                         {plan.khataNumber && (
-                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                            Khata #{plan.khataNumber}
+                          <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 font-bold rounded text-[10px]">
+                            کھاتہ #{plan.khataNumber}
                           </span>
                         )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <strong className="text-slate-800 block">{plan.customerName}</strong>
-                        <span className="text-slate-400 font-mono text-[11px]">{plan.customerPhone}</span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="font-semibold text-slate-700 block">{plan.productTitle}</span>
-                        {plan.salesmanName && (
-                          <span className="text-[10px] text-slate-400">Salesman: {plan.salesmanName}</span>
+                      </div>
+                    </td>
+
+                    {/* Product */}
+                    <td className="p-3.5">
+                      <div className="font-bold text-slate-800 truncate max-w-[180px]">
+                        {plan.productTitle}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {plan.planNumber} {plan.imeiSerial ? `• ${plan.imeiSerial}` : ""}
+                      </div>
+                    </td>
+
+                    {/* Route */}
+                    <td className="p-3.5">
+                      <span className="text-[11px] font-medium text-slate-600 block truncate max-w-[140px]">
+                        {plan.areaZone}
+                      </span>
+                    </td>
+
+                    {/* Due Date */}
+                    <td className="p-3.5">
+                      <div className={`font-bold text-[11px] ${isOverdue ? "text-rose-600 font-black" : isDueToday ? "text-emerald-700" : "text-slate-700"}`}>
+                        {formatDate(inst.dueDate)}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Inst #{inst.installmentNo}
+                      </div>
+                    </td>
+
+                    {/* Expected */}
+                    <td className="p-3.5 text-right font-black text-slate-900 text-xs sm:text-sm">
+                      {formatPKR(inst.totalDue)}
+                    </td>
+
+                    {/* Paid */}
+                    <td className="p-3.5 text-right font-bold text-emerald-800 text-xs sm:text-sm">
+                      {formatPKR(inst.amountPaid || 0)}
+                    </td>
+
+                    {/* Status */}
+                    <td className="p-3.5 text-center">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${getStatusBadgeClass(inst.status)}`}>
+                        {inst.status === "PAID" ? "PAID ✓" : inst.status === "SHORT_PAID" ? "SHORT" : isOverdue ? "OVERDUE" : "PENDING"}
+                      </span>
+                    </td>
+
+                    {/* Quick 1-Click Action Buttons */}
+                    <td className="p-3.5 pr-5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {inst.status !== "PAID" && (
+                          <>
+                            <button
+                              onClick={() => handleOpenReceive(plan, true)}
+                              className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] rounded-lg shadow-sm transition-all"
+                              title="Receive Full Installment"
+                            >
+                              Receive Full
+                            </button>
+                            <button
+                              onClick={() => handleOpenReceive(plan, false)}
+                              className="px-2 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[11px] rounded-lg transition-all"
+                              title="Receive Partial / Short"
+                            >
+                              Short
+                            </button>
+                          </>
                         )}
-                      </td>
-                      <td className="py-3 px-3 font-mono font-bold text-slate-900">
-                        {formatPKR(plan.monthlyInstallment)} / {plan.installmentFrequency || "Month"}
-                      </td>
-                      <td className="py-3 px-3 font-mono font-bold">
-                        {plan.accumulatedShortArrears > 0 ? (
-                          <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                            {formatPKR(plan.accumulatedShortArrears)}
-                          </span>
-                        ) : (
-                          <span className="text-emerald-700 font-bold">Rs. 0</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(plan.status)}`}>
-                          {plan.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
+                        <Link
+                          href={`/portal/print/receipt/${plan.id}`}
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+                          title="Print Receipt Slip"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </Link>
                         <Link
                           href={`/portal/plans/${plan.id}`}
-                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors"
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+                          title="View Full Khata Plan"
                         >
-                          View Ledger
+                          <ArrowRight className="w-3.5 h-3.5" />
                         </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* 6. QUICK OPERATIONS SHORTCUTS */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-4">
+        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+          Management & Recovery Shortcuts
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+          <Link
+            href="/portal/recovery"
+            className="p-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
+          >
+            <Bike className="w-5 h-5 text-emerald-700" />
+            <span>Mobile Recovery</span>
+          </Link>
+          <Link
+            href="/portal/customers/legacy-entry"
+            className="p-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
+          >
+            <UserPlus className="w-5 h-5 text-amber-700" />
+            <span>Register Customer</span>
+          </Link>
+          <Link
+            href="/portal/plans"
+            className="p-3.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-2xl border border-blue-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
+          >
+            <FileSpreadsheet className="w-5 h-5 text-blue-700" />
+            <span>All Khata Plans</span>
+          </Link>
+          <Link
+            href="/portal/handovers"
+            className="p-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
+          >
+            <CheckCircle2 className="w-5 h-5 text-amber-700" />
+            <span>Cash Handovers</span>
+          </Link>
+          <Link
+            href="/portal/claims"
+            className="p-3.5 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-2xl border border-rose-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
+          >
+            <Wrench className="w-5 h-5 text-rose-700" />
+            <span>Claims & Returns</span>
+          </Link>
+          <Link
+            href="/portal/reports"
+            className="p-3.5 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-2xl border border-purple-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
+          >
+            <BarChart3 className="w-5 h-5 text-purple-700" />
+            <span>Reports & Analytics</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* 7. QUICK RECEIVE PAYMENT MODAL */}
+      {payModalPlan && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Receive Installment Payment
+                </h3>
+                <p className="text-xs text-slate-500 font-urdu">
+                  کھاتہ: {payModalPlan.customerName} ({payModalPlan.planNumber})
+                </p>
+              </div>
+              <button
+                onClick={() => setPayModalPlan(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 text-base font-bold"
+              >
+                ✕
+              </button>
             </div>
+
+            <form onSubmit={handleConfirmPayment} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Received Amount (PKR)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(Number(e.target.value))}
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-emerald-500 rounded-xl text-lg font-black text-slate-900 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Payment Notes / Receipt Ref
+                </label>
+                <input
+                  type="text"
+                  placeholder="Optional notes or receipt details..."
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none"
+                />
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 space-y-1">
+                <div className="flex justify-between">
+                  <span className="font-bold">Target Wallet:</span>
+                  <span>Chiniot Showroom Counter Till</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">Recorded By:</span>
+                  <span>{currentUser.name}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPayModalPlan(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingPayment}
+                  className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2"
+                >
+                  {isProcessingPayment ? "Processing..." : "Confirm & Save"}
+                </button>
+              </div>
+            </form>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -23,19 +23,26 @@ import {
   ShieldAlert,
   HelpCircle,
   FileCheck,
+  Navigation,
+  ArrowRight,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { IPTPLog, OfflineCollectionItem } from "@/lib/db/types";
+import {
+  OFFLINE_QUEUE_KEY,
+  syncOfflineQueueToMongo,
+  subscribeToSyncStatus,
+} from "@/lib/db/live-sync";
 
 export default function RecoveryPortalPage() {
   const { currentTenant, currentUser } = useAuth();
-  const [plans, setPlans] = useState(() => store.getPlans(currentTenant.id));
-  const [ptpLogs, setPtpLogs] = useState(() => store.getPTPLogs(currentTenant.id));
-  const [selectedRoute, setSelectedRoute] = useState<string>("Route-A (Gulberg / Model Town)");
+  const [plans, setPlans] = useState(() => store.getPlans(currentTenant?.id));
+  const [ptpLogs, setPtpLogs] = useState(() => store.getPTPLogs(currentTenant?.id));
+  const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
 
-  // Offline PWA State
+  // Offline Buffer State
   const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [offlineQueue, setOfflineQueue] = useState<OfflineCollectionItem[]>([]);
+  const [offlineQueue, setOfflineQueue] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Pay Modal State
@@ -54,7 +61,7 @@ export default function RecoveryPortalPage() {
   const [ptpReason, setPtpReason] = useState<IPTPLog["reason"]>("SALARY_DELAY");
   const [ptpNotes, setPtpNotes] = useState<string>("");
 
-  // Messages
+  // Messages & Slips
   const [msg, setMsg] = useState<{
     type: "success" | "error" | "offline";
     text: string;
@@ -62,7 +69,20 @@ export default function RecoveryPortalPage() {
     phone?: string;
     customerName?: string;
     ptpReminderText?: string;
+    isOfflineSlip?: boolean;
+    clientUUID?: string;
+    amount?: number;
   } | null>(null);
+
+  const loadOfflineQueue = () => {
+    try {
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY) || localStorage.getItem("rt_offline_queue");
+      if (raw) setOfflineQueue(JSON.parse(raw));
+      else setOfflineQueue([]);
+    } catch (e) {
+      setOfflineQueue([]);
+    }
+  };
 
   // Connectivity Listeners & Local Storage Offline Queue
   useEffect(() => {
@@ -73,45 +93,43 @@ export default function RecoveryPortalPage() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Load offline queue
-    try {
-      const saved = localStorage.getItem("rt_offline_queue");
-      if (saved) setOfflineQueue(JSON.parse(saved));
-    } catch (e) {}
+    loadOfflineQueue();
+
+    const unsub = subscribeToSyncStatus(() => {
+      loadOfflineQueue();
+    });
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      unsub();
     };
   }, []);
 
-  if (!currentUser) return null;
+  if (!currentUser || !currentTenant) return null;
 
-  // Prioritize PTP Due accounts at top
   const todayStr = new Date().toISOString().split("T")[0];
 
-  const sortedPlans = [...plans].filter((p) => p.areaZone === selectedRoute || selectedRoute === "ALL").sort((a, b) => {
-    const aPtp = ptpLogs.find((ptp) => ptp.contractId === a.id && ptp.status === "PENDING");
-    const bPtp = ptpLogs.find((ptp) => ptp.contractId === b.id && ptp.status === "PENDING");
+  const sortedPlans = [...plans]
+    .filter((p) => p.areaZone === selectedRoute || selectedRoute === "ALL")
+    .sort((a, b) => {
+      const aPtp = ptpLogs.find((ptp) => ptp.contractId === a.id && ptp.status === "PENDING");
+      const bPtp = ptpLogs.find((ptp) => ptp.contractId === b.id && ptp.status === "PENDING");
+      if (aPtp && !bPtp) return -1;
+      if (!aPtp && bPtp) return 1;
+      return 0;
+    });
 
-    if (aPtp && !bPtp) return -1;
-    if (!aPtp && bPtp) return 1;
-    return 0;
-  });
-
-  // Offline Sync Action
+  // 1-Click Offline Sync Action
   const handleSyncOffline = async () => {
-    if (offlineQueue.length === 0) return;
     setIsSyncing(true);
-
     try {
-      const res = store.syncOfflineCollections(offlineQueue);
+      const res = await syncOfflineQueueToMongo(store);
       setPlans([...store.getPlans(currentTenant.id)]);
-      setOfflineQueue([]);
-      localStorage.removeItem("rt_offline_queue");
+      loadOfflineQueue();
       setMsg({
-        type: "success",
-        text: `Success: ${res.syncedCount} offline receipts synced successfully (Total: ${formatPKR(res.totalAmount)}).`,
+        type: res.success ? "success" : "error",
+        text: res.message,
       });
     } catch (err: any) {
       setMsg({ type: "error", text: `Sync Failed: ${err.message}` });
@@ -121,10 +139,11 @@ export default function RecoveryPortalPage() {
   };
 
   // Open Payment Collect Modal
-  const handleOpenCollect = (p: any) => {
+  const handleOpenCollect = (p: any, isFull: boolean = true) => {
     setPayModalPlan(p);
     const nextInst = p.schedule.find((s: any) => s.status !== "PAID") || p.schedule[0];
-    setPayAmount(nextInst ? nextInst.totalDue : 0);
+    const due = nextInst ? nextInst.totalDue - (nextInst.amountPaid || 0) : p.monthlyInstallment;
+    setPayAmount(isFull ? due : Math.round(due / 2));
     setPayNotes("");
     setMsg(null);
   };
@@ -139,42 +158,53 @@ export default function RecoveryPortalPage() {
   };
 
   // Confirm Payment (Online or Offline-First)
-  const handleConfirmCollect = (e: React.FormEvent) => {
+  const handleConfirmCollect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payModalPlan) return;
+    if (!payModalPlan || payAmount <= 0) return;
+
+    const officerId = currentUser.id || "usr_recovery";
+    const planId = payModalPlan.id;
+    const clientUUID = `OFFLINE-${officerId}-${planId}-${Date.now()}`;
 
     if (!isOnline) {
-      // Offline Collection Handler
-      const tempId = `off_${Date.now()}`;
-      const offlineItem: OfflineCollectionItem = {
-        tempId,
+      // Offline Emergency Buffer Handler
+      const offlineItem = {
+        clientUUID,
+        tempId: clientUUID,
         planId: payModalPlan.id,
         planNumber: payModalPlan.planNumber,
         customerName: payModalPlan.customerName,
         customerPhone: payModalPlan.customerPhone,
         amount: Number(payAmount),
         collectedAt: new Date().toISOString(),
-        collectedBy: currentUser.name,
+        collectedBy: currentUser.id,
+        officerName: currentUser.name,
+        notes: payNotes || "Field collection (Offline mode)",
         synced: false,
-        offlineReceiptHash: `OFFLINE-HASH-${tempId.slice(-6)}`,
+        paymentMethod: "CASH",
+        offlineReceiptHash: clientUUID,
       };
 
       const updatedQueue = [...offlineQueue, offlineItem];
       setOfflineQueue(updatedQueue);
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(updatedQueue));
       localStorage.setItem("rt_offline_queue", JSON.stringify(updatedQueue));
 
       setMsg({
         type: "offline",
-        text: `Offline receipt saved: ${formatPKR(payAmount)} stored on device. Will auto-sync when online.`,
-        receiptId: tempId,
+        text: `Offline وصولی محفوظ کر لی گئی۔ انٹرنیٹ آنے پر کلاؤڈ پر منتقل کریں۔`,
+        receiptId: clientUUID,
         phone: payModalPlan.customerPhone,
         customerName: payModalPlan.customerName,
+        isOfflineSlip: true,
+        clientUUID,
+        amount: Number(payAmount),
       });
       setPayModalPlan(null);
       return;
     }
 
-    // Online Collection
+    // Online Collection via Direct Live Path
     const nextInst = payModalPlan.schedule.find((s: any) => s.status !== "PAID") || payModalPlan.schedule[0];
     if (!nextInst) return;
 
@@ -191,10 +221,11 @@ export default function RecoveryPortalPage() {
       setPlans([...store.getPlans(currentTenant.id)]);
       setMsg({
         type: "success",
-        text: `Field Recovery: Collected ${formatPKR(payAmount)} and added to Cash In Hand bag.`,
+        text: `وصولی کامیاب: ${formatPKR(payAmount)} کیش بیگ میں شامل ہو گئی۔ رسید #${res.receiptId}`,
         receiptId: res.receiptId,
         phone: payModalPlan.customerPhone,
         customerName: payModalPlan.customerName,
+        amount: Number(payAmount),
       });
       setPayModalPlan(null);
     } catch (err: any) {
@@ -218,19 +249,15 @@ export default function RecoveryPortalPage() {
         officerName: currentUser.name,
       });
 
-      setPlans([...store.getPlans(currentTenant.id)]);
       setPtpLogs([...store.getPTPLogs(currentTenant.id)]);
-
-      const reminderTxt = `Assalam-o-Alaikum ${ptpModalPlan.customerName}, this is a gentle confirmation from Rajpoot Traders regarding your promised installment payment of Rs. ${formatPKR(ptpAmount)} on date ${formatDate(ptpDate)}. Thank you.`;
-
+      setPlans([...store.getPlans(currentTenant.id)]);
       setMsg({
         type: "success",
-        text: `PTP Promised Payment logged for ${formatDate(ptpDate)} (Amount: ${formatPKR(ptpAmount)}). Customer moved to top priority.`,
+        text: `PTP وعدہ تاریخ محفوظ کر لی گئی: ${formatDate(ptpDate)} برائے ${formatPKR(ptpAmount)}.`,
         phone: ptpModalPlan.customerPhone,
         customerName: ptpModalPlan.customerName,
-        ptpReminderText: reminderTxt,
+        ptpReminderText: `محترم ${ptpModalPlan.customerName} صاحب، راجپوت ٹریڈرز کی قسط کا وعدہ بتاریخ ${formatDate(ptpDate)} رقم ${formatPKR(ptpAmount)} نوٹ کر لیا گیا ہے۔ شکریہ۔`,
       });
-
       setPtpModalPlan(null);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to log PTP" });
@@ -238,340 +265,355 @@ export default function RecoveryPortalPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-16">
-      {/* Top Banner with Connectivity Pill */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-emerald-800/40 relative overflow-hidden">
-        <div className="space-y-2 relative z-10">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase font-black tracking-widest bg-emerald-700 text-emerald-100 px-3 py-1 rounded-full border border-emerald-500/30">
-              Tier 3: Field Recovery Portal
-            </span>
-            <span className="text-xs font-mono text-amber-300">Officer: {currentUser.name}</span>
-            <UrduSpeaker customText="فیلڈ ریکوری پورٹل۔ روٹ کی وصولی کریں، وعدہ ادائیگی درج کریں یا آف لائن موڈ استعمال کریں۔" size="sm" showLabel />
+    <div className="space-y-5 pb-20 max-w-2xl mx-auto">
+      {/* 1. TOP CONNECTIVITY & GPS STATUS BAR */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-xl ${isOnline ? "bg-emerald-950 text-emerald-400" : "bg-amber-950 text-amber-400"}`}>
+            {isOnline ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5 animate-pulse" />}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black">
-            Area Route Recovery & PTP Schedule
-          </h1>
-          <p className="text-xs sm:text-sm text-emerald-200 font-urdu leading-relaxed">
-            Live GPS Guidance, Offline Field Receipts & PTP Scheduling
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black tracking-wide">
+                {isOnline ? "GPS & Cloud Online ✓" : "Offline Mode (Device Storage)"}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Officer: {currentUser.name} ({currentUser.assignedRouteZone || "All Routes"})
+            </p>
+          </div>
         </div>
 
-        {/* Connectivity & Offline Sync Button */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 relative z-10">
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-bold ${
-            isOnline ? "bg-emerald-950/80 text-emerald-300 border-emerald-700" : "bg-amber-950/90 text-amber-300 border-amber-600 animate-pulse"
-          }`}>
-            {isOnline ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-amber-400" />}
-            <span>{isOnline ? "Online Cloud Connected" : "Offline PWA Mode Active"}</span>
-          </div>
-
-          {offlineQueue.length > 0 && (
-            <button
-              onClick={handleSyncOffline}
-              disabled={isSyncing || !isOnline}
-              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-              <span>Sync {offlineQueue.length} Offline Records ({isOnline ? "Ready" : "Waiting for Net"})</span>
-            </button>
-          )}
-
-          <Link
-            href="/portal/recovery/route-sheet"
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 font-bold text-xs rounded-xl shadow transition-colors"
-          >
-            <Printer className="w-4 h-4 text-emerald-700" />
-            <span>Print Route Sheet</span>
-          </Link>
-        </div>
+        <Link
+          href="/portal/recovery/route-sheet"
+          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1"
+        >
+          <Printer className="w-4 h-4 text-amber-400" />
+          <span className="hidden sm:inline">Route Sheet</span>
+        </Link>
       </div>
 
-      {/* Messages */}
-      {msg && (
-        <div className={`p-4 sm:p-5 rounded-2xl text-xs font-bold border space-y-3 ${
-          msg.type === "success"
-            ? "bg-emerald-50 text-emerald-950 border-emerald-300"
-            : msg.type === "offline"
-            ? "bg-amber-50 text-amber-950 border-amber-300"
-            : "bg-rose-50 text-rose-950 border-rose-300"
-        }`}>
-          <div className="flex items-center gap-2">
-            {msg.type === "success" ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
-            ) : msg.type === "offline" ? (
-              <WifiOff className="w-5 h-5 text-amber-700 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0" />
-            )}
-            <span className="font-urdu leading-relaxed">{msg.text}</span>
+      {/* 2. FLASHING 1-CLICK OFFLINE SYNC BANNER */}
+      {offlineQueue.length > 0 && (
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-2xl shadow-xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white text-emerald-900 rounded-xl font-black text-sm">
+              {offlineQueue.length}
+            </div>
+            <div>
+              <h4 className="font-black text-sm">Pending Offline Records Ready to Sync</h4>
+              <p className="text-xs text-emerald-100 font-urdu">
+                انٹرنیٹ موجود ہے۔ 1-کلک سے لائیو MongoDB پر منتقل کریں۔
+              </p>
+            </div>
           </div>
-
-          <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
-            {msg.receiptId && <span className="font-mono text-slate-600">Receipt Ref: #{msg.receiptId}</span>}
-            {msg.phone && (
-              <a
-                href={`https://wa.me/${msg.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                  msg.ptpReminderText ||
-                    `Assalam-o-Alaikum ${msg.customerName || ""}, your payment has been received by Rajpoot Traders officer ${currentUser.name}. Official Receipt Ref #${msg.receiptId}. Shukriya.`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs shadow-sm"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>{msg.ptpReminderText ? "Send WhatsApp PTP Confirmation" : "Send WhatsApp Digital Receipt"}</span>
-              </a>
-            )}
-          </div>
+          <button
+            onClick={handleSyncOffline}
+            disabled={isSyncing}
+            className="w-full sm:w-auto px-5 py-2.5 bg-white hover:bg-emerald-50 text-emerald-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 text-emerald-700 ${isSyncing ? "animate-spin" : ""}`} />
+            <span>{isSyncing ? "Syncing..." : `🔄 Sync Pending Offline Data (${offlineQueue.length})`}</span>
+          </button>
         </div>
       )}
 
-      {/* Route Filter Selector */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <label className="text-xs font-bold text-slate-700">Filter By Assigned Route Area:</label>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {["Route-A (Gulberg / Model Town)", "Route-B (Johar Town / Iqbal Town)", "ALL"].map((rt) => (
-            <button
-              key={rt}
-              onClick={() => setSelectedRoute(rt)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                selectedRoute === rt
-                  ? "bg-emerald-700 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              {rt}
+      {/* 3. NOTIFICATION & RECEIPT SLIP PREVIEW */}
+      {msg && (
+        <div
+          className={`p-4 rounded-2xl border text-xs font-bold space-y-2 shadow-md ${
+            msg.type === "success"
+              ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+              : msg.type === "offline"
+              ? "bg-amber-50 border-amber-300 text-amber-950"
+              : "bg-rose-50 border-rose-300 text-rose-950"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {msg.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              ) : msg.type === "offline" ? (
+                <FileCheck className="w-5 h-5 text-amber-600" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              )}
+              <span>{msg.text}</span>
+            </div>
+            <button onClick={() => setMsg(null)} className="text-slate-400 hover:text-slate-700 text-xs">
+              ✕
             </button>
-          ))}
+          </div>
+
+          {/* Offline Acknowledgment Slip */}
+          {msg.isOfflineSlip && (
+            <div className="bg-white border border-amber-300 rounded-xl p-3 text-slate-800 space-y-1 font-mono text-[11px]">
+              <div className="text-center font-black border-b border-amber-200 pb-1 text-amber-900">
+                [Offline Recorded Receipt]
+              </div>
+              <div className="flex justify-between pt-1">
+                <span>Customer:</span>
+                <span className="font-bold">{msg.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Amount Paid:</span>
+                <span className="font-bold text-emerald-800">{formatPKR(msg.amount || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Client UUID:</span>
+                <span className="text-[10px] text-slate-500">{msg.clientUUID?.slice(0, 22)}...</span>
+              </div>
+              <div className="text-center text-[10px] text-amber-700 pt-1">
+                ⚠️ Recorded offline on device buffer. Will automatically upload on cloud sync.
+              </div>
+            </div>
+          )}
+
+          {msg.ptpReminderText && (
+            <div className="pt-2 flex gap-2">
+              <a
+                href={`sms:${msg.phone}?body=${encodeURIComponent(msg.ptpReminderText)}`}
+                className="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Send SMS to Kharedar</span>
+              </a>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* 4. ROUTE SELECTOR BAR */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2">
+        <label className="text-xs font-bold text-slate-600 uppercase flex items-center gap-1.5">
+          <MapPin className="w-4 h-4 text-emerald-700" />
+          <span>Select Assigned Route / Zone</span>
+        </label>
+        <select
+          value={selectedRoute}
+          onChange={(e) => setSelectedRoute(e.target.value)}
+          className="w-full bg-slate-50 border-2 border-emerald-600 rounded-xl px-3 py-3 text-sm font-black text-slate-900 focus:outline-none"
+        >
+          <option value="ALL">All Routes ({plans.length} Total Customers)</option>
+          <option value="Route-A (Gulberg / Model Town)">Route-A (Gulberg / Model Town)</option>
+          <option value="Route-B (Johar Town / Faisal Town)">Route-B (Johar Town / Faisal Town)</option>
+          <option value="محلہ رحمن آباد و مسلم بازار چنیوٹ">محلہ رحمن آباد و مسلم بازار چنیوٹ</option>
+          <option value="لاہور روڈ و کچہری بازار چنیوٹ">لاہور روڈ و کچہری بازار چنیوٹ</option>
+          <option value="جھنگ روڈ و فیصل آباد روڈ چنیوٹ">جھنگ روڈ و فیصل آباد روڈ چنیوٹ</option>
+        </select>
       </div>
 
-      {/* Cards List */}
-      {sortedPlans.length === 0 ? (
-        <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-xs text-slate-500 font-urdu space-y-2">
-          <p className="font-bold text-slate-700">No active installments pending on this route (Clean Slate)</p>
-          <p>Register a new customer or import from customer ledger.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {sortedPlans.map((p) => {
-            const nextInst = p.schedule.find((s) => s.status !== "PAID") || p.schedule[p.schedule.length - 1];
-            const activePtp = ptpLogs.find((ptp) => ptp.contractId === p.id && ptp.status === "PENDING");
-            const isPtpDueToday = activePtp && activePtp.promisedDate <= todayStr;
+      {/* 5. ONE-THUMB CLIENT RECOVERY CARDS */}
+      <div className="space-y-4">
+        {sortedPlans.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+            <h4 className="text-sm font-bold text-slate-800">No pending clients on this route!</h4>
+            <p className="text-xs text-slate-500 font-urdu">اس روٹ پر تمام وصولیاں مکمل ہیں۔</p>
+          </div>
+        ) : (
+          sortedPlans.map((plan) => {
+            const nextPending = plan.schedule.find((s: any) => s.status !== "PAID") || plan.schedule[0];
+            const isOverdue = nextPending && nextPending.dueDate < todayStr && nextPending.status !== "PAID";
+            const isDueToday = nextPending && nextPending.dueDate === todayStr;
+            const activePtp = ptpLogs.find((ptp) => ptp.contractId === plan.id && ptp.status === "PENDING");
+            const dueAmount = nextPending ? nextPending.totalDue - (nextPending.amountPaid || 0) : plan.monthlyInstallment;
 
             return (
               <div
-                key={p.id}
-                className={`rounded-3xl border p-6 shadow-sm space-y-4 flex flex-col justify-between transition-all ${
-                  isPtpDueToday
-                    ? "bg-gradient-to-b from-amber-50/90 to-white border-2 border-amber-500 shadow-md"
-                    : activePtp
-                    ? "bg-purple-50/40 border-purple-200"
-                    : "bg-white border-slate-200 hover:shadow-md"
+                key={plan.id}
+                className={`bg-white rounded-2xl border-2 p-5 shadow-sm space-y-4 transition-all ${
+                  activePtp
+                    ? "border-amber-400 bg-amber-50/10"
+                    : isOverdue
+                    ? "border-rose-400 bg-rose-50/10"
+                    : "border-slate-200 hover:border-emerald-500"
                 }`}
               >
-                <div className="space-y-3">
-                  {/* Card Top Row: Contract & Status Badges */}
-                  <div className="flex items-center justify-between gap-2">
+                {/* Header: Name, Khata, Status */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
-                        {p.planNumber}
-                      </span>
-                      {activePtp && (
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border flex items-center gap-1 ${
-                          isPtpDueToday
-                            ? "bg-amber-500 text-white border-amber-600 animate-pulse"
-                            : "bg-purple-100 text-purple-800 border-purple-300"
-                        }`}>
-                          <Clock className="w-3 h-3" />
-                          <span>PTP: {formatDate(activePtp.promisedDate)}</span>
+                      <h3 className="text-base font-black text-slate-900 tracking-tight">
+                        {plan.customerName}
+                      </h3>
+                      {plan.khataNumber && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-bold rounded-full text-[10px]">
+                          کھاتہ #{plan.khataNumber}
                         </span>
                       )}
                     </div>
-
-                    {nextInst && (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeClass(p.status === "DEFAULTED_REPOSSESSED" ? "OVERDUE" : nextInst.status)}`}>
-                        {p.status === "DEFAULTED_REPOSSESSED" ? "REPOSSESSED" : `${nextInst.status} (Inst #${nextInst.installmentNo})`}
-                      </span>
-                    )}
+                    <p className="text-xs text-slate-500 font-medium">
+                      {plan.productTitle} • <span className="font-mono text-[10px] text-slate-400">{plan.planNumber}</span>
+                    </p>
                   </div>
 
-                  {/* Customer Info */}
+                  <span
+                    className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${
+                      activePtp
+                        ? "bg-amber-100 text-amber-900 border-amber-300"
+                        : isOverdue
+                        ? "bg-rose-100 text-rose-900 border-rose-300"
+                        : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                    }`}
+                  >
+                    {activePtp ? "PTP ACTIVE" : isOverdue ? "OVERDUE" : isDueToday ? "DUE TODAY" : "ACTIVE"}
+                  </span>
+                </div>
+
+                {/* Amount & Due Row */}
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-xl p-3 border border-slate-100 text-xs">
                   <div>
-                    <h3 className="text-base font-black text-slate-900">{p.customerName}</h3>
-                    <p className="text-xs text-slate-500 font-medium truncate">{p.productTitle}</p>
-                    <span className="text-[10px] font-mono text-slate-400 block">CNIC: {formatCNIC(p.customerCnic)}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Next Installment</span>
+                    <strong className="text-base font-black text-slate-900">{formatPKR(dueAmount)}</strong>
+                    <span className="text-[10px] text-slate-500 block">Due: {formatDate(nextPending?.dueDate)}</span>
                   </div>
-
-                  {/* Financial Obligation Snapshot */}
-                  {nextInst && (
-                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Current Monthly Due:</span>
-                        <strong className="text-slate-900">{formatPKR(nextInst.totalDue)}</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Short Arrears:</span>
-                        <strong className={p.accumulatedShortArrears > 0 ? "text-rose-700 font-bold" : "text-emerald-700"}>
-                          {formatPKR(p.accumulatedShortArrears)}
-                        </strong>
-                      </div>
-                      <div className="flex justify-between text-slate-400 font-mono text-[11px] pt-1 border-t border-slate-200">
-                        <span>Due Date: {formatDate(nextInst.dueDate)}</span>
-                        <span>IMEI: {p.imeiSerial}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Active PTP Reason Callout */}
-                  {activePtp && (
-                    <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-xl text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-900">Promise to Pay Details:</span>
-                        <strong className="text-amber-950 font-black">{formatPKR(activePtp.expectedAmount)}</strong>
-                      </div>
-                      <p className="text-[11px] text-amber-800 font-urdu">
-                        Reason: {activePtp.reason} {activePtp.notes ? `(${activePtp.notes})` : ""}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Action Buttons: Phone & 1-Tap Live GPS */}
-                  <div className="flex items-center gap-2 pt-1 text-xs">
-                    <a
-                      href={`tel:${p.customerPhone}`}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl"
-                    >
-                      <Phone className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>Call Client</span>
-                    </a>
-                    <a
-                      href={
-                        p.gpsLocation?.lat
-                          ? `https://www.google.com/maps/dir/?api=1&destination=${p.gpsLocation.lat},${p.gpsLocation.lng}`
-                          : `https://maps.google.com/?q=${encodeURIComponent(p.areaZone)}`
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl border border-emerald-200"
-                    >
-                      <MapPin className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>{p.gpsLocation?.lat ? "Live GPS Pin" : "Area Map"}</span>
-                    </a>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Short Arrears (بقایا)</span>
+                    <strong className={`text-base font-black ${plan.accumulatedShortArrears > 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                      {formatPKR(plan.accumulatedShortArrears)}
+                    </strong>
+                    <span className="text-[10px] text-slate-500 block">Zone: {plan.areaZone}</span>
                   </div>
                 </div>
 
-                {/* Bottom Recovery Actions */}
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <button
-                      onClick={() => handleOpenCollect(p)}
-                      disabled={p.status === "DEFAULTED_REPOSSESSED"}
-                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <DollarSign className="w-4 h-4 text-amber-300" />
-                      <span>Log Cash Payment</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleOpenPTP(p)}
-                      disabled={p.status === "DEFAULTED_REPOSSESSED"}
-                      className="w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl border border-purple-200 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-purple-700" />
-                      <span>Log PTP Promise</span>
-                    </button>
+                {/* Active PTP Note */}
+                {activePtp && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-xs text-amber-900 flex items-center justify-between">
+                    <span>
+                      <strong>Promised Date:</strong> {formatDate(activePtp.promisedDate)} ({formatPKR(activePtp.expectedAmount)})
+                    </span>
+                    <span className="text-[10px] font-bold bg-amber-200/80 px-2 py-0.5 rounded">PTP</span>
                   </div>
+                )}
 
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <Link
-                      href={`/portal/plans/${p.id}/settle`}
-                      className="text-emerald-700 hover:underline font-bold"
-                    >
-                      Early Payoff (NOC) →
-                    </Link>
+                {/* 1-Tap Quick Action Buttons (One-Thumb Optimized) */}
+                <div className="grid grid-cols-3 gap-2 text-xs font-bold">
+                  {/* 1-Tap Phone Call */}
+                  <a
+                    href={`tel:${plan.customerPhone}`}
+                    className="py-3 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-xl border border-blue-200 flex flex-col items-center justify-center gap-1 transition-all"
+                  >
+                    <Phone className="w-5 h-5 text-blue-700" />
+                    <span>Call Now</span>
+                  </a>
 
-                    <Link
-                      href={`/portal/plans/${p.id}/repossess`}
-                      className="text-rose-700 hover:underline font-bold"
-                    >
-                      Repossess Item →
-                    </Link>
-                  </div>
+                  {/* 1-Tap Google Maps */}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${plan.gpsLocation?.lat || 31.7200},${plan.gpsLocation?.lng || 72.9789}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-3 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-xl border border-slate-200 flex flex-col items-center justify-center gap-1 transition-all"
+                  >
+                    <Navigation className="w-5 h-5 text-emerald-700" />
+                    <span>Directions</span>
+                  </a>
+
+                  {/* 1-Tap PTP Promise */}
+                  <button
+                    onClick={() => handleOpenPTP(plan)}
+                    className="py-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl border border-amber-200 flex flex-col items-center justify-center gap-1 transition-all"
+                  >
+                    <Clock className="w-5 h-5 text-amber-700" />
+                    <span>Log PTP</span>
+                  </button>
+                </div>
+
+                {/* Primary Large 1-Tap Payment Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleOpenCollect(plan, true)}
+                    className="py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    <span>Receive Full ({formatPKR(dueAmount)})</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenCollect(plan, false)}
+                    className="py-3.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-black text-xs sm:text-sm rounded-xl transition-all"
+                  >
+                    <span>Receive Short / Partial</span>
+                  </button>
                 </div>
               </div>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
 
-      {/* MODAL 1: Log Payment (Online / Offline) */}
+      {/* 6. PAYMENT COLLECTION MODAL */}
       {payModalPlan && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700">
-                  {isOnline ? "Real-Time Cloud Collection" : "⚡ Offline PWA Collection"}
-                </span>
-                <h3 className="text-base font-black text-slate-900">
-                  Log Field Collection ({payModalPlan.customerName})
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Record Field Payment
                 </h3>
+                <p className="text-xs text-slate-500 font-urdu">
+                  {payModalPlan.customerName} ({payModalPlan.planNumber})
+                </p>
               </div>
-              <button onClick={() => setPayModalPlan(null)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">
+              <button
+                onClick={() => setPayModalPlan(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 text-base font-bold"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleConfirmCollect} className="space-y-4 text-xs">
+            <form onSubmit={handleConfirmCollect} className="space-y-4">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Cash Amount Collected (Rs.) *
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Cash Collected Amount (PKR)
                 </label>
                 <input
                   type="number"
                   required
-                  min={100}
+                  min={1}
                   value={payAmount}
                   onChange={(e) => setPayAmount(Number(e.target.value))}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-lg font-mono font-black text-slate-900 outline-none focus:border-emerald-600"
+                  className="w-full px-4 py-3.5 bg-slate-50 border-2 border-emerald-600 rounded-xl text-xl font-black text-slate-900 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Collection Notes / Receipt Memo
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Field Notes / Remarks
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. Paid in full on spot / Received at shop..."
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
-                  placeholder="e.g. Received at doorstep, 5x 1000 notes"
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none"
                 />
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl text-[11px] text-slate-500 font-urdu">
-                {isOnline
-                  ? "This collection will immediately record in the verified ledger and add to your cash bag."
-                  : "Device is offline. Receipt is stored locally and will sync when connected."}
+              <div className="bg-slate-100 rounded-xl p-3 text-xs text-slate-700 space-y-1">
+                <div className="flex justify-between">
+                  <span className="font-bold">Destination Bag:</span>
+                  <span>{currentUser.name} (Field In-Transit)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold">Mode:</span>
+                  <span>{isOnline ? "Online Live Save" : "Offline Storage Buffer"}</span>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setPayModalPlan(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
+                  className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-md"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{isOnline ? "Confirm Payment" : "Save Offline Receipt"}</span>
+                  {isOnline ? "Confirm Payment" : "Save Offline Slip"}
                 </button>
               </div>
             </form>
@@ -579,97 +621,85 @@ export default function RecoveryPortalPage() {
         </div>
       )}
 
-      {/* MODAL 2: Log Promise to Pay (PTP) */}
+      {/* 7. PTP PROMISE MODAL */}
       {ptpModalPlan && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-purple-700">
-                  Promise-to-Pay (PTP) Scheduling
-                </span>
-                <h3 className="text-base font-black text-slate-900">
-                  Log PTP Schedule ({ptpModalPlan.customerName})
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Log Promise to Pay (PTP)
                 </h3>
+                <p className="text-xs text-slate-500 font-urdu">
+                  وعدہ تاریخ و رقم کا اندراج: {ptpModalPlan.customerName}
+                </p>
               </div>
-              <button onClick={() => setPtpModalPlan(null)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">
+              <button
+                onClick={() => setPtpModalPlan(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 text-base font-bold"
+              >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleConfirmPTP} className="space-y-4 text-xs">
+            <form onSubmit={handleConfirmPTP} className="space-y-4">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Promised Payment Date *
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Promised Payment Date
                 </label>
                 <input
                   type="date"
                   required
                   value={ptpDate}
                   onChange={(e) => setPtpDate(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold outline-none focus:border-purple-600"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-amber-600"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Expected Payment Amount (Rs.) *
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Promised Amount (PKR)
                 </label>
                 <input
                   type="number"
                   required
-                  min={500}
+                  min={1}
                   value={ptpAmount}
                   onChange={(e) => setPtpAmount(Number(e.target.value))}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-base font-bold outline-none focus:border-purple-600"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-amber-600"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Delay Reason Category *
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Reason for Delay
                 </label>
                 <select
                   value={ptpReason}
-                  onChange={(e) => setPtpReason(e.target.value as any)}
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold outline-none focus:border-purple-600"
+                  onChange={(e: any) => setPtpReason(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
                 >
-                  <option value="SALARY_DELAY">Salary Delay / Not Paid Yet</option>
-                  <option value="MEDICAL_EMERGENCY">Medical Emergency / Hospitalization</option>
-                  <option value="OUT_OF_CITY_TRAVEL">Out of City / Traveling</option>
-                  <option value="DISPUTED_BILL">Account Dispute / Bill Clarification</option>
-                  <option value="FAMILY_ISSUE">Family Emergency</option>
-                  <option value="OTHER">Other Valid Reason</option>
+                  <option value="SALARY_DELAY">تنخواہ میں تاخیر (Salary Delay)</option>
+                  <option value="MEDICAL_EMERGENCY">طبی ایمرجنسی / بیماری (Medical Emergency)</option>
+                  <option value="OUT_OF_CITY_TRAVEL">شہر سے باہر سفر (Out of City Travel)</option>
+                  <option value="FAMILY_ISSUE">گھریلو مجبوری (Family Issue)</option>
+                  <option value="OTHER">دیگر وجہ (Other Reason)</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Special Commitment Notes
-                </label>
-                <input
-                  type="text"
-                  value={ptpNotes}
-                  onChange={(e) => setPtpNotes(e.target.value)}
-                  placeholder="e.g. Promised on Friday evening after bank close"
-                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setPtpModalPlan(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-md"
                 >
-                  <Calendar className="w-4 h-4" />
-                  <span>Save PTP Commitment</span>
+                  Save PTP Promise
                 </button>
               </div>
             </form>

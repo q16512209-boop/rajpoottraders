@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -45,8 +45,8 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
       <div className="stamp-paper-page bg-white border border-slate-300 shadow-2xl p-8 sm:p-12 mx-auto max-w-4xl font-sans text-slate-900 relative">
         {/* Subtle Watermark */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
-          <span className="text-6xl font-black rotate-[-35deg] text-emerald-900 uppercase">
-            RAJPOOT TRADERS
+          <span className="text-5xl font-black rotate-[-35deg] text-emerald-900 uppercase text-center">
+            {tenant.customHeader || tenant.name}
           </span>
         </div>
 
@@ -57,14 +57,14 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
           </strong>
           <span>(For Rs. 100 / Rs. 500 Non-Judicial E-Stamp Paper Header)</span>
           <span className="text-[10px] text-slate-400 mt-1">
-            Contract Ref: {plan.planNumber} • Hash: {plan.tamperProofHash.slice(0, 24)}
+            Contract Ref: {plan.planNumber} • Date: {formatDate(plan.startDate || new Date())}
           </span>
         </div>
 
         {/* Official Header */}
         <div className="text-center border-b-2 border-slate-900 pb-4 mb-6 space-y-1">
           <h1 className="text-2xl font-black tracking-tight text-slate-900">
-            {tenant.brandHeader}
+            {tenant.brandHeader || tenant.name}
           </h1>
           <p className="text-sm font-urdu font-bold text-emerald-800">
             Hire Purchase Installment Agreement (معاہدہ بیع بالتقسیط)
@@ -78,9 +78,9 @@ export default function ContractPrintPage({ params }: { params: { id: string } }
         <div className="space-y-6 text-xs leading-relaxed text-slate-800">
           <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
-              <strong className="block text-slate-900 text-sm">First Party (Seller / Rajpoot Traders):</strong>
+              <strong className="block text-slate-900 text-sm">First Party (Seller / Business):</strong>
               <p className="font-semibold text-emerald-900">{tenant.name}</p>
-              <p>Represented by: Chaudhry Kamran Rajpoot</p>
+              <p>Represented by: {tenant.ownerName}</p>
             </div>
             <div>
               <strong className="block text-slate-900 text-sm">Second Party (Hire-Purchaser / Customer):</strong>
