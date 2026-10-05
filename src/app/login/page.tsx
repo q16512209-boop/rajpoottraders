@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -40,13 +40,23 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     const cleanEmail = email.trim().toLowerCase();
-    const success = login(cleanEmail, password);
+    try {
+      const user = await login(cleanEmail, password);
 
-    if (success) {
-      router.push("/portal");
-    } else {
+      if (user) {
+        if (user.role === "SUPER_ADMIN") {
+          router.push("/portal/admin/businesses");
+        } else {
+          router.push("/portal");
+        }
+      } else {
+        setFailedAttempts((prev) => prev + 1);
+        setError("Invalid email or password. Please verify your registered credentials.");
+        setIsSubmitting(false);
+      }
+    } catch (err: any) {
       setFailedAttempts((prev) => prev + 1);
-      setError("Invalid email or password. Please verify your registered credentials.");
+      setError(err.message || "Login failed. Please check connection.");
       setIsSubmitting(false);
     }
   };

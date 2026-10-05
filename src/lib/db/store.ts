@@ -52,6 +52,19 @@ function verifyLedgerChain(chain: ChainedLedgerBlock[]): { isValid: boolean; bro
 export class AppStore {
   constructor() {
     if (typeof window !== 'undefined') {
+      try {
+        const legacyKeys = [
+          "rajpoot_traders_store_v1",
+          "rajpoot_traders_store_v2",
+          "rajpoot_traders_store_v3",
+          "rajpoot_live_db_snapshot_v1",
+          "rajpoot_pending_cloud_queue_v1",
+          "rt_store_snapshot",
+          "rt_customers_cache",
+          "rt_plans_cache"
+        ];
+        legacyKeys.forEach((k) => localStorage.removeItem(k));
+      } catch (e) {}
       startBackgroundAutoSync(this);
     }
   }
@@ -128,153 +141,39 @@ export class AppStore {
   private repossessions: IRepossessionRecord[] = [];
   private settlements: ISettlementRecord[] = [];
   private ptpLogs: IPTPLog[] = [];
-  private claimRequests: IClaimRequest[] = [
-    {
-      id: "claim_demo_01",
-      tenantId: "tenant_chiniot",
-      type: "WARRANTY_CLAIM",
-      planId: "plan_khata_6",
-      planNumber: "RT-2026-0006",
-      customerId: "cust_khata_6",
-      customerName: "Akbar Ali (Nusrat Hussain)",
-      customerPhone: "0333-6717585",
-      productTitle: "Electric Heavy Iron",
-      imeiSerial: "SN-IRON-CHN-006",
-      issueDescription: "Iron thermostat tripping repeatedly during heating cycle.",
-      physicalConditionNotes: "Slight scratches on sole plate, otherwise good condition.",
-      requestedBy: "usr_recovery_bilal",
-      requestedByName: "Bilal Ahmed (Field Recovery)",
-      requesterRole: "FIELD_RECOVERY",
-      status: "PENDING_APPROVAL",
-      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    },
-  ];
+  private claimRequests: IClaimRequest[] = [];
   private routeZones: IRouteZone[] = [
     {
       id: "zone_chn_01",
       tenantId: "tenant_chiniot",
-      name: "Mohallah Rehman Abad & Muslim Bazaar",
+      name: "محلہ رحمن آباد و مسلم بازار چنیوٹ",
       city: "Chiniot",
       assignedCollectorId: "usr_recovery_bilal",
       assignedCollectorName: "Bilal Ahmed (Field Recovery)",
       description: "Central Bazaar, Muslim Bazaar, and Mohallah Rehman Abad residential lane.",
       centerLat: 31.7200,
       centerLng: 72.9789,
-      activeCustomerCount: 42,
+      activeCustomerCount: 0,
       status: "ACTIVE",
-      createdAt: new Date(Date.now() - 3600000 * 24 * 30).toISOString(),
+      createdAt: new Date().toISOString(),
     },
     {
       id: "zone_chn_02",
       tenantId: "tenant_chiniot",
-      name: "Chenab Colony & Lahore Road",
+      name: "چناب کالونی و لاہور روڈ چنیوٹ",
       city: "Chiniot",
       assignedCollectorId: "usr_recovery_bilal",
       assignedCollectorName: "Bilal Ahmed (Field Recovery)",
       description: "Chenab Colony, Bypass, and Lahore Road commercial market.",
       centerLat: 31.7250,
       centerLng: 72.9850,
-      activeCustomerCount: 28,
+      activeCustomerCount: 0,
       status: "ACTIVE",
-      createdAt: new Date(Date.now() - 3600000 * 24 * 25).toISOString(),
-    },
-    {
-      id: "zone_chn_03",
-      tenantId: "tenant_chiniot",
-      name: "Jhang Road & Katchery",
-      city: "Chiniot",
-      assignedCollectorId: "usr_recovery_bilal",
-      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
-      description: "District Courts area, Jhang Road commercial strip, and New Abadi.",
-      centerLat: 31.7150,
-      centerLng: 72.9650,
-      activeCustomerCount: 19,
-      status: "ACTIVE",
-      createdAt: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
-    },
-    {
-      id: "zone_chn_04",
-      tenantId: "tenant_chiniot",
-      name: "Railway Road & Mohallah Aali",
-      city: "Chiniot",
-      assignedCollectorId: "usr_recovery_bilal",
-      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
-      description: "Railway Station market, Grain Market, and Mohallah Aali.",
-      centerLat: 31.7280,
-      centerLng: 72.9720,
-      activeCustomerCount: 23,
-      status: "ACTIVE",
-      createdAt: new Date(Date.now() - 3600000 * 24 * 15).toISOString(),
-    },
-    {
-      id: "zone_chn_05",
-      tenantId: "tenant_chiniot",
-      name: "Lalian Road & Rural Zone",
-      city: "Chiniot",
-      assignedCollectorId: "usr_recovery_bilal",
-      assignedCollectorName: "Bilal Ahmed (Field Recovery)",
-      description: "Lalian link road, suburban dairy farms, and outskirts cluster.",
-      centerLat: 31.7400,
-      centerLng: 72.9500,
-      activeCustomerCount: 15,
-      status: "ACTIVE",
-      createdAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
-    },
-  ];
-  private staffTargets: IStaffTarget[] = [
-    {
-      id: "target_demo_01",
-      tenantId: "tenant_chiniot",
-      staffId: "usr_recovery_bilal",
-      staffName: "Bilal Ahmed (Field Recovery)",
-      staffRole: "FIELD_RECOVERY",
-      targetType: "RECOVERY_AMOUNT",
-      targetValue: 250000,
-      periodType: "MONTHLY",
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
-      endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split("T")[0],
-      status: "ACTIVE",
-      notes: "Monthly recovery target across all active Chiniot routes.",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "target_demo_02",
-      tenantId: "tenant_chiniot",
-      staffId: "usr_salesman_zaheem",
-      staffName: "Zaheem Salesman",
-      staffRole: "BRANCH_MANAGER",
-      targetType: "SALES_AMOUNT",
-      targetValue: 500000,
-      periodType: "FIFTEEN_DAYS",
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
-      endDate: new Date(new Date().getFullYear(), new Date().getMonth(), 15).toISOString().split("T")[0],
-      status: "ACTIVE",
-      notes: "Mid-month target for Inverter ACs and Electric Irons.",
       createdAt: new Date().toISOString(),
     },
   ];
-  private fieldOrders: IFieldOrder[] = [
-    {
-      id: "ord_demo_01",
-      tenantId: "tenant_chiniot",
-      orderNumber: "ORD-CHN-2026-001",
-      customerName: "Rashid Mahmood",
-      customerPhone: "0301-7894561",
-      customerAddress: "Mohallah Rehman Abad, Street #3, Chiniot",
-      productId: "prod_gfc_fan",
-      productTitle: "GFC 56 inch Deluxe Ceiling Fan",
-      quantity: 1,
-      bookedBy: "usr_recovery_bilal",
-      bookedByName: "Bilal Ahmed (Field Recovery)",
-      bookedByRole: "FIELD_RECOVERY",
-      paymentPreference: "INSTALLMENT",
-      downPaymentOffer: 1500,
-      proposedInstallmentFrequency: "WEEKLY",
-      notes: "Customer wants delivery by Saturday during recovery round.",
-      status: "BOOKED_PENDING",
-      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    },
-  ];
+  private staffTargets: IStaffTarget[] = [];
+  private fieldOrders: IFieldOrder[] = [];
   private isProductionCleanMode: boolean = true;
 
   // --- Authentication & User Management ---

@@ -20,6 +20,7 @@ import {
   UserCheck,
   ExternalLink,
   Filter,
+  Upload,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 
@@ -162,8 +163,37 @@ export default function CustomersPage() {
       </div>
 
       {/* Customers Table / Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((c) => {
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4 max-w-lg mx-auto shadow-sm">
+          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
+            <Users className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-slate-800">Koi customer mojood nahi hai.</h3>
+            <p className="text-xs text-slate-500 font-urdu">
+              کوئی کسٹمر ریکارڈ نہیں ملا۔ نیا کسٹمر شامل کریں یا ایکسل فائل امپورٹ کریں۔
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            <Link
+              href="/portal/customers/new"
+              className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Naya Customer Shamil Karein</span>
+            </Link>
+            <Link
+              href="/portal/import"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Excel Bulk Migration</span>
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((c) => {
           const rawCnic = decryptField(c.cnic);
           const isRevealed = !!showFullCnic[c.id];
 
@@ -273,6 +303,7 @@ export default function CustomersPage() {
           );
         })}
       </div>
+      )}
 
       {/* MODAL: Update Customer GPS Location */}
       {selectedCustForGps && (

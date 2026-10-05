@@ -12,7 +12,7 @@ interface AuthContextType {
   availableUsers: User[];
   isLoggedIn: boolean;
   isLoaded: boolean;
-  login: (email: string, pass: string) => boolean;
+  login: (email: string, pass: string) => Promise<User | null>;
   logout: () => void;
   switchTenant: (tenantId: string) => void;
   refreshUsers: () => void;
@@ -23,7 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Define strict route permission rules
 const ROUTE_PERMISSIONS: Array<{ prefix: string; roles: UserRole[]; description: string }> = [
-  { prefix: "/portal/admin", roles: ["SUPER_ADMIN"], description: "Super Admin Platform Oversight & Audit Chain" },
+  { prefix: "/portal/admin", roles: ["SUPER_ADMIN"], description: "Super Admin Platform Oversight & Multi-Tenant Management" },
   { prefix: "/portal/treasury", roles: ["SUPER_ADMIN", "OWNER"], description: "Owner Pocket & Showroom Treasury" },
   { prefix: "/portal/users", roles: ["SUPER_ADMIN", "OWNER"], description: "Staff & User Role Access Matrix" },
   { prefix: "/portal/routes", roles: ["SUPER_ADMIN", "OWNER"], description: "Custom Dynamic Routes & Zones" },
@@ -72,17 +72,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoaded(true);
   }, []);
 
-  const login = (email: string, pass: string): boolean => {
-    const user = store.authenticate(email, pass);
-    if (!user) return false;
+  const login = async (email: string, pass: string): Promise<User | null> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
 
-    setCurrentUser(user);
-    const t = store.getTenantById(user.tenantId) || store.getTenants()[0];
+    try {
+      // 1. Try real database authentication endpoint
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPass }),
+      });
+      const data = await res.json();
+
+      if (data.success && data.user) {
+        const authenticatedUser = data.user as User;
+        setCurrentUser(authenticatedUser);
+        const t = store.getTenantById(authenticatedUser.tenantId) || store.getTenants()[0];
+        setCurrentTenant(t);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("rt_user_id", authenticatedUser.id);
+        }
+        return authenticatedUser;
+      }
+    } catch (e) {
+      // If network fails, fall back to local store authentication
+      console.warn("Live auth API unreachable, attempting local store fallback:", e);
+    }
+
+    const localUser = store.authenticate(cleanEmail, cleanPass);
+    if (!localUser) return null;
+
+    setCurrentUser(localUser);
+    const t = store.getTenantById(localUser.tenantId) || store.getTenants()[0];
     setCurrentTenant(t);
     if (typeof window !== "undefined") {
-      localStorage.setItem("rt_user_id", user.id);
+      localStorage.setItem("rt_user_id", localUser.id);
     }
-    return true;
+    return localUser;
   };
 
   const logout = () => {
@@ -107,8 +134,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { allowed: false, reason: "NOT_AUTHENTICATED" };
     }
 
+    // Super admin has full platform access
     if (currentUser.role === "SUPER_ADMIN") {
       return { allowed: true };
+    }
+
+    // Strict block for non-super admins trying to access /portal/admin
+    if (pathname.startsWith("/portal/admin")) {
+      return {
+        allowed: false,
+        requiredRole: "SUPER_ADMIN",
+        reason: "اس صفحے (سپر ایڈمن پلیٹ فارم کنٹرول) تک رسائی صرف Super Admin کے پاس ہے۔",
+      };
     }
 
     // Match path against rules

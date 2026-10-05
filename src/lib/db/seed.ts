@@ -133,6 +133,7 @@ export const initialUsers: User[] = [
   {
     id: "usr_recovery_bilal",
     tenantId: "tenant_chiniot",
+    businessId: "tenant_chiniot",
     name: "بلال احمد (Bilal Recovery Officer)",
     email: "recovery@rajpoottraders.com",
     password: "recovery123",
@@ -145,88 +146,11 @@ export const initialUsers: User[] = [
   },
 ];
 
-export const initialCustomers: Customer[] = [
-  {
-    id: "cust_khata_6",
-    tenantId: "tenant_chiniot",
-    fullName: "اکبر علی (Akbar Ali)",
-    fatherName: "نصرت حسین (Nusrat Hussain)",
-    cnic: "33202-6717585-1",
-    phone: "0333-6717585",
-    address: "نصرت کشیدہ کاری، نزد دیسی مسجد، چنیوٹ",
-    landmark: "دیسی مسجد چنیوٹ",
-    city: "چنیوٹ (Chiniot)",
-    zoneArea: "محلہ رحمن آباد و مسلم بازار چنیوٹ",
-    guarantors: [
-      {
-        id: "g_1_akbar",
-        fullName: "محمد اسلم (ضامن 1)",
-        fatherName: "عبدالرشید",
-        cnic: "33202-1234567-1",
-        phone: "0300-1122334",
-        relation: "پڑوسی و کشیدہ کار",
-        address: "نزد دیسی مسجد چنیوٹ",
-        workplace: "مارکیٹ",
-        landmark: "دیسی مسجد",
-      },
-    ],
-    riskScore: 10,
-    isDefaulter: false,
-    createdAt: "2026-08-03T00:00:00Z",
-  },
-];
+// Production Clean Slate: Zero Dummy Customers
+export const initialCustomers: Customer[] = [];
 
-export const initialPlans: InstallmentPlan[] = [
-  {
-    id: "plan_khata_6",
-    planNumber: "RT-CHN-000006",
-    khataNumber: "6",
-    tenantId: "tenant_chiniot",
-    customerId: "cust_khata_6",
-    customerName: "اکبر علی ولد نصرت حسین",
-    customerCnic: "33202-6717585-1",
-    customerPhone: "0333-6717585",
-    salesmanName: "ضہیم (Zaheem)",
-    salesmanId: "usr_salesman_zaheem",
-    productId: "prod_istari_heavy",
-    productTitle: "استری (Heavy Weight Electric Iron)",
-    imeiSerial: "SN-IST-0006",
-    cashPrice: 5800,
-    downPayment: 500,
-    markupRatePct: 17,
-    totalMarkup: 1000,
-    totalFinanced: 6800,
-    durationMonths: 13,
-    totalInstallmentsCount: 13,
-    installmentFrequency: "WEEKLY",
-    collectionIntervalDays: 7,
-    collectionDayName: "ہفتہ (Saturday)",
-    monthlyInstallment: 500,
-    accumulatedShortArrears: 0,
-    status: "ACTIVE",
-    startDate: "2026-08-03T00:00:00Z",
-    endDate: "2026-11-03T00:00:00Z",
-    areaZone: "محلہ رحمن آباد و مسلم بازار چنیوٹ",
-    contractVerified: true,
-    tamperProofHash: "HASH_CHN_KHATA_6",
-    guarantorIds: ["g_1_akbar"],
-    schedule: [
-      { installmentNo: 1, dueDate: "2026-08-08", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 500, paidDate: "2026-08-08", status: "PAID", collectedBy: "ضہیم / بلال", notes: "Akbar sign" },
-      { installmentNo: 2, dueDate: "2026-08-16", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 500, paidDate: "2026-08-16", status: "PAID", collectedBy: "ضہیم / بلال" },
-      { installmentNo: 3, dueDate: "2026-08-22", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 1500, paidDate: "2026-08-22", status: "PAID", collectedBy: "ضہیم / بلال", notes: "Lump sum advance 3 weeks" },
-      { installmentNo: 4, dueDate: "2026-08-22", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 500, paidDate: "2026-08-22", status: "PAID", collectedBy: "ضہیم / بلال" },
-      { installmentNo: 5, dueDate: "2026-08-29", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 1000, paidDate: "2026-08-29", status: "PAID", collectedBy: "ضہیم / بلال" },
-      { installmentNo: 6, dueDate: "2026-09-05", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 7, dueDate: "2026-09-12", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 8, dueDate: "2026-09-19", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 9, dueDate: "2026-09-26", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 10, dueDate: "2026-10-03", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 11, dueDate: "2026-10-10", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 12, dueDate: "2026-10-17", principalDue: 500, lateFee: 0, shortArrears: 0, totalDue: 500, amountPaid: 0, status: "PENDING" },
-      { installmentNo: 13, dueDate: "2026-10-24", principalDue: 300, lateFee: 0, shortArrears: 0, totalDue: 300, amountPaid: 0, status: "PENDING" },
-    ],
-  },
-];
+// Production Clean Slate: Zero Dummy Plans
+export const initialPlans: InstallmentPlan[] = [];
 
 export const initialHandovers: HandoverRequest[] = [];
 export const initialExpenses: ExpenseRecord[] = [];
@@ -384,7 +308,7 @@ export const initialLedgerChain: ChainedLedgerBlock[] = [
       type: "INTERNAL_TRANSFER",
       amount: 0,
       actorId: "system",
-      notes: "RAJPOOT TRADERS CHINIOT - Blockchain Ledger Initialized",
+      notes: "RAJPOOT TRADERS CHINIOT - Ledger Initialized",
     },
     prevHash: "0000000000000000000000000000000000000000000000000000000000000000",
     hash: "000000000019a8bc43f1190d79d19a2e379b38ecbc9102c91a74e792e3a61f91",
