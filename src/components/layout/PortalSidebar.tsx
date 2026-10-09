@@ -9,27 +9,13 @@ import {
   Users,
   FileSpreadsheet,
   Bike,
-  CheckSquare,
   ShieldCheck,
-  Receipt,
   FileText,
   Building2,
-  UserCheck,
-  CreditCard,
   LogOut,
   ExternalLink,
   ChevronDown,
-  Layers,
-  CircleDollarSign,
-  Upload,
-  Database,
-  Volume2,
   X,
-  UserPlus,
-  Package,
-  BarChart3,
-  MapPin,
-  ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { UserRole } from "@/lib/db/types";
@@ -47,86 +33,59 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
   if (!currentUser) return null;
 
   const roleBadgeInfo: Record<UserRole, { label: string; tier: string; color: string }> = {
-    SUPER_ADMIN: { label: "Super Admin", tier: "Tier 0: Main Boss", color: "bg-purple-900/60 text-purple-200 border-purple-700" },
+    SUPER_ADMIN: { label: "Super Admin", tier: "Tier 0: Platform Boss", color: "bg-purple-900/60 text-purple-200 border-purple-700" },
     OWNER: { label: "Shop Owner", tier: "Tier 1: Owner Pocket", color: "bg-amber-900/60 text-amber-200 border-amber-700" },
     BRANCH_MANAGER: { label: "Branch Manager", tier: "Tier 2: Counter & Sales", color: "bg-blue-900/60 text-blue-200 border-blue-700" },
     FIELD_RECOVERY: { label: "Recovery Officer", tier: "Tier 3: Field & Routes", color: "bg-emerald-900/60 text-emerald-200 border-emerald-700" },
     CUSTOMER: { label: "Customer", tier: "Tier 4: Self-Service", color: "bg-teal-900/60 text-teal-200 border-teal-700" },
   };
 
-  const navItems = [
+  const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
+
+  // Dedicated clean navigation configuration
+  const superAdminNav = [
     {
-      title: "Core Operations",
+      title: "Platform Administration",
       links: [
-        { href: "/portal", label: "Dashboard Overview", icon: LayoutDashboard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY", "CUSTOMER"] },
-        { href: "/portal/reports", label: "Owner Reports & Targets", icon: BarChart3, guideKey: "TREASURY", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/routes", label: "Custom Routes & Zones", icon: MapPin, guideKey: "ROUTE_SHEET", roles: ["SUPER_ADMIN", "OWNER"] },
-        { href: "/portal/products", label: "Products Catalog & Inventory", icon: Package, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/users", label: "Staff & Credentials Management", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER"] },
-        { href: "/portal/import", label: "Excel Bulk Importer", icon: Upload, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/data-management", label: "Clean Production Setup", icon: Database, guideKey: "CLEAN_DATA", roles: ["SUPER_ADMIN", "OWNER"] },
-      ],
-    },
-    {
-      title: "Super Admin & Risk (Tier 0)",
-      links: [
-        { href: "/portal/admin/businesses", label: "Manage Businesses & Shops", icon: Building2, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN"] },
-        { href: "/portal/admin", label: "Master Oversight & Audit Chain", icon: ShieldCheck, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN"] },
-        { href: "/portal/admin/blogs", label: "SEO Blog Post Publisher", icon: FileText, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN"] },
-      ],
-    },
-    {
-      title: "Treasury & Finance (Tier 1)",
-      links: [
-        { href: "/portal/treasury", label: "Owner Pocket & Wallets", icon: Wallet, guideKey: "TREASURY", roles: ["SUPER_ADMIN", "OWNER"] },
-        { href: "/portal/expenses", label: "Daily Expenses & Outflows", icon: CircleDollarSign, guideKey: "EXPENSE", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/handovers", label: "2-Step Cash Handovers", icon: CheckSquare, guideKey: "HANDOVER", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-      ],
-    },
-    {
-      title: "Operations & KYC (Tier 2)",
-      links: [
-        { href: "/portal/orders", label: "Field Order Bookings", icon: ShoppingCart, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/customers", label: "KYC Vault & Defaulter Radar", icon: Users, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/customers/legacy-entry", label: "Fast Old Khata Entry", icon: UserCheck, guideKey: "IMPORT_EXCEL", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/customers/new", label: "Register Customer & Guarantors", icon: UserPlus, guideKey: "CUSTOMER_KYC", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/plans", label: "Installment Plans & Arrears", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/plans/new", label: "Create Hire-Purchase Plan", icon: CreditCard, guideKey: "NEW_PLAN", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER"] },
-        { href: "/portal/claims", label: "Warranty Claims & Item Returns", icon: CheckSquare, guideKey: "DEFULTER_RADAR", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-      ],
-    },
-    {
-      title: "Field Recovery (Tier 3)",
-      links: [
-        { href: "/portal/recovery", label: "Mobile Recovery Portal", icon: Bike, guideKey: "LOG_PAYMENT", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-        { href: "/portal/recovery/route-sheet", label: "Printable Route Sheets", icon: FileText, guideKey: "ROUTE_SHEET", roles: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY"] },
-      ],
-    },
-    {
-      title: "Customer Self-Service (Tier 4)",
-      links: [
-        { href: "/portal/customer-portal", label: "My Installments & Receipts", icon: Receipt, guideKey: "PRINT_RECEIPT", roles: ["SUPER_ADMIN", "CUSTOMER"] },
+        { href: "/portal/admin/businesses", label: "Registered Businesses / Shops", icon: Building2, guideKey: "DEFULTER_RADAR" },
+        { href: "/portal/admin/blogs", label: "SEO Blogs CMS", icon: FileText, guideKey: "IMPORT_EXCEL" },
+        { href: "/portal/admin", label: "Cloud Backup & Database Health", icon: ShieldCheck, guideKey: "DEFULTER_RADAR" },
       ],
     },
   ];
+
+  const shopStaffNav = [
+    {
+      title: "Core Operations",
+      links: [
+        { href: "/portal", label: "Dashboard (All-in-One)", icon: LayoutDashboard, guideKey: "NEW_PLAN" },
+        { href: "/portal/customers", label: "Customers & KYC", icon: Users, guideKey: "CUSTOMER_KYC" },
+        { href: "/portal/plans", label: "Installment Plans", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT" },
+        { href: "/portal/recovery", label: "Field Recovery (Rider View)", icon: Bike, guideKey: "ROUTE_SHEET" },
+        { href: "/portal/treasury", label: "Cash & Pocket Ledger", icon: Wallet, guideKey: "TREASURY" },
+      ],
+    },
+  ];
+
+  const activeNavGroups = isSuperAdmin ? superAdminNav : shopStaffNav;
 
   const content = (
     <div className="flex flex-col h-full bg-slate-900 text-slate-300">
       {/* Brand Header */}
       <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
-        <Link href="/portal" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
+        <Link href={isSuperAdmin ? "/portal/admin/businesses" : "/portal"} className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 border border-emerald-400/30">
             <span className="text-amber-300 font-serif">
-              {currentTenant.name.slice(0, 1)}
+              {isSuperAdmin ? "R" : currentTenant.name.slice(0, 1)}
             </span>
-            {currentTenant.name.split(" ")[1]?.slice(0, 1) || "T"}
+            {isSuperAdmin ? "T" : (currentTenant.name.split(" ")[1]?.slice(0, 1) || "T")}
           </div>
           <div className="min-w-0">
             <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight truncate max-w-[160px]">
-              {currentTenant.name}
+              {isSuperAdmin ? "RAJPOOT TRADERS" : currentTenant.name}
             </h2>
             <p className="text-[10px] text-emerald-400 font-medium truncate">
-              {currentTenant.city || currentTenant.code} • Portal v3.0
+              {isSuperAdmin ? "Super Admin Platform" : `${currentTenant.city || currentTenant.code} • Portal`}
             </p>
           </div>
         </Link>
@@ -174,11 +133,11 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
         </div>
       </div>
 
-      {/* Branch Selector (for Super Admin) */}
-      {currentUser.role === "SUPER_ADMIN" && (
+      {/* Branch Switcher (Optional for Super Admin) */}
+      {isSuperAdmin && (
         <div className="px-4 py-2.5 border-b border-slate-800/80 bg-slate-950/40">
           <label className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block mb-1">
-            Active Branch (Super Admin View)
+            Active Tenant Context
           </label>
           <div className="relative">
             <select
@@ -197,47 +156,40 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
         </div>
       )}
 
-      {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-5">
-        {navItems.map((group, idx) => {
-          const visibleLinks = group.links.filter(
-            (link) => currentUser.role === "SUPER_ADMIN" || link.roles.includes(currentUser.role)
-          );
-          if (visibleLinks.length === 0) return null;
-
-          return (
-            <div key={idx} className="space-y-1">
-              <h3 className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 px-3 mb-1.5">
-                {group.title}
-              </h3>
-              {visibleLinks.map((link) => {
-                const Icon = link.icon;
-                const isActive = pathname === link.href;
-                return (
-                  <div key={link.href} className="flex items-center justify-between group">
-                    <Link
-                      href={link.href}
-                      onClick={onMobileClose}
-                      className={`flex-1 flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl transition-all ${
-                        isActive
-                          ? "bg-emerald-700 text-white font-bold shadow-sm"
-                          : "text-slate-300 hover:text-white hover:bg-slate-800/80"
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-amber-300" : "text-slate-400"}`} />
-                      <span className="truncate">{link.label}</span>
-                    </Link>
-                    {link.guideKey && (
-                      <div className="pl-1 shrink-0">
-                        <UrduSpeaker guideKey={link.guideKey} size="sm" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+      {/* Navigation Links */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4">
+        {activeNavGroups.map((group, idx) => (
+          <div key={idx} className="space-y-1.5">
+            <h3 className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 px-3 mb-1">
+              {group.title}
+            </h3>
+            {group.links.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href || (link.href !== "/portal" && pathname.startsWith(link.href));
+              return (
+                <div key={link.href} className="flex items-center justify-between group">
+                  <Link
+                    href={link.href}
+                    onClick={onMobileClose}
+                    className={`flex-1 flex items-center gap-3 px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all ${
+                      isActive
+                        ? "bg-emerald-700 text-white font-bold shadow-sm"
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/80"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-amber-300" : "text-slate-400"}`} />
+                    <span className="truncate">{link.label}</span>
+                  </Link>
+                  {link.guideKey && (
+                    <div className="pl-1 shrink-0">
+                      <UrduSpeaker guideKey={link.guideKey} size="sm" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {/* Footer Exit Link */}

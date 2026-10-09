@@ -102,9 +102,9 @@ export default function PlansPage() {
                 <FileSpreadsheet className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-black text-slate-800">Koi installment plan mojood nahi hai.</h3>
+                <h3 className="text-base font-black text-slate-800">Filhal koi record mojood nahi hai.</h3>
                 <p className="text-xs text-slate-500 font-urdu">
-                  کوئی فعال کھاتہ پلان نہیں ملا۔ نیا قسط پلان بنائیں یا پرانا کھاتہ درج کریں۔
+                  فی الحال کوئی ریکارڈ موجود نہیں ہے۔ نیا کسٹمر شامل کرنے کے لیے اوپر دیے گئے بٹن پر کلک کریں۔
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">

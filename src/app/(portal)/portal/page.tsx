@@ -57,7 +57,6 @@ export default function PortalDashboard() {
   const [wallets, setWallets] = useState(() => store.getWallets(currentTenant?.id));
   const [customers, setCustomers] = useState(() => store.getCustomers(currentTenant?.id));
   const [handovers, setHandovers] = useState(() => store.getHandovers(currentTenant?.id));
-  const [claims, setClaims] = useState(() => store.getClaimRequests(currentTenant?.id));
   const [routes, setRoutes] = useState(() => store.getRouteZones(currentTenant?.id));
 
   // Redirect Super Admin immediately to business oversight
@@ -102,7 +101,6 @@ export default function PortalDashboard() {
     setWallets([...store.getWallets(currentTenant.id)]);
     setCustomers([...store.getCustomers(currentTenant.id)]);
     setHandovers([...store.getHandovers(currentTenant.id)]);
-    setClaims([...store.getClaimRequests(currentTenant.id)]);
     setRoutes([...store.getRouteZones(currentTenant.id)]);
   };
 
@@ -534,9 +532,9 @@ export default function PortalDashboard() {
                 <CheckCircle2 className="w-7 h-7" />
               </div>
               <div className="space-y-1">
-                <p className="text-base font-bold text-slate-800">Koi customer ya qist mojood nahi hai.</p>
+                <p className="text-base font-bold text-slate-800">Filhal koi record mojood nahi hai.</p>
                 <p className="text-xs text-slate-500 font-urdu">
-                  کوئی کھاتہ یا قسط زیرِ التواء نہیں ہے۔ نیا کسٹمر شامل کریں یا ایکسل فائل امپورٹ کریں۔
+                  فی الحال کوئی ریکارڈ موجود نہیں ہے۔ نیا کسٹمر شامل کرنے کے لیے اوپر دیے گئے بٹن پر کلک کریں۔
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
@@ -649,16 +647,17 @@ export default function PortalDashboard() {
                               className="px-2 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[11px] rounded-lg transition-all"
                               title="Receive Partial / Short"
                             >
-                              Short
+                              Receive Short
                             </button>
                           </>
                         )}
                         <Link
                           href={`/portal/print/receipt/${plan.id}`}
-                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1"
                           title="Print Receipt Slip"
                         >
-                          <Printer className="w-3.5 h-3.5" />
+                          <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Print Slip</span>
                         </Link>
                         <Link
                           href={`/portal/plans/${plan.id}`}
@@ -682,7 +681,7 @@ export default function PortalDashboard() {
         <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
           Management & Recovery Shortcuts
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
           <Link
             href="/portal/recovery"
             className="p-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-2xl border border-emerald-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
@@ -691,11 +690,11 @@ export default function PortalDashboard() {
             <span>Mobile Recovery</span>
           </Link>
           <Link
-            href="/portal/customers/legacy-entry"
+            href="/portal/customers"
             className="p-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
           >
-            <UserPlus className="w-5 h-5 text-amber-700" />
-            <span>Register Customer</span>
+            <Users className="w-5 h-5 text-amber-700" />
+            <span>Customers & KYC</span>
           </Link>
           <Link
             href="/portal/plans"
@@ -705,25 +704,18 @@ export default function PortalDashboard() {
             <span>All Khata Plans</span>
           </Link>
           <Link
-            href="/portal/handovers"
+            href="/portal/treasury"
             className="p-3.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-2xl border border-amber-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
           >
-            <CheckCircle2 className="w-5 h-5 text-amber-700" />
-            <span>Cash Handovers</span>
+            <Wallet className="w-5 h-5 text-amber-700" />
+            <span>Cash & Treasury</span>
           </Link>
           <Link
-            href="/portal/claims"
-            className="p-3.5 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-2xl border border-rose-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
-          >
-            <Wrench className="w-5 h-5 text-rose-700" />
-            <span>Claims & Returns</span>
-          </Link>
-          <Link
-            href="/portal/reports"
+            href="/portal/import"
             className="p-3.5 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-2xl border border-purple-200 font-bold flex flex-col items-center justify-center gap-2 text-center transition-all shadow-sm"
           >
-            <BarChart3 className="w-5 h-5 text-purple-700" />
-            <span>Reports & Analytics</span>
+            <Upload className="w-5 h-5 text-purple-700" />
+            <span>Excel Migration</span>
           </Link>
         </div>
       </div>
