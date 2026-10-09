@@ -394,12 +394,12 @@ export default function RecoveryPortalPage() {
           onChange={(e) => setSelectedRoute(e.target.value)}
           className="w-full bg-slate-50 border-2 border-emerald-600 rounded-xl px-3 py-3 text-sm font-black text-slate-900 focus:outline-none"
         >
-          <option value="ALL">All Routes ({plans.length} Total Customers)</option>
-          <option value="Route-A (Gulberg / Model Town)">Route-A (Gulberg / Model Town)</option>
-          <option value="Route-B (Johar Town / Faisal Town)">Route-B (Johar Town / Faisal Town)</option>
-          <option value="محلہ رحمن آباد و مسلم بازار چنیوٹ">محلہ رحمن آباد و مسلم بازار چنیوٹ</option>
-          <option value="لاہور روڈ و کچہری بازار چنیوٹ">لاہور روڈ و کچہری بازار چنیوٹ</option>
-          <option value="جھنگ روڈ و فیصل آباد روڈ چنیوٹ">جھنگ روڈ و فیصل آباد روڈ چنیوٹ</option>
+          <option value="ALL">تمام چنیوٹ بازار و روٹس ({plans.length} کھاتے)</option>
+          {store.getRouteZones(currentTenant?.id).map((r) => (
+            <option key={r.id} value={r.name}>
+              {r.name}
+            </option>
+          ))}
         </select>
       </div>
 
