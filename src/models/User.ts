@@ -7,7 +7,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password?: string;
-  role: "SUPER_ADMIN" | "OWNER" | "BRANCH_MANAGER" | "FIELD_RECOVERY" | "CUSTOMER";
+  role: "SUPER_ADMIN" | "OWNER" | "BRANCH_MANAGER" | "SALESMAN" | "FIELD_RECOVERY" | "CUSTOMER";
   phone: string;
   avatar?: string;
   assignedRouteZone?: string;
@@ -27,7 +27,7 @@ const UserSchema = new Schema<IUser>(
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "FIELD_RECOVERY", "CUSTOMER"],
+      enum: ["SUPER_ADMIN", "OWNER", "BRANCH_MANAGER", "SALESMAN", "FIELD_RECOVERY", "CUSTOMER"],
       default: "BRANCH_MANAGER",
       index: true,
     },

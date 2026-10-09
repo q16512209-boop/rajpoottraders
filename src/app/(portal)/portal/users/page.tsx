@@ -172,6 +172,7 @@ export default function UsersManagementPage() {
     SUPER_ADMIN: "bg-purple-100 text-purple-800 border-purple-300",
     OWNER: "bg-amber-100 text-amber-800 border-amber-300",
     BRANCH_MANAGER: "bg-blue-100 text-blue-800 border-blue-300",
+    SALESMAN: "bg-cyan-100 text-cyan-800 border-cyan-300",
     FIELD_RECOVERY: "bg-emerald-100 text-emerald-800 border-emerald-300",
     CUSTOMER: "bg-slate-100 text-slate-700 border-slate-300",
   };
@@ -500,7 +501,8 @@ export default function UsersManagementPage() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 outline-none"
                   >
                     {isSuperAdmin && <option value="OWNER">Shop Owner / Franchise</option>}
-                    <option value="BRANCH_MANAGER">Salesman & Counter Manager</option>
+                    <option value="BRANCH_MANAGER">Showroom / Branch Manager</option>
+                    <option value="SALESMAN">Sales Officer / Counter Booking</option>
                     <option value="FIELD_RECOVERY">Field Recovery Officer</option>
                   </select>
                 </div>
@@ -641,7 +643,8 @@ export default function UsersManagementPage() {
                       onChange={(e) => setRole(e.target.value as UserRole)}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none"
                     >
-                      <option value="BRANCH_MANAGER">Salesman & Counter Manager</option>
+                      <option value="BRANCH_MANAGER">Showroom / Branch Manager</option>
+                      <option value="SALESMAN">Sales Officer / Counter Booking</option>
                       <option value="FIELD_RECOVERY">Field Recovery Officer</option>
                     </select>
                   )}

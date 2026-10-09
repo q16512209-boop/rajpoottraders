@@ -16,6 +16,11 @@ import {
   ExternalLink,
   ChevronDown,
   X,
+  ArrowRightLeft,
+  Receipt,
+  Package,
+  MapPin,
+  UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { UserRole } from "@/lib/db/types";
@@ -24,6 +29,23 @@ import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+}
+
+function getHomeLink(role: UserRole): string {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return "/portal/admin/businesses";
+    case "FIELD_RECOVERY":
+      return "/portal/recovery";
+    case "SALESMAN":
+      return "/portal/plans";
+    case "CUSTOMER":
+      return "/portal/customer-portal";
+    case "OWNER":
+    case "BRANCH_MANAGER":
+    default:
+      return "/portal";
+  }
 }
 
 export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
@@ -36,44 +58,107 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
     SUPER_ADMIN: { label: "Super Admin", tier: "Tier 0: Platform Boss", color: "bg-purple-900/60 text-purple-200 border-purple-700" },
     OWNER: { label: "Shop Owner", tier: "Tier 1: Owner Pocket", color: "bg-amber-900/60 text-amber-200 border-amber-700" },
     BRANCH_MANAGER: { label: "Branch Manager", tier: "Tier 2: Counter & Sales", color: "bg-blue-900/60 text-blue-200 border-blue-700" },
+    SALESMAN: { label: "Sales Officer", tier: "Tier 2.5: Sales & KYC", color: "bg-cyan-900/60 text-cyan-200 border-cyan-700" },
     FIELD_RECOVERY: { label: "Recovery Officer", tier: "Tier 3: Field & Routes", color: "bg-emerald-900/60 text-emerald-200 border-emerald-700" },
     CUSTOMER: { label: "Customer", tier: "Tier 4: Self-Service", color: "bg-teal-900/60 text-teal-200 border-teal-700" },
   };
 
   const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
 
-  // Dedicated clean navigation configuration
-  const superAdminNav = [
-    {
-      title: "Platform Administration",
-      links: [
-        { href: "/portal/admin/businesses", label: "Registered Businesses / Shops", icon: Building2, guideKey: "DEFULTER_RADAR" },
-        { href: "/portal/admin/blogs", label: "SEO Blogs CMS", icon: FileText, guideKey: "IMPORT_EXCEL" },
-        { href: "/portal/admin", label: "Cloud Backup & Database Health", icon: ShieldCheck, guideKey: "DEFULTER_RADAR" },
-      ],
-    },
-  ];
+  // Dedicated role-based navigation matrix
+  const getNavGroups = (role: UserRole) => {
+    switch (role) {
+      case "SUPER_ADMIN":
+        return [
+          {
+            title: "Platform Administration",
+            links: [
+              { href: "/portal/admin/businesses", label: "Registered Businesses / Shops", icon: Building2, guideKey: "DEFULTER_RADAR" },
+              { href: "/portal/admin/blogs", label: "SEO Blogs CMS", icon: FileText, guideKey: "IMPORT_EXCEL" },
+              { href: "/portal/admin", label: "Cloud Backup & Database Health", icon: ShieldCheck, guideKey: "DEFULTER_RADAR" },
+            ],
+          },
+        ];
 
-  const shopStaffNav = [
-    {
-      title: "Core Operations",
-      links: [
-        { href: "/portal", label: "Dashboard (All-in-One)", icon: LayoutDashboard, guideKey: "NEW_PLAN" },
-        { href: "/portal/customers", label: "Customers & KYC", icon: Users, guideKey: "CUSTOMER_KYC" },
-        { href: "/portal/plans", label: "Installment Plans", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT" },
-        { href: "/portal/recovery", label: "Field Recovery (Rider View)", icon: Bike, guideKey: "ROUTE_SHEET" },
-        { href: "/portal/treasury", label: "Cash & Pocket Ledger", icon: Wallet, guideKey: "TREASURY" },
-      ],
-    },
-  ];
+      case "OWNER":
+        return [
+          {
+            title: "Business Suite",
+            links: [
+              { href: "/portal", label: "Dashboard (All-in-One)", icon: LayoutDashboard, guideKey: "NEW_PLAN" },
+              { href: "/portal/customers", label: "Customers & KYC Vault", icon: Users, guideKey: "CUSTOMER_KYC" },
+              { href: "/portal/plans", label: "Installment Plans", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT" },
+              { href: "/portal/recovery", label: "Field Recovery (Overview)", icon: Bike, guideKey: "ROUTE_SHEET" },
+              { href: "/portal/treasury", label: "Treasury & Pocket Cash", icon: Wallet, guideKey: "TREASURY" },
+              { href: "/portal/handovers", label: "Cash Handovers (Accept Collection)", icon: ArrowRightLeft, guideKey: "HANDOVERS" },
+              { href: "/portal/expenses", label: "Daily Expenses Logger", icon: Receipt, guideKey: "EXPENSES" },
+              { href: "/portal/products", label: "Products & IMEI Inventory", icon: Package, guideKey: "PRODUCTS" },
+              { href: "/portal/routes", label: "Routes & Area Zones", icon: MapPin, guideKey: "ROUTES" },
+              { href: "/portal/users", label: "Staff & Roles Management", icon: UserCheck, guideKey: "STAFF" },
+            ],
+          },
+        ];
 
-  const activeNavGroups = isSuperAdmin ? superAdminNav : shopStaffNav;
+      case "BRANCH_MANAGER":
+        return [
+          {
+            title: "Branch Operations",
+            links: [
+              { href: "/portal", label: "Dashboard", icon: LayoutDashboard, guideKey: "NEW_PLAN" },
+              { href: "/portal/customers", label: "Customers & KYC", icon: Users, guideKey: "CUSTOMER_KYC" },
+              { href: "/portal/plans", label: "Installment Plans", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT" },
+              { href: "/portal/products", label: "Inventory Dispatch", icon: Package, guideKey: "PRODUCTS" },
+              { href: "/portal/handovers", label: "Receive Field Handover", icon: ArrowRightLeft, guideKey: "HANDOVERS" },
+              { href: "/portal/expenses", label: "Log Expenses", icon: Receipt, guideKey: "EXPENSES" },
+              { href: "/portal/recovery", label: "Field Recovery View", icon: Bike, guideKey: "ROUTE_SHEET" },
+            ],
+          },
+        ];
+
+      case "SALESMAN":
+        return [
+          {
+            title: "Sales & Booking",
+            links: [
+              { href: "/portal/customers", label: "Customers & KYC", icon: Users, guideKey: "CUSTOMER_KYC" },
+              { href: "/portal/plans", label: "Installment Plans (New Booking)", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT" },
+              { href: "/portal/products", label: "Products & Inventory", icon: Package, guideKey: "PRODUCTS" },
+            ],
+          },
+        ];
+
+      case "FIELD_RECOVERY":
+        return [
+          {
+            title: "Rider Recovery Operations",
+            links: [
+              { href: "/portal/recovery", label: "Mobile Recovery (Rider View)", icon: Bike, guideKey: "ROUTE_SHEET" },
+              { href: "/portal/recovery/route-sheet", label: "Daily Route Sheet", icon: FileSpreadsheet, guideKey: "ROUTE_SHEET" },
+              { href: "/portal/handovers", label: "Handover Cash to Till", icon: ArrowRightLeft, guideKey: "HANDOVERS" },
+            ],
+          },
+        ];
+
+      case "CUSTOMER":
+      default:
+        return [
+          {
+            title: "Customer Account",
+            links: [
+              { href: "/portal/customer-portal", label: "My Installments & Khata", icon: LayoutDashboard, guideKey: "CUSTOMER_PORTAL" },
+            ],
+          },
+        ];
+    }
+  };
+
+  const activeNavGroups = getNavGroups(currentUser.role);
 
   const content = (
     <div className="flex flex-col h-full bg-slate-900 text-slate-300">
       {/* Brand Header */}
       <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
-        <Link href={isSuperAdmin ? "/portal/admin/businesses" : "/portal"} className="flex items-center gap-3">
+        <Link href={getHomeLink(currentUser.role)} className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-white font-black text-lg shadow-md shrink-0 border border-emerald-400/30">
             <span className="text-amber-300 font-serif">
               {isSuperAdmin ? "R" : currentTenant.name.slice(0, 1)}

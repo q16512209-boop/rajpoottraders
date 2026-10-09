@@ -46,6 +46,12 @@ export default function LoginPage() {
       if (user) {
         if (user.role === "SUPER_ADMIN") {
           router.push("/portal/admin/businesses");
+        } else if (user.role === "FIELD_RECOVERY") {
+          router.push("/portal/recovery");
+        } else if (user.role === "SALESMAN") {
+          router.push("/portal/plans");
+        } else if (user.role === "CUSTOMER") {
+          router.push("/portal/customer-portal");
         } else {
           router.push("/portal");
         }

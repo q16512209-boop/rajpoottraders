@@ -2,6 +2,7 @@ export type UserRole =
   | "SUPER_ADMIN"     // Tier 0: Platform Oversight, Audit Chain, Branch Licensing, All Roles
   | "OWNER"           // Tier 1: Shop Owner, Dedicated Owner Pocket Wallet, Treasury, Staff Roles
   | "BRANCH_MANAGER"  // Tier 2: Showroom Manager, Till reconciliation, Counter down payments, Customer KYC
+  | "SALESMAN"        // Tier 2.5: Sales Officer, Counter booking, New KYC & Plans
   | "FIELD_RECOVERY"  // Tier 3: Field Recovery Officer, Route sheets, Partial payments, Handovers
   | "CUSTOMER";       // Tier 4: Self-Service Customer, My Plans, Receipts, Arrears
 
