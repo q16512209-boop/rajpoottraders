@@ -317,7 +317,7 @@ export class AppStore {
     }
 
     if (creator.role === "OWNER" && (userData.role === "SUPER_ADMIN" || userData.role === "OWNER")) {
-      throw new Error("Unauthorized: Shop Owners can only create Branch Managers and Field Recovery Officers.");
+      throw new Error("Unauthorized: Shop Owners can create Branch Managers, Salesmen, and Field Recovery Officers.");
     }
 
     const existing = this.users.find((u) => u.email.toLowerCase() === userData.email.toLowerCase());
@@ -333,6 +333,7 @@ export class AppStore {
     };
 
     this.users.push(newUser);
+    syncEntityToCloud("users", newUser);
 
     // If Field Recovery, create a dedicated wallet bag
     if (newUser.role === "FIELD_RECOVERY") {
@@ -359,6 +360,7 @@ export class AppStore {
     }
 
     Object.assign(user, updates);
+    syncEntityToCloud("users", user);
     return user;
   }
 
@@ -2145,6 +2147,74 @@ export class AppStore {
     });
 
     return true;
+  }
+
+  // --- Bulk & Multi-Route Assignment to Staff ---
+  assignAllRoutesToStaff(actor: User, staffId: string, tenantId: string): { updatedRoutesCount: number; staff: User } {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner and Super Admin can bulk assign routes.");
+    }
+    const staff = this.users.find((u) => u.id === staffId);
+    if (!staff) throw new Error("Staff member not found");
+
+    const tenantRoutes = this.routeZones.filter((z) => z.tenantId === tenantId);
+    tenantRoutes.forEach((z) => {
+      z.assignedCollectorId = staff.id;
+      z.assignedCollectorName = `${staff.name} (${staff.role})`;
+      z.updatedAt = new Date().toISOString();
+      syncEntityToCloud("routeZones", z);
+    });
+
+    staff.assignedRouteZone = "تمام روٹس (All Routes)";
+    staff.assignedRouteZones = ["ALL_ROUTES", ...tenantRoutes.map((r) => r.name)];
+    syncEntityToCloud("users", staff);
+
+    this.appendLedgerBlock({
+      id: `tx_bulk_assign_${Date.now()}`,
+      tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      notes: `Bulk Route Assignment: All ${tenantRoutes.length} routes assigned to ${staff.name} (${staff.role}) by ${actor.name}.`,
+    });
+
+    return { updatedRoutesCount: tenantRoutes.length, staff };
+  }
+
+  assignStaffRoutes(actor: User, staffId: string, routeZoneNames: string[], tenantId: string): User {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner and Super Admin can assign routes.");
+    }
+    const staff = this.users.find((u) => u.id === staffId);
+    if (!staff) throw new Error("Staff member not found");
+
+    const isAll = routeZoneNames.includes("ALL_ROUTES") || routeZoneNames.includes("ALL");
+    if (isAll) {
+      this.assignAllRoutesToStaff(actor, staffId, tenantId);
+      return staff;
+    }
+
+    staff.assignedRouteZones = routeZoneNames;
+    staff.assignedRouteZone = routeZoneNames.length > 0 ? routeZoneNames.join(", ") : undefined;
+    syncEntityToCloud("users", staff);
+
+    // Update matching route zones collector
+    this.routeZones.filter((z) => z.tenantId === tenantId).forEach((z) => {
+      if (routeZoneNames.includes(z.name)) {
+        z.assignedCollectorId = staff.id;
+        z.assignedCollectorName = `${staff.name} (${staff.role})`;
+        z.updatedAt = new Date().toISOString();
+        syncEntityToCloud("routeZones", z);
+      } else if (z.assignedCollectorId === staff.id) {
+        z.assignedCollectorId = undefined;
+        z.assignedCollectorName = undefined;
+        z.updatedAt = new Date().toISOString();
+        syncEntityToCloud("routeZones", z);
+      }
+    });
+
+    return staff;
   }
 
   // --- Staff Performance Targets Management ---

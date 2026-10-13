@@ -65,6 +65,7 @@ export interface User {
   phone: string;
   avatar?: string;
   assignedRouteZone?: string;
+  assignedRouteZones?: string[];
   customerId?: string;
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;

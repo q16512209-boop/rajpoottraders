@@ -11,6 +11,7 @@ export interface IUser extends Document {
   phone: string;
   avatar?: string;
   assignedRouteZone?: string;
+  assignedRouteZones?: string[];
   customerId?: string;
   status: "ACTIVE" | "INACTIVE";
   createdAt: Date;
@@ -34,6 +35,7 @@ const UserSchema = new Schema<IUser>(
     phone: { type: String, required: true },
     avatar: { type: String, default: "" },
     assignedRouteZone: { type: String, default: "" },
+    assignedRouteZones: { type: [String], default: [] },
     customerId: { type: String, default: "" },
     status: {
       type: String,

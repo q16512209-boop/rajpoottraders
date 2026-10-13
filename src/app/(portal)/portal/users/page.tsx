@@ -35,6 +35,8 @@ export default function UsersManagementPage() {
   // Global Password Visibility Toggle for List
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
 
+  const dynamicRoutes = store.getRouteZones(currentTenant.id);
+
   // Add Form State
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,7 +44,8 @@ export default function UsersManagementPage() {
   const [role, setRole] = useState<UserRole>("FIELD_RECOVERY");
   const [phone, setPhone] = useState("");
   const [tenantId, setTenantId] = useState(currentTenant.id);
-  const [routeZone, setRouteZone] = useState("Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
+  const [routeAssignmentMode, setRouteAssignmentMode] = useState<"ALL" | "CUSTOM">("ALL");
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
 
   // Edit Form State
   const [editUserId, setEditUserId] = useState<string>("");
@@ -51,7 +54,8 @@ export default function UsersManagementPage() {
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<UserRole>("FIELD_RECOVERY");
   const [editPhone, setEditPhone] = useState("");
-  const [editRouteZone, setEditRouteZone] = useState("Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
+  const [editRouteAssignmentMode, setEditRouteAssignmentMode] = useState<"ALL" | "CUSTOM">("ALL");
+  const [editSelectedRoutes, setEditSelectedRoutes] = useState<string[]>([]);
   const [editStatus, setEditStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [showEditPass, setShowEditPass] = useState(false);
 
@@ -90,7 +94,15 @@ export default function UsersManagementPage() {
     setEditPassword(user.password || "");
     setEditRole(user.role);
     setEditPhone(user.phone || "");
-    setEditRouteZone(user.assignedRouteZone || "Mohallah Rehman Abad & Muslim Bazaar, Chiniot");
+
+    const userZones = user.assignedRouteZones || (user.assignedRouteZone ? user.assignedRouteZone.split(", ") : []);
+    const isAll =
+      userZones.includes("ALL_ROUTES") ||
+      userZones.includes("ALL") ||
+      (user.assignedRouteZone && (user.assignedRouteZone.includes("تمام روٹس") || user.assignedRouteZone.includes("All Routes")));
+    
+    setEditRouteAssignmentMode(isAll ? "ALL" : "CUSTOM");
+    setEditSelectedRoutes(isAll ? [] : userZones.filter((z) => z !== "ALL_ROUTES" && z !== "ALL"));
     setEditStatus(user.status);
     setShowEditPass(false);
     setShowEditModal(true);
@@ -103,6 +115,16 @@ export default function UsersManagementPage() {
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const isAllRoutes = routeAssignmentMode === "ALL";
+      const finalRouteZone = isAllRoutes
+        ? "تمام روٹس (All Routes)"
+        : selectedRoutes.length > 0
+        ? selectedRoutes.join(", ")
+        : undefined;
+      const finalRouteZones = isAllRoutes
+        ? ["ALL_ROUTES", ...dynamicRoutes.map((r) => r.name)]
+        : selectedRoutes;
+
       store.createUser(currentUser, {
         tenantId,
         name,
@@ -110,7 +132,8 @@ export default function UsersManagementPage() {
         password,
         role: isSuperAdmin ? "OWNER" : role,
         phone,
-        assignedRouteZone: role === "FIELD_RECOVERY" ? routeZone : undefined,
+        assignedRouteZone: role !== "CUSTOMER" ? finalRouteZone : undefined,
+        assignedRouteZones: role !== "CUSTOMER" ? finalRouteZones : undefined,
         status: "ACTIVE",
       });
 
@@ -121,6 +144,8 @@ export default function UsersManagementPage() {
       setEmail("");
       setPassword("");
       setPhone("");
+      setSelectedRoutes([]);
+      setRouteAssignmentMode("ALL");
       setMsg({
         type: "success",
         text: `Staff member "${name}" (${role}) created successfully! Password: ${password}`,
@@ -133,13 +158,24 @@ export default function UsersManagementPage() {
   const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const isAllRoutes = editRouteAssignmentMode === "ALL";
+      const finalRouteZone = isAllRoutes
+        ? "تمام روٹس (All Routes)"
+        : editSelectedRoutes.length > 0
+        ? editSelectedRoutes.join(", ")
+        : undefined;
+      const finalRouteZones = isAllRoutes
+        ? ["ALL_ROUTES", ...dynamicRoutes.map((r) => r.name)]
+        : editSelectedRoutes;
+
       store.updateUser(editUserId, {
         name: editName,
         email: editEmail,
         password: editPassword,
         phone: editPhone,
         role: editRole,
-        assignedRouteZone: editRole === "FIELD_RECOVERY" ? editRouteZone : undefined,
+        assignedRouteZone: editRole !== "CUSTOMER" ? finalRouteZone : undefined,
+        assignedRouteZones: editRole !== "CUSTOMER" ? finalRouteZones : undefined,
         status: editStatus,
       }, currentUser);
 
@@ -311,7 +347,23 @@ export default function UsersManagementPage() {
                       {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                  {u.assignedRouteZone && <p className="text-emerald-700 font-bold font-urdu">Route: {u.assignedRouteZone}</p>}
+                  {u.assignedRouteZones?.includes("ALL_ROUTES") || u.assignedRouteZone === "ALL_ROUTES" || u.assignedRouteZone?.includes("تمام روٹس") || u.assignedRouteZone?.includes("All Routes") ? (
+                    <div className="pt-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 font-urdu">
+                        🌐 تمام روٹس (All Routes - پورا شہر)
+                      </span>
+                    </div>
+                  ) : u.assignedRouteZones && u.assignedRouteZones.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {u.assignedRouteZones.map((rz, i) => (
+                        <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 font-urdu">
+                          📍 {rz}
+                        </span>
+                      ))}
+                    </div>
+                  ) : u.assignedRouteZone ? (
+                    <p className="text-emerald-700 font-bold font-urdu">Route: {u.assignedRouteZone}</p>
+                  ) : null}
                 </div>
               </div>
             );
@@ -364,10 +416,22 @@ export default function UsersManagementPage() {
                       {formatPhone(u.phone)}
                     </td>
                     <td className="py-3 px-4 text-slate-600 font-urdu">
-                      {u.assignedRouteZone ? (
+                      {u.assignedRouteZones?.includes("ALL_ROUTES") || u.assignedRouteZone === "ALL_ROUTES" || u.assignedRouteZone?.includes("تمام روٹس") || u.assignedRouteZone?.includes("All Routes") ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 font-urdu">
+                          🌐 تمام روٹس (All Routes - پورا شہر)
+                        </span>
+                      ) : u.assignedRouteZones && u.assignedRouteZones.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {u.assignedRouteZones.map((rz, i) => (
+                            <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 font-urdu">
+                              📍 {rz}
+                            </span>
+                          ))}
+                        </div>
+                      ) : u.assignedRouteZone ? (
                         <span className="text-emerald-700 font-bold">{u.assignedRouteZone}</span>
                       ) : (
-                        "Chiniot Main Showroom"
+                        <span className="text-slate-400">تمام دکان / جنرل پول</span>
                       )}
                     </td>
                     <td className="py-3 px-4">
@@ -520,19 +584,98 @@ export default function UsersManagementPage() {
                 </div>
               </div>
 
-              {editRole === "FIELD_RECOVERY" && (
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Assigned Route Zone</label>
-                  <select
-                    value={editRouteZone}
-                    onChange={(e) => setEditRouteZone(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
-                  >
-                    <option value="Mohallah Rehman Abad & Muslim Bazaar, Chiniot">Mohallah Rehman Abad & Muslim Bazaar, Chiniot</option>
-                    <option value="Chenab Colony & Lahore Road, Chiniot">Chenab Colony & Lahore Road, Chiniot</option>
-                    <option value="Jhang Road & Katchery, Chiniot">Jhang Road & Katchery, Chiniot</option>
-                    <option value="Railway Road & Mohallah Aali, Chiniot">Railway Road & Mohallah Aali, Chiniot</option>
-                  </select>
+              {editRole !== "CUSTOMER" && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-800 font-bold font-urdu">
+                      تفویض شدہ روٹس و علاقے (Assigned Routes / Zones)
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-urdu">
+                      ایک یا تمام روٹس منتخب کریں
+                    </span>
+                  </div>
+
+                  {/* Radio: ALL vs Custom */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      editRouteAssignmentMode === "ALL" ? "bg-emerald-50 border-emerald-400 text-emerald-950 font-bold" : "bg-white border-slate-200 text-slate-700"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="editRouteMode"
+                        checked={editRouteAssignmentMode === "ALL"}
+                        onChange={() => setEditRouteAssignmentMode("ALL")}
+                        className="accent-emerald-600"
+                      />
+                      <span>🌐 تمام روٹس (All Routes - پورا شہر / دکان)</span>
+                    </label>
+
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      editRouteAssignmentMode === "CUSTOM" ? "bg-emerald-50 border-emerald-400 text-emerald-950 font-bold" : "bg-white border-slate-200 text-slate-700"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="editRouteMode"
+                        checked={editRouteAssignmentMode === "CUSTOM"}
+                        onChange={() => setEditRouteAssignmentMode("CUSTOM")}
+                        className="accent-emerald-600"
+                      />
+                      <span>📍 مخصوص روٹس منتخب کریں ({editSelectedRoutes.length} منتخب)</span>
+                    </label>
+                  </div>
+
+                  {editRouteAssignmentMode === "CUSTOM" && (
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-600 font-bold">چیک باکس سے مطلوبہ روٹس منتخب کریں:</span>
+                        <div className="space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditSelectedRoutes(dynamicRoutes.map((r) => r.name))}
+                            className="text-emerald-700 hover:underline font-bold"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditSelectedRoutes([])}
+                            className="text-slate-500 hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
+                        {dynamicRoutes.map((r) => {
+                          const checked = editSelectedRoutes.includes(r.name);
+                          return (
+                            <label
+                              key={r.id}
+                              className={`flex items-center gap-2 p-1.5 rounded-lg text-xs cursor-pointer ${
+                                checked ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEditSelectedRoutes([...editSelectedRoutes, r.name]);
+                                  } else {
+                                    setEditSelectedRoutes(editSelectedRoutes.filter((x) => x !== r.name));
+                                  }
+                                }}
+                                className="rounded text-emerald-600"
+                              />
+                              <span className="truncate">{r.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -651,19 +794,98 @@ export default function UsersManagementPage() {
                 </div>
               </div>
 
-              {role === "FIELD_RECOVERY" && (
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1 font-urdu">Assigned Route Zone</label>
-                  <select
-                    value={routeZone}
-                    onChange={(e) => setRouteZone(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-950 outline-none font-urdu"
-                  >
-                    <option value="Mohallah Rehman Abad & Muslim Bazaar, Chiniot">Mohallah Rehman Abad & Muslim Bazaar, Chiniot</option>
-                    <option value="Chenab Colony & Lahore Road, Chiniot">Chenab Colony & Lahore Road, Chiniot</option>
-                    <option value="Jhang Road & Katchery, Chiniot">Jhang Road & Katchery, Chiniot</option>
-                    <option value="Railway Road & Mohallah Aali, Chiniot">Railway Road & Mohallah Aali, Chiniot</option>
-                  </select>
+              {role !== "CUSTOMER" && (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-800 font-bold font-urdu">
+                      تفویض شدہ روٹس و علاقے (Assigned Routes / Zones)
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-urdu">
+                      ایک یا تمام روٹس منتخب کریں
+                    </span>
+                  </div>
+
+                  {/* Radio: ALL vs Custom */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      routeAssignmentMode === "ALL" ? "bg-emerald-50 border-emerald-400 text-emerald-950 font-bold" : "bg-white border-slate-200 text-slate-700"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="addRouteMode"
+                        checked={routeAssignmentMode === "ALL"}
+                        onChange={() => setRouteAssignmentMode("ALL")}
+                        className="accent-emerald-600"
+                      />
+                      <span>🌐 تمام روٹس (All Routes - پورا شہر / دکان)</span>
+                    </label>
+
+                    <label className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      routeAssignmentMode === "CUSTOM" ? "bg-emerald-50 border-emerald-400 text-emerald-950 font-bold" : "bg-white border-slate-200 text-slate-700"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="addRouteMode"
+                        checked={routeAssignmentMode === "CUSTOM"}
+                        onChange={() => setRouteAssignmentMode("CUSTOM")}
+                        className="accent-emerald-600"
+                      />
+                      <span>📍 مخصوص روٹس منتخب کریں ({selectedRoutes.length} منتخب)</span>
+                    </label>
+                  </div>
+
+                  {routeAssignmentMode === "CUSTOM" && (
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-600 font-bold">چیک باکس سے مطلوبہ روٹس منتخب کریں:</span>
+                        <div className="space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoutes(dynamicRoutes.map((r) => r.name))}
+                            className="text-emerald-700 hover:underline font-bold"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoutes([])}
+                            className="text-slate-500 hover:underline"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
+                        {dynamicRoutes.map((r) => {
+                          const checked = selectedRoutes.includes(r.name);
+                          return (
+                            <label
+                              key={r.id}
+                              className={`flex items-center gap-2 p-1.5 rounded-lg text-xs cursor-pointer ${
+                                checked ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedRoutes([...selectedRoutes, r.name]);
+                                  } else {
+                                    setSelectedRoutes(selectedRoutes.filter((x) => x !== r.name));
+                                  }
+                                }}
+                                className="rounded text-emerald-600"
+                              />
+                              <span className="truncate">{r.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

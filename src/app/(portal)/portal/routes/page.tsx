@@ -56,7 +56,30 @@ export default function RoutesManagerPage() {
     );
   }
 
-  const collectors = staffUsers.filter((u) => u.role === "FIELD_RECOVERY" || u.role === "BRANCH_MANAGER");
+  const collectors = staffUsers.filter((u) => u.role !== "CUSTOMER");
+
+  // Bulk Assign All Routes Modal
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkStaffId, setBulkStaffId] = useState("");
+
+  const handleBulkAssignAll = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkStaffId) return;
+    try {
+      const selectedStaff = staffUsers.find((u) => u.id === bulkStaffId);
+      if (!selectedStaff) return;
+      const count = store.assignAllRoutesToStaff(currentUser, bulkStaffId, currentTenant.id);
+      setRoutes([...store.getRouteZones(currentTenant.id)]);
+      setShowBulkModal(false);
+      setBulkStaffId("");
+      setMsg({
+        type: "success",
+        text: `تمام روٹس (${count} روٹس) کامیابی کے ساتھ "${selectedStaff.name}" کو تفویض کر دیے گئے ہیں۔ اب وہ پورے شہر سے بلا جھجک ریکوری کر سکتے ہیں!`,
+      });
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to bulk assign routes" });
+    }
+  };
 
   const filteredRoutes = routes.filter((r) => {
     const q = search.toLowerCase();
@@ -159,16 +182,27 @@ export default function RoutesManagerPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setShowAddModal(true);
-            setMsg(null);
-          }}
-          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-xs shrink-0 self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Custom Route</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => {
+              setShowBulkModal(true);
+              setMsg(null);
+            }}
+            className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-xs shrink-0"
+          >
+            <span>⚡ 1-کلک: تمام روٹس تفویض کریں (All Routes)</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowAddModal(true);
+              setMsg(null);
+            }}
+            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-xs shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Custom Route</span>
+          </button>
+        </div>
       </div>
 
       {/* Alert Messages */}
@@ -359,7 +393,7 @@ export default function RoutesManagerPage() {
                     <option value="">-- General Pool (Unassigned) --</option>
                     {collectors.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.role === "FIELD_RECOVERY" ? "Recovery Officer" : "Manager"})
+                        {c.name} ({c.role === "FIELD_RECOVERY" ? "فیلڈ ریکوری" : c.role === "SALESMAN" ? "سیلز مین" : c.role === "BRANCH_MANAGER" ? "برانچ مینیجر" : c.role})
                       </option>
                     ))}
                   </select>
@@ -471,7 +505,7 @@ export default function RoutesManagerPage() {
                     <option value="">-- General Pool (Unassigned) --</option>
                     {collectors.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.role === "FIELD_RECOVERY" ? "Recovery Officer" : "Manager"})
+                        {c.name} ({c.role === "FIELD_RECOVERY" ? "فیلڈ ریکوری" : c.role === "SALESMAN" ? "سیلز مین" : c.role === "BRANCH_MANAGER" ? "برانچ مینیجر" : c.role})
                       </option>
                     ))}
                   </select>
@@ -516,6 +550,73 @@ export default function RoutesManagerPage() {
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Update Route</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Bulk Assign All Routes */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold tracking-wider bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  Bulk Route Assignment
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">تمام روٹس ایک ریکوری افسر کو دیں</h3>
+              </div>
+              <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-slate-600 font-bold p-2">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-950 space-y-1">
+              <p className="font-bold">
+                💡 اگر دکان کا ایک ہی ریکوری مین یا فیلڈ اسٹاف ہے تو اس آپشن سے سسٹم کے تمام روٹس اور چنیوٹ کے تمام بازار ایک ہی کلک میں اس کو تفویض ہو جائیں گے۔
+              </p>
+              <p className="text-[11px] text-amber-800">
+                کل روٹس: <strong>{routes.length}</strong> (ریلوے روڈ، مسلم بازار، کچہری روڈ، رجوعہ سادات، وغیرہ)
+              </p>
+            </div>
+
+            <form onSubmit={handleBulkAssignAll} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  ریکوری افسر یا اسٹاف ممبر منتخب کریں *
+                </label>
+                <select
+                  required
+                  value={bulkStaffId}
+                  onChange={(e) => setBulkStaffId(e.target.value)}
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 outline-none focus:border-amber-500"
+                >
+                  <option value="">-- منتخب کریں (Select Staff) --</option>
+                  {collectors.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.role === "FIELD_RECOVERY" ? "فیلڈ ریکوری" : c.role === "SALESMAN" ? "سیلز مین" : c.role === "BRANCH_MANAGER" ? "برانچ مینیجر" : c.role}) - {c.phone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkModal(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  منسوخ کریں
+                </button>
+                <button
+                  type="submit"
+                  disabled={!bulkStaffId}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black rounded-xl shadow flex items-center gap-1.5 transition-all"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>تمام روٹس تفویض کریں (Assign All)</span>
                 </button>
               </div>
             </form>

@@ -120,8 +120,25 @@ export default function RecoveryPortalPage() {
 
   const todayStr = new Date().toISOString().split("T")[0];
 
+  const hasAllRoutes =
+    currentUser.assignedRouteZones?.includes("ALL_ROUTES") ||
+    currentUser.assignedRouteZone === "ALL_ROUTES" ||
+    currentUser.assignedRouteZone === "تمام روٹس (All Routes)" ||
+    currentUser.assignedRouteZone?.includes("All Routes");
+
+  const myAssignedRoutes = (currentUser.assignedRouteZones || [currentUser.assignedRouteZone]).filter(
+    (r): r is string => Boolean(r && r !== "ALL_ROUTES" && !r.includes("All Routes"))
+  );
+
   const sortedPlans = [...plans]
-    .filter((p) => p.areaZone === selectedRoute || selectedRoute === "ALL")
+    .filter((p) => {
+      if (selectedRoute === "ALL") return true;
+      if (selectedRoute === "MY_ROUTES") {
+        if (hasAllRoutes) return true;
+        return myAssignedRoutes.includes(p.areaZone || "");
+      }
+      return p.areaZone === selectedRoute;
+    })
     .sort((a, b) => {
       const aPtp = ptpLogs.find((ptp) => ptp.contractId === a.id && ptp.status === "PENDING");
       const bPtp = ptpLogs.find((ptp) => ptp.contractId === b.id && ptp.status === "PENDING");
@@ -362,7 +379,13 @@ export default function RecoveryPortalPage() {
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Officer: {currentUser.name} ({currentUser.assignedRouteZone || "All Routes"})
+              Officer: {currentUser.name} (
+              {hasAllRoutes
+                ? "🌐 تمام روٹس (All Routes - پورا شہر)"
+                : myAssignedRoutes.length > 0
+                ? myAssignedRoutes.join("، ")
+                : currentUser.assignedRouteZone || "All Routes"}
+              )
             </p>
           </div>
         </div>
@@ -477,10 +500,15 @@ export default function RecoveryPortalPage() {
           onChange={(e) => setSelectedRoute(e.target.value)}
           className="w-full bg-slate-50 border-2 border-emerald-600 rounded-xl px-3 py-3 text-sm font-black text-slate-900 focus:outline-none"
         >
-          <option value="ALL">تمام چنیوٹ بازار و روٹس ({plans.length} کھاتے)</option>
+          <option value="ALL">🌐 تمام چنیوٹ بازار و روٹس (All Routes - {plans.length} کھاتے)</option>
+          {myAssignedRoutes.length > 0 && !hasAllRoutes && (
+            <option value="MY_ROUTES" className="font-bold text-emerald-800">
+              ⭐ میرے تفویض شدہ روٹس ({myAssignedRoutes.join("، ")})
+            </option>
+          )}
           {store.getRouteZones(currentTenant?.id).map((r) => (
             <option key={r.id} value={r.name}>
-              {r.name}
+              📍 {r.name}
             </option>
           ))}
         </select>
