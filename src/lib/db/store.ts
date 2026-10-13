@@ -714,7 +714,7 @@ export class AppStore {
     return this.customers.find((c) => c.id === id);
   }
 
-  createCustomer(data: Omit<Customer, "id" | "createdAt" | "riskScore" | "isDefaulter">): Customer {
+  createCustomer(data: Omit<Customer, "id" | "createdAt" | "riskScore" | "isDefaulter"> & { khataNumber?: number }): Customer {
     const rawCnic = data.cnic ? decryptField(data.cnic) : "N/A";
     const plainCnic = rawCnic && rawCnic !== "[ENCRYPTED DATA]" ? rawCnic : (data.cnic || "N/A");
 
@@ -735,9 +735,14 @@ export class AppStore {
           },
         ];
 
+    const parsedKhata = data.khataNumber !== undefined && data.khataNumber !== null && String(data.khataNumber).trim() !== ""
+      ? Number(data.khataNumber)
+      : undefined;
+
     const overlap = this.checkHouseholdDefaulter(data.address, plainCnic, data.phone);
     const newCust: Customer = {
       ...data,
+      khataNumber: parsedKhata,
       guarantors,
       id: `cust_${Date.now()}`,
       createdAt: new Date().toISOString(),
@@ -750,6 +755,89 @@ export class AppStore {
     this.customers.unshift(newCust);
     syncEntityToCloud("customers", newCust);
     return newCust;
+  }
+
+  updateCustomer(
+    actor: User,
+    customerId: string,
+    data: Partial<Customer>
+  ): Customer {
+    const customer = this.customers.find((c) => c.id === customerId);
+    if (!customer) throw new Error("Customer record not found");
+
+    if (data.khataNumber !== undefined) {
+      customer.khataNumber = data.khataNumber !== null && String(data.khataNumber).trim() !== ""
+        ? Number(data.khataNumber)
+        : undefined;
+    }
+    if (data.fullName !== undefined) customer.fullName = data.fullName.trim();
+    if (data.fatherName !== undefined) customer.fatherName = data.fatherName.trim();
+    if (data.cnic !== undefined) {
+      const clean = data.cnic.trim();
+      customer.cnic = clean.startsWith("enc_") ? clean : encryptField(clean);
+    }
+    if (data.phone !== undefined) customer.phone = data.phone.trim();
+    if (data.secondaryPhone !== undefined) customer.secondaryPhone = data.secondaryPhone?.trim() || "";
+    if (data.address !== undefined) customer.address = data.address.trim();
+    if (data.landmark !== undefined) customer.landmark = data.landmark?.trim() || "";
+    if (data.city !== undefined) customer.city = data.city.trim();
+    if (data.zoneArea !== undefined) customer.zoneArea = data.zoneArea.trim();
+    if (data.guarantors !== undefined) customer.guarantors = data.guarantors;
+    if (data.isDefaulter !== undefined) customer.isDefaulter = data.isDefaulter;
+    if (data.defaulterReason !== undefined) customer.defaulterReason = data.defaulterReason;
+
+    // Sync changes to all linked plans for this customer
+    for (const plan of this.plans) {
+      if (plan.customerId === customer.id) {
+        if (customer.fullName) plan.customerName = customer.fullName;
+        if (customer.phone) plan.customerPhone = customer.phone;
+        if (customer.cnic) plan.customerCnic = decryptField(customer.cnic);
+        if (customer.zoneArea) plan.areaZone = customer.zoneArea;
+        if (customer.khataNumber !== undefined && customer.khataNumber !== null) {
+          plan.khataNumber = String(customer.khataNumber);
+        }
+        syncEntityToCloud("plans", plan);
+      }
+    }
+
+    syncEntityToCloud("customers", customer);
+
+    this.appendLedgerBlock({
+      id: `tx_cust_upd_${customer.id}_${Date.now()}`,
+      tenantId: customer.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      customerId: customer.id,
+      notes: `Customer profile updated for ${customer.fullName} (Khata #${customer.khataNumber || "N/A"}) by ${actor.name} (${actor.role}).`,
+    });
+
+    return customer;
+  }
+
+  deleteCustomer(actor: User, customerId: string): boolean {
+    if (actor.role !== "SUPER_ADMIN" && actor.role !== "OWNER") {
+      throw new Error("Unauthorized: Only Shop Owner can delete customer records.");
+    }
+    const idx = this.customers.findIndex((c) => c.id === customerId);
+    if (idx === -1) return false;
+
+    const cust = this.customers[idx];
+    this.customers.splice(idx, 1);
+
+    this.appendLedgerBlock({
+      id: `tx_cust_del_${customerId}_${Date.now()}`,
+      tenantId: cust.tenantId,
+      timestamp: new Date().toISOString(),
+      type: "INTERNAL_TRANSFER",
+      amount: 0,
+      actorId: actor.id,
+      customerId,
+      notes: `Customer record deleted for ${cust.fullName} (Khata #${cust.khataNumber || "N/A"}) by ${actor.name}.`,
+    });
+
+    return true;
   }
 
   checkHouseholdDefaulter(address?: string, cnicRaw?: string, phone?: string) {
@@ -2684,6 +2772,7 @@ export class AppStore {
 
     const customer: Customer = {
       id: customerId,
+      khataNumber: data.khataNumber ? Number(data.khataNumber) : undefined,
       tenantId: data.tenantId,
       fullName: data.fullName,
       fatherName: data.fatherName || "والد کا نام درج نہیں",

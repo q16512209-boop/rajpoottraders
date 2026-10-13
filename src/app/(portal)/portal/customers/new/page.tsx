@@ -26,6 +26,7 @@ export default function NewCustomerPage() {
   const { currentTenant } = useAuth();
 
   // Applicant KYC State
+  const [khataNumber, setKhataNumber] = useState("");
   const [fullName, setFullName] = useState("");
   const [fatherName, setFatherName] = useState("");
   const [cnic, setCnic] = useState("");
@@ -103,6 +104,7 @@ export default function NewCustomerPage() {
 
     const newCust = store.createCustomer({
       tenantId: currentTenant.id,
+      khataNumber: khataNumber ? Number(khataNumber) : undefined,
       fullName,
       fatherName: fatherName || "",
       cnic: encryptField(cleanCnic),
@@ -163,6 +165,24 @@ export default function NewCustomerPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="sm:col-span-2 bg-amber-50/70 border-2 border-amber-300 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+              <div>
+                <label className="block text-amber-950 font-black text-sm mb-0.5">
+                  📖 Physical Khata # / کھاتہ نمبر (Optional / اختیاری)
+                </label>
+                <p className="text-[11px] text-amber-800 font-urdu">
+                  اگر گاہک کا فزیکل رجسٹر یا ڈائری کا کھاتہ نمبر موجود ہے تو یہاں درج کریں (مثلاً: 14، 43، 118)۔
+                </p>
+              </div>
+              <input
+                type="number"
+                value={khataNumber}
+                onChange={(e) => setKhataNumber(e.target.value)}
+                placeholder="e.g. 14"
+                className="w-full sm:w-40 p-2.5 bg-white border-2 border-amber-400 rounded-xl font-black text-slate-900 text-sm outline-none focus:border-amber-600 shadow-inner"
+              />
+            </div>
+
             <div>
               <label className="block text-slate-700 font-bold mb-1">Full Name *</label>
               <input

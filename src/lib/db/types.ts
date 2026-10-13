@@ -95,6 +95,7 @@ export interface GPSLocation {
 
 export interface Customer {
   id: string;
+  khataNumber?: number;
   tenantId: string;
   businessId?: string;
   fullName: string;

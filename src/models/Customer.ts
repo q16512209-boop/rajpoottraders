@@ -23,6 +23,7 @@ export interface IGPSLocation {
 
 export interface ICustomer extends Document {
   id: string;
+  khataNumber?: number;
   tenantId: string;
   businessId?: string;
   fullName: string;
@@ -69,6 +70,7 @@ const GPSLocationSchema = new Schema<IGPSLocation>({
 const CustomerSchema = new Schema<ICustomer>(
   {
     id: { type: String, required: true, unique: true, index: true },
+    khataNumber: { type: Number, required: false, index: true },
     tenantId: { type: String, required: true, default: "tenant_chiniot", index: true },
     businessId: { type: String, default: "tenant_chiniot", index: true },
     fullName: { type: String, required: true, trim: true, index: true },
