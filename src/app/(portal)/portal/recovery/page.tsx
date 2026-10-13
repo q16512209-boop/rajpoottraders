@@ -25,9 +25,10 @@ import {
   FileCheck,
   Navigation,
   ArrowRight,
+  Send,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
-import { IPTPLog, OfflineCollectionItem } from "@/lib/db/types";
+import { IPTPLog, OfflineCollectionItem, ConcessionRequest } from "@/lib/db/types";
 import {
   OFFLINE_QUEUE_KEY,
   syncOfflineQueueToMongo,
@@ -38,6 +39,9 @@ export default function RecoveryPortalPage() {
   const { currentTenant, currentUser } = useAuth();
   const [plans, setPlans] = useState(() => store.getPlans(currentTenant?.id));
   const [ptpLogs, setPtpLogs] = useState(() => store.getPTPLogs(currentTenant?.id));
+  const [concessionRequests, setConcessionRequests] = useState<ConcessionRequest[]>(() =>
+    store.getConcessionRequests(currentTenant?.id)
+  );
   const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
 
   // Offline Buffer State
@@ -60,6 +64,12 @@ export default function RecoveryPortalPage() {
   const [ptpAmount, setPtpAmount] = useState<number>(0);
   const [ptpReason, setPtpReason] = useState<IPTPLog["reason"]>("SALARY_DELAY");
   const [ptpNotes, setPtpNotes] = useState<string>("");
+
+  // Concession / Maafi Modal State
+  const [concessionModalPlan, setConcessionModalPlan] = useState<any>(null);
+  const [concessionAmount, setConcessionAmount] = useState<number>(0);
+  const [concessionReason, setConcessionReason] = useState<string>("گھریلو مالی مجبوری / یکمشت تصفیہ رعایت");
+  const [isSubmittingConcession, setIsSubmittingConcession] = useState<boolean>(false);
 
   // Messages & Slips
   const [msg, setMsg] = useState<{
@@ -264,6 +274,79 @@ export default function RecoveryPortalPage() {
     }
   };
 
+  // Open Concession Modal
+  const handleOpenConcession = (p: any) => {
+    const totalPaid =
+      (p.downPayment || 0) +
+      (p.schedule || []).reduce((acc: number, s: any) => acc + (s.amountPaid || 0), 0) +
+      (p.discountWaived || 0);
+    const balance = Math.max(0, (p.totalFinanced || 0) - totalPaid);
+    setConcessionModalPlan(p);
+    setConcessionAmount(balance > 1000 ? 500 : balance);
+    setConcessionReason("گھریلو مالی مجبوری / یکمشت تصفیہ رعایت");
+    setMsg(null);
+  };
+
+  // Confirm Concession Request Submission
+  const handleConfirmConcession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!concessionModalPlan || concessionAmount <= 0) return;
+
+    setIsSubmittingConcession(true);
+    try {
+      store.requestConcession({
+        planId: concessionModalPlan.id,
+        discountAmount: Number(concessionAmount),
+        reason: concessionReason,
+        requestedBy: currentUser,
+      });
+
+      if (isOnline) {
+        try {
+          const totalPaid =
+            (concessionModalPlan.downPayment || 0) +
+            (concessionModalPlan.schedule || []).reduce((acc: number, s: any) => acc + (s.amountPaid || 0), 0) +
+            (concessionModalPlan.discountWaived || 0);
+          const remainingBalance = Math.max(0, (concessionModalPlan.totalFinanced || 0) - totalPaid);
+
+          await fetch("/api/concessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "CREATE",
+              planId: concessionModalPlan.id,
+              khataNumber: concessionModalPlan.khataNumber || concessionModalPlan.planNumber,
+              customerId: concessionModalPlan.customerId,
+              customerName: concessionModalPlan.customerName,
+              customerPhone: concessionModalPlan.customerPhone,
+              totalPrice: concessionModalPlan.totalFinanced,
+              totalPaid,
+              remainingBalance,
+              discountAmount: Number(concessionAmount),
+              reason: concessionReason,
+              requestedBy: currentUser.name,
+              requestedById: currentUser.id,
+              officerRole: currentUser.role,
+              tenantId: concessionModalPlan.tenantId,
+              businessId: concessionModalPlan.businessId || concessionModalPlan.tenantId,
+            }),
+          });
+        } catch (apiErr) {}
+      }
+
+      setConcessionRequests([...store.getConcessionRequests(currentTenant.id)]);
+      setMsg({
+        type: "success",
+        text: `معافی / رعایت کی درخواست (Rs. ${Number(concessionAmount).toLocaleString()}) دکان کے مالک کو منظوری کے لیے ارسال کردی گئی۔`,
+      });
+      setConcessionModalPlan(null);
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to submit concession request" });
+    } finally {
+      setIsSubmittingConcession(false);
+    }
+  };
+
   return (
     <div className="space-y-5 pb-20 max-w-2xl mx-auto">
       {/* 1. TOP CONNECTIVITY & GPS STATUS BAR */}
@@ -418,6 +501,14 @@ export default function RecoveryPortalPage() {
             const isDueToday = nextPending && nextPending.dueDate === todayStr;
             const activePtp = ptpLogs.find((ptp) => ptp.contractId === plan.id && ptp.status === "PENDING");
             const dueAmount = nextPending ? nextPending.totalDue - (nextPending.amountPaid || 0) : plan.monthlyInstallment;
+            const planPaidSoFar =
+              (plan.downPayment || 0) +
+              (plan.schedule || []).reduce((acc: number, s: any) => acc + (s.amountPaid || 0), 0) +
+              (plan.discountWaived || 0);
+            const planRemainingBalance = Math.max(0, (plan.totalFinanced || 0) - planPaidSoFar);
+            const pendingConc = concessionRequests.find(
+              (c) => c.planId === plan.id && c.status === "PENDING_APPROVAL"
+            );
 
             return (
               <div
@@ -535,6 +626,38 @@ export default function RecoveryPortalPage() {
                     <span>Receive Short / Partial</span>
                   </button>
                 </div>
+
+                {/* Concession / Discount Request Banner or Trigger */}
+                {pendingConc ? (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs text-amber-950 flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-2 font-urdu">
+                      <Clock className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                      <span>معافی / رعایت کی درخواست ({formatPKR(pendingConc.discountAmount)}) زیرِ التوا ہے</span>
+                    </span>
+                    <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded text-[10px] uppercase font-mono font-bold shrink-0">
+                      Pending
+                    </span>
+                  </div>
+                ) : plan.status === "CLOSED_WITH_DISCOUNT" ? (
+                  <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-xs text-emerald-950 flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-2 font-urdu">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>کھاتہ رعایت پر مکمل کلئیر (معافی: {formatPKR(plan.discountWaived || 0)})</span>
+                    </span>
+                    <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded text-[10px] uppercase font-mono font-bold shrink-0">
+                      Closed
+                    </span>
+                  </div>
+                ) : planRemainingBalance > 0 && plan.status === "ACTIVE" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenConcession(plan)}
+                    className="w-full py-2.5 bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-900 border border-dashed border-slate-300 hover:border-amber-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <Send className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="font-urdu">📩 معافی / رعایت کی درخواست (Request Discount / Waiver)</span>
+                  </button>
+                ) : null}
               </div>
             );
           })
@@ -703,6 +826,113 @@ export default function RecoveryPortalPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 8. CONCESSION / MAAFI REQUEST MODAL */}
+      {concessionModalPlan && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <Send className="w-4 h-4 text-amber-600" />
+                  <span>معافی / رعایت کی درخواست (Concession)</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-urdu">
+                  {concessionModalPlan.customerName} (کھاتہ #{concessionModalPlan.khataNumber || concessionModalPlan.planNumber})
+                </p>
+              </div>
+              <button
+                onClick={() => setConcessionModalPlan(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 text-base font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {(() => {
+              const paid =
+                (concessionModalPlan.downPayment || 0) +
+                (concessionModalPlan.schedule || []).reduce((acc: number, s: any) => acc + (s.amountPaid || 0), 0) +
+                (concessionModalPlan.discountWaived || 0);
+              const balance = Math.max(0, (concessionModalPlan.totalFinanced || 0) - paid);
+              const proposedCash = Math.max(0, balance - (Number(concessionAmount) || 0));
+
+              return (
+                <form onSubmit={handleConfirmConcession} className="space-y-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">کل قیمت (Total Financed):</span>
+                      <strong className="text-slate-900">{formatPKR(concessionModalPlan.totalFinanced)}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">اب تک وصولی (Total Paid):</span>
+                      <strong className="text-emerald-700">{formatPKR(paid)}</strong>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                      <span className="font-bold text-slate-700">کل موجودہ بقایا (Current Balance):</span>
+                      <strong className="text-rose-700 font-black">{formatPKR(balance)}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      مجوزہ رعایت / معافی رقم (Discount to Waive in PKR)
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={balance}
+                      value={concessionAmount}
+                      onChange={(e) => setConcessionAmount(Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-amber-500 rounded-xl text-lg font-black text-slate-900 focus:outline-none focus:border-amber-600"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      گاہک کی طرف سے بقیہ کیش وصولی: <strong className="text-emerald-800 font-black">{formatPKR(proposedCash)}</strong>
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      وجہ / تفصیل برائے مالک (Reason for Concession)
+                    </label>
+                    <textarea
+                      required
+                      rows={2}
+                      value={concessionReason}
+                      onChange={(e) => setConcessionReason(e.target.value)}
+                      placeholder="e.g. خریدار کا کہنا ہے کہ رعایت کر دیں تو بقیہ رقم آج ہی نقد ادا کر دے گا..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-emerald-600 font-urdu"
+                    />
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed font-urdu">
+                    ⚠️ <strong>وضاحت:</strong> رعایت کی درخواست دکان کے مالک کے نوٹیفکیشن ٹرے میں جائے گی۔ منظوری پر کیش دراز متاثر نہیں ہو گا، صرف حقیقی موصول شدہ کیش درج ہو گا۔
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setConcessionModalPlan(null)}
+                      className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                    >
+                      منسوخ کریں
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingConcession || concessionAmount <= 0 || concessionAmount > balance}
+                      className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs rounded-xl shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSubmittingConcession ? "ارسال ہو رہا ہے..." : "مالک کو ارسال کریں"}</span>
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
           </div>
         </div>
       )}

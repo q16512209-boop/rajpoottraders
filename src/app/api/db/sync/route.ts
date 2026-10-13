@@ -16,6 +16,7 @@ const COLLECTION_MAP: { [key: string]: string } = {
   ptpLogs: "ptp_logs",
   articles: "articles",
   ledgerChain: "ledger_chain",
+  concessionRequests: "concession_requests",
 };
 
 // GET: Fetch all collections from MongoDB

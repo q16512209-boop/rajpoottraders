@@ -91,17 +91,26 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 4. Recalculate plan arrears and completion status
-      const totalPaidSoFar = plan.schedule.reduce((acc, s) => acc + (s.amountPaid || 0), 0);
-      const totalExpectedSoFar = plan.schedule
-        .filter((s) => new Date(s.dueDate) <= new Date())
-        .reduce((acc, s) => acc + s.totalDue, 0);
+      // 4. Recalculate plan arrears and dynamic early payoff auto-completion
+      const totalPaidSoFar = (plan.downPayment || 0) +
+        plan.schedule.reduce((acc, s) => acc + (s.amountPaid || 0), 0) +
+        (plan.discountWaived || 0);
+      const remainingBalance = Math.max(0, (plan.totalFinanced || 0) - totalPaidSoFar);
 
-      plan.accumulatedShortArrears = Math.max(0, totalExpectedSoFar - totalPaidSoFar);
-
-      const allPaid = plan.schedule.length > 0 && plan.schedule.every((s) => s.status === "PAID");
-      if (allPaid) {
-        plan.status = "COMPLETED";
+      if (remainingBalance === 0) {
+        plan.status = plan.discountWaived && plan.discountWaived > 0 ? "CLOSED_WITH_DISCOUNT" : "COMPLETED";
+        plan.accumulatedShortArrears = 0;
+        plan.schedule.forEach((s) => {
+          if (s.status !== "PAID") {
+            s.status = "PAID";
+            s.notes = s.notes ? `${s.notes} • Early payoff settled` : "Settled via early payoff";
+          }
+        });
+      } else {
+        const totalExpectedSoFar = plan.schedule
+          .filter((s) => new Date(s.dueDate) <= new Date())
+          .reduce((acc, s) => acc + s.totalDue, 0);
+        plan.accumulatedShortArrears = Math.max(0, totalExpectedSoFar - totalPaidSoFar);
       }
 
       await plan.save();

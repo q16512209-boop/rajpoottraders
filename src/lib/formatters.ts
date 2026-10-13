@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Format currency in Pakistani Rupees (PKR)
  */
 export function formatPKR(amount: number | undefined | null): string {
@@ -62,6 +62,10 @@ export function getStatusBadgeClass(status: string): string {
     case "ACTIVE":
     case "APPROVED":
     case "VERIFIED":
+    case "COMPLETED":
+    case "FULLY_PAID":
+    case "CLOSED_WITH_DISCOUNT":
+    case "COMPLETED_EARLY_SETTLED":
       return "bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-600/20";
     case "PENDING":
     case "DUE":

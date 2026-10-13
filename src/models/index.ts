@@ -4,4 +4,5 @@ export * from "./Plan";
 export * from "./Installment";
 export * from "./CashLedger";
 export * from "./User";
+export * from "./ConcessionRequest";
 export { connectMongoose } from "@/lib/db/mongoose";

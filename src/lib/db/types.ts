@@ -199,7 +199,9 @@ export interface InstallmentPlan {
   collectionDayName?: string; // e.g. "FRIDAY", "ہفتہ", "سوموار"
   monthlyInstallment: number; // installment amount per cycle (e.g. 500 weekly)
   accumulatedShortArrears: number;
-  status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF" | "DEFAULTED_REPOSSESSED" | "COMPLETED_EARLY_SETTLED";
+  discountWaived?: number;
+  concessionReason?: string;
+  status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF" | "DEFAULTED_REPOSSESSED" | "COMPLETED_EARLY_SETTLED" | "CLOSED_WITH_DISCOUNT" | "FULLY_PAID";
   startDate: string;
   endDate: string;
   schedule: InstallmentScheduleItem[];
@@ -469,6 +471,32 @@ export interface IFieldOrder {
   deliveredAt?: string;
   convertedPlanId?: string;
   convertedSaleReceiptId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ConcessionRequest {
+  id: string;
+  tenantId: string;
+  businessId?: string;
+  planId: string;
+  khataNumber?: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  totalPrice: number;
+  totalPaid: number;
+  remainingBalance: number;
+  discountAmount: number;
+  reason: string;
+  requestedBy: string;
+  requestedById?: string;
+  officerRole: string;
+  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  reviewedBy?: string;
+  reviewedById?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
   createdAt: string;
   updatedAt?: string;
 }

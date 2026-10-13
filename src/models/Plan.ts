@@ -56,7 +56,9 @@ export interface IPlan extends Document {
   collectionDayName?: string;
   monthlyInstallment: number;
   accumulatedShortArrears: number;
-  status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF" | "DEFAULTED_REPOSSESSED" | "COMPLETED_EARLY_SETTLED";
+  status: "ACTIVE" | "COMPLETED" | "DEFAULTED" | "WRITTEN_OFF" | "DEFAULTED_REPOSSESSED" | "COMPLETED_EARLY_SETTLED" | "CLOSED_WITH_DISCOUNT" | "FULLY_PAID";
+  discountWaived?: number;
+  concessionReason?: string;
   startDate: string;
   endDate: string;
   schedule: IScheduleItem[];
@@ -127,9 +129,20 @@ const PlanSchema = new Schema<IPlan>(
     collectionDayName: { type: String, default: "" },
     monthlyInstallment: { type: Number, required: true },
     accumulatedShortArrears: { type: Number, default: 0 },
+    discountWaived: { type: Number, default: 0 },
+    concessionReason: { type: String, default: "" },
     status: {
       type: String,
-      enum: ["ACTIVE", "COMPLETED", "DEFAULTED", "WRITTEN_OFF", "DEFAULTED_REPOSSESSED", "COMPLETED_EARLY_SETTLED"],
+      enum: [
+        "ACTIVE",
+        "COMPLETED",
+        "DEFAULTED",
+        "WRITTEN_OFF",
+        "DEFAULTED_REPOSSESSED",
+        "COMPLETED_EARLY_SETTLED",
+        "CLOSED_WITH_DISCOUNT",
+        "FULLY_PAID",
+      ],
       default: "ACTIVE",
       index: true,
     },

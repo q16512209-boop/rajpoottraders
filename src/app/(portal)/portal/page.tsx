@@ -123,7 +123,11 @@ export default function PortalDashboard() {
   const totalKhatas = plans.length;
   const activeCount = plans.filter((p) => p.status === "ACTIVE").length;
   const completedCount = plans.filter(
-    (p) => p.status === "COMPLETED" || p.status === "COMPLETED_EARLY_SETTLED"
+    (p) =>
+      p.status === "COMPLETED" ||
+      p.status === "COMPLETED_EARLY_SETTLED" ||
+      p.status === "CLOSED_WITH_DISCOUNT" ||
+      p.status === "FULLY_PAID"
   ).length;
   const repossessedCount = plans.filter(
     (p) => p.status === "DEFAULTED_REPOSSESSED" || p.status === "WRITTEN_OFF" || p.status === "DEFAULTED"
@@ -132,15 +136,17 @@ export default function PortalDashboard() {
   // Financial Aggregate Totals
   let totalFinancedSum = 0;
   let totalRecoveredSum = 0;
+  let totalDiscountsWaivedSum = 0;
 
   plans.forEach((plan) => {
     totalFinancedSum += plan.totalFinanced || 0;
     const paidInSchedule = (plan.schedule || []).reduce((acc, s) => acc + (s.amountPaid || 0), 0);
     const paidTotal = paidInSchedule + (plan.downPayment || 0);
     totalRecoveredSum += paidTotal;
+    totalDiscountsWaivedSum += plan.discountWaived || 0;
   });
 
-  const totalMarketOutstanding = Math.max(0, totalFinancedSum - totalRecoveredSum);
+  const totalMarketOutstanding = Math.max(0, totalFinancedSum - totalRecoveredSum - totalDiscountsWaivedSum);
   const collectionEfficiency = totalFinancedSum > 0 ? ((totalRecoveredSum / totalFinancedSum) * 100).toFixed(1) : "0";
 
   // Filter Khatas matching Route, Status, and Search
@@ -155,7 +161,9 @@ export default function PortalDashboard() {
     if (
       statusFilter === "COMPLETED" &&
       plan.status !== "COMPLETED" &&
-      plan.status !== "COMPLETED_EARLY_SETTLED"
+      plan.status !== "COMPLETED_EARLY_SETTLED" &&
+      plan.status !== "CLOSED_WITH_DISCOUNT" &&
+      plan.status !== "FULLY_PAID"
     )
       return false;
     if (
@@ -540,11 +548,16 @@ export default function PortalDashboard() {
                     0
                   );
                   const planTotalPaid = paidInSchedule + (plan.downPayment || 0);
-                  const planRemaining = Math.max(0, (plan.totalFinanced || 0) - planTotalPaid);
+                  const planRemaining = Math.max(
+                    0,
+                    (plan.totalFinanced || 0) - planTotalPaid - (plan.discountWaived || 0)
+                  );
 
                   const isCompleted =
                     plan.status === "COMPLETED" ||
                     plan.status === "COMPLETED_EARLY_SETTLED" ||
+                    plan.status === "CLOSED_WITH_DISCOUNT" ||
+                    plan.status === "FULLY_PAID" ||
                     planRemaining <= 0;
                   const isRepossessed =
                     plan.status === "DEFAULTED_REPOSSESSED" ||
@@ -609,7 +622,11 @@ export default function PortalDashboard() {
 
                       {/* 7. Status Badges */}
                       <td className="p-3.5 text-center">
-                        {isCompleted ? (
+                        {plan.status === "CLOSED_WITH_DISCOUNT" ? (
+                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 font-black text-[10px] rounded-full font-urdu">
+                            رعایت پر کلئیر ✓
+                          </span>
+                        ) : isCompleted ? (
                           <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 font-black text-[10px] rounded-full font-urdu">
                             مکمل کلئیر ✓
                           </span>

@@ -14,7 +14,14 @@ export default function PlansPage() {
   const [search, setSearch] = useState<string>("");
 
   const filtered = plans.filter((p) => {
-    const matchStatus = filterStatus === "ALL" || p.status === filterStatus;
+    const matchStatus =
+      filterStatus === "ALL" ||
+      (filterStatus === "COMPLETED"
+        ? p.status === "COMPLETED" ||
+          p.status === "COMPLETED_EARLY_SETTLED" ||
+          p.status === "CLOSED_WITH_DISCOUNT" ||
+          p.status === "FULLY_PAID"
+        : p.status === filterStatus);
     const q = search.toLowerCase().trim();
     const matchSearch =
       q === "" ||

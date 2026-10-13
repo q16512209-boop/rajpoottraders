@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { store } from "@/lib/db/store";
 import { formatPKR, formatDate, formatDateTime, formatCNIC, getStatusBadgeClass } from "@/lib/formatters";
 import { useAuth } from "@/lib/context/auth-context";
@@ -16,6 +17,9 @@ import {
   ArrowRight,
   DollarSign,
   Edit3,
+  Trash2,
+  Send,
+  BadgePercent,
   ArrowLeftRight,
   ShieldCheck,
   RotateCcw,
@@ -33,7 +37,7 @@ import {
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
-import { GPSLocation, InstallmentScheduleItem } from "@/lib/db/types";
+import { GPSLocation, InstallmentScheduleItem, Customer, InstallmentPlan } from "@/lib/db/types";
 
 export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const { currentTenant, currentUser } = useAuth();
@@ -81,10 +85,223 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const router = useRouter();
+
   if (!currentUser) return null;
   if (!plan) return <div className="p-8 text-center font-bold">Plan not found</div>;
 
   const isOwnerOrSuperAdmin = currentUser.role === "SUPER_ADMIN" || currentUser.role === "OWNER";
+
+  // Associated Customer and Financial Totals
+  const customer = store.getCustomers(currentTenant.id).find((c) => c.id === plan.customerId);
+  const totalPaidAll = (plan.schedule || []).reduce((acc, curr) => acc + (curr.amountPaid || 0), 0) + (plan.downPayment || 0);
+  const remainingBalance = Math.max(0, (plan.totalFinanced || 0) - totalPaidAll - (plan.discountWaived || 0));
+
+  // Edit Khata Modal State (Owner/SuperAdmin Only)
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editKhataNo, setEditKhataNo] = useState(plan.khataNumber || "");
+  const [editCustomerName, setEditCustomerName] = useState(plan.customerName || "");
+  const [editFatherName, setEditFatherName] = useState(customer?.fatherName || "");
+  const [editPhone, setEditPhone] = useState(plan.customerPhone || "");
+  const [editCnic, setEditCnic] = useState(plan.customerCnic || "");
+  const [editAddress, setEditAddress] = useState(customer?.address || plan.areaZone || "");
+  const [editAreaZone, setEditAreaZone] = useState(plan.areaZone || "");
+  const [editProductTitle, setEditProductTitle] = useState(plan.productTitle || "");
+  const [editImeiSerial, setEditImeiSerial] = useState(plan.imeiSerial || "");
+  const [editCashPrice, setEditCashPrice] = useState(plan.cashPrice || 0);
+  const [editDownPayment, setEditDownPayment] = useState(plan.downPayment || 0);
+  const [editTotalFinanced, setEditTotalFinanced] = useState(plan.totalFinanced || 0);
+  const [editMonthlyInstallment, setEditMonthlyInstallment] = useState(plan.monthlyInstallment || 0);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+  // Delete Khata Modal State (Owner/SuperAdmin Only)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Concession / Maafi Request Modal State (Recovery Officers & Staff)
+  const [concessionModalOpen, setConcessionModalOpen] = useState(false);
+  const [concessionDiscountAmount, setConcessionDiscountAmount] = useState<number>(remainingBalance);
+  const [concessionReason, setConcessionReason] = useState<string>("Ghareeb bewa / Marzi e Malik");
+  const [isSubmittingConcession, setIsSubmittingConcession] = useState(false);
+
+  // Pending concession request for this plan if any
+  const pendingConcession = store
+    .getConcessionRequests(currentTenant.id)
+    .find((r) => r.planId === plan.id && r.status === "PENDING_APPROVAL");
+
+  const handleOpenEdit = () => {
+    const cust = store.getCustomers(currentTenant.id).find((c) => c.id === plan.customerId);
+    setEditKhataNo(plan.khataNumber || "");
+    setEditCustomerName(plan.customerName || "");
+    setEditFatherName(cust?.fatherName || "");
+    setEditPhone(plan.customerPhone || "");
+    setEditCnic(plan.customerCnic || "");
+    setEditAddress(cust?.address || plan.areaZone || "");
+    setEditAreaZone(plan.areaZone || "");
+    setEditProductTitle(plan.productTitle || "");
+    setEditImeiSerial(plan.imeiSerial || "");
+    setEditCashPrice(plan.cashPrice || 0);
+    setEditDownPayment(plan.downPayment || 0);
+    setEditTotalFinanced(plan.totalFinanced || 0);
+    setEditMonthlyInstallment(plan.monthlyInstallment || 0);
+    setEditModalOpen(true);
+    setMsg(null);
+  };
+
+  const handleSaveEditKhata = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isOwnerOrSuperAdmin) return;
+    setIsSubmittingEdit(true);
+    try {
+      const planUpdates: Partial<InstallmentPlan> = {
+        khataNumber: editKhataNo.trim(),
+        customerName: editCustomerName.trim(),
+        customerPhone: editPhone.trim(),
+        customerCnic: editCnic.trim(),
+        productTitle: editProductTitle.trim(),
+        imeiSerial: editImeiSerial.trim(),
+        cashPrice: Number(editCashPrice),
+        downPayment: Number(editDownPayment),
+        totalFinanced: Number(editTotalFinanced),
+        monthlyInstallment: Number(editMonthlyInstallment),
+        areaZone: editAreaZone.trim(),
+      };
+      const customerUpdates: Partial<Customer> = {
+        fullName: editCustomerName.trim(),
+        fatherName: editFatherName.trim(),
+        phone: editPhone.trim(),
+        cnic: editCnic.trim(),
+        address: editAddress.trim(),
+        zoneArea: editAreaZone.trim(),
+      };
+
+      const res = store.editPlan({
+        planId: plan.id,
+        planUpdates,
+        customerUpdates,
+        editorUser: currentUser,
+      });
+
+      try {
+        await fetch(`/api/plans/${plan.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "x-user-role": currentUser.role,
+            "x-user-business-id": currentTenant.id,
+          },
+          body: JSON.stringify({
+            userRole: currentUser.role,
+            businessId: currentTenant.id,
+            planUpdates,
+            customerUpdates,
+          }),
+        });
+      } catch (apiErr) {}
+
+      setPlan({ ...res.plan });
+      setEditModalOpen(false);
+      setMsg({
+        type: "success",
+        text: `Khata #${res.plan.khataNumber || res.plan.planNumber} kamyabi se update ho gaya hai!`,
+      });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to update khata." });
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleConfirmDeleteKhata = async () => {
+    if (!isOwnerOrSuperAdmin) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/plans/${plan.id}?role=${currentUser.role}&businessId=${currentTenant.id}`, {
+        method: "DELETE",
+        headers: {
+          "x-user-role": currentUser.role,
+          "x-user-business-id": currentTenant.id,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete Khata");
+      }
+
+      store.deletePlan({
+        planId: plan.id,
+        deleterUser: currentUser,
+      });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+
+      router.push("/portal/plans");
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Delete failed" });
+      setIsDeleting(false);
+      setDeleteModalOpen(false);
+    }
+  };
+
+  const handleSubmitConcessionRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (concessionDiscountAmount <= 0) {
+      alert("Discount amount must be greater than 0");
+      return;
+    }
+    setIsSubmittingConcession(true);
+    try {
+      store.requestConcession({
+        planId: plan.id,
+        discountAmount: Number(concessionDiscountAmount),
+        reason: concessionReason,
+        requestedBy: currentUser,
+      });
+
+      try {
+        await fetch("/api/concessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "CREATE",
+            planId: plan.id,
+            khataNumber: plan.khataNumber || plan.planNumber,
+            customerId: plan.customerId,
+            customerName: plan.customerName,
+            customerPhone: plan.customerPhone,
+            totalPrice: plan.totalFinanced,
+            totalPaid: totalPaidAll,
+            remainingBalance,
+            discountAmount: Number(concessionDiscountAmount),
+            reason: concessionReason,
+            requestedBy: currentUser.name,
+            requestedById: currentUser.id,
+            officerRole: currentUser.role,
+            tenantId: plan.tenantId,
+            businessId: plan.businessId || plan.tenantId,
+          }),
+        });
+      } catch (e) {}
+
+      setConcessionModalOpen(false);
+      setMsg({
+        type: "success",
+        text: `Rs. ${concessionDiscountAmount} معافی / رعایت کی درخواست مالک کو منظوری کے لیے بھیج دی گئی ہے۔`,
+      });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to submit concession request" });
+    } finally {
+      setIsSubmittingConcession(false);
+    }
+  };
 
   const handleOpenPay = (instNo: number, dueAmount: number, itemDueDate: string) => {
     setActiveInstallmentNo(instNo);
@@ -335,6 +552,56 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Owner-Exclusive Khata Edit & Delete Buttons */}
+          {isOwnerOrSuperAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={handleOpenEdit}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition-all border border-amber-300"
+                title="Sirf Owner aur Super Admin k liye"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>✏️ Edit Khata / Plan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow transition-all border border-rose-500"
+                title="Sirf Owner aur Super Admin k liye"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>🗑️ Delete Khata</span>
+              </button>
+            </>
+          )}
+
+          {/* Concession / Maafi Request Workflow */}
+          {pendingConcession ? (
+            <span className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-400/90 text-slate-950 font-black text-xs rounded-xl border border-amber-300 shadow">
+              <Clock className="w-4 h-4 text-slate-950" />
+              <span>⏳ Concession Pending: Rs. {pendingConcession.discountAmount}</span>
+            </span>
+          ) : remainingBalance > 0 && plan.status !== "CLOSED_WITH_DISCOUNT" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setConcessionDiscountAmount(remainingBalance);
+                setConcessionModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-teal-800 hover:bg-teal-700 text-teal-100 border border-teal-500 font-bold text-xs rounded-xl shadow transition-all"
+            >
+              <Send className="w-4 h-4 text-amber-300" />
+              <span>📩 Request Concession (معافی)</span>
+            </button>
+          ) : plan.discountWaived && plan.discountWaived > 0 ? (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 text-emerald-100 border border-emerald-500 font-bold text-xs rounded-xl">
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              <span>معافی شدہ: Rs. {plan.discountWaived}</span>
+            </span>
+          ) : null}
+
           {plan.status === "ACTIVE" && (
             <>
               <button
@@ -971,6 +1238,354 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                   className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow"
                 >
                   Save GPS Location
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Owner-Only Edit Khata Modal */}
+      {editModalOpen && isOwnerOrSuperAdmin && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-amber-600" />
+                  <span>Edit Khata & Plan (Owner Exclusive)</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-urdu">
+                  صرف دکان کے مالک کو کھاتہ اور خریدار کی تفصیلات تبدیل کرنے کی اجازت ہے۔
+                </p>
+              </div>
+              <button
+                onClick={() => setEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditKhata} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Khata Number (کھاتہ #) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editKhataNo}
+                    onChange={(e) => setEditKhataNo(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-amber-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Customer Full Name (خریدار کا نام) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCustomerName}
+                    onChange={(e) => setEditCustomerName(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Father Name (ولدیت) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFatherName}
+                    onChange={(e) => setEditFatherName(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-urdu text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Phone Number (موبائل فون) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">CNIC (شناختی کارڈ) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCnic}
+                    onChange={(e) => setEditCnic(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Bazaar / Area Route *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editAreaZone}
+                    onChange={(e) => setEditAreaZone(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Full Street Address / Shop Location</label>
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 outline-none"
+                />
+              </div>
+
+              <div className="border-t pt-3">
+                <span className="text-[11px] uppercase font-black text-slate-400 block mb-2">
+                  Product & Pricing Details
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Product Title *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProductTitle}
+                      onChange={(e) => setEditProductTitle(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">IMEI / Serial Number</label>
+                    <input
+                      type="text"
+                      value={editImeiSerial}
+                      onChange={(e) => setEditImeiSerial(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Cash Price (Rs.)</label>
+                    <input
+                      type="number"
+                      value={editCashPrice}
+                      onChange={(e) => setEditCashPrice(Number(e.target.value))}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Advance Down Payment (Rs.)</label>
+                    <input
+                      type="number"
+                      value={editDownPayment}
+                      onChange={(e) => setEditDownPayment(Number(e.target.value))}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-emerald-800 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Total Financed Price (کل رقم - Rs.) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={editTotalFinanced}
+                      onChange={(e) => setEditTotalFinanced(Number(e.target.value))}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-black text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Installment Amount (قسط - Rs.) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={editMonthlyInstallment}
+                      onChange={(e) => setEditMonthlyInstallment(Number(e.target.value))}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEdit}
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl shadow transition-all"
+                >
+                  {isSubmittingEdit ? "Updating..." : "Save Khata Changes (تبدیلیاں محفوظ کریں)"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Owner-Only Delete Khata Confirmation Modal */}
+      {deleteModalOpen && isOwnerOrSuperAdmin && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border-2 border-rose-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-100 rounded-2xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Delete Khata #{plan.khataNumber || plan.planNumber}?
+                </h3>
+                <p className="text-xs text-slate-500 font-urdu">
+                  صرف دکان کے مالک کو کھاتہ ڈیلیٹ کرنے کا اختیار ہے۔
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 space-y-2">
+              <p className="font-bold">⚠️ خبردار: یہ عمل ناقابل واپسی ہے۔</p>
+              <p className="font-urdu leading-relaxed">
+                اس کھاتے کا تمام ریکارڈ، اقساط کی ہسٹری اور معاہدہ مستقل طور پر ختم ہو جائے گا۔
+              </p>
+              <div className="bg-white p-2.5 rounded-xl border border-rose-200 font-mono text-[11px] text-slate-800">
+                <div><strong>Khata #:</strong> {plan.khataNumber || plan.planNumber}</div>
+                <div><strong>Customer:</strong> {plan.customerName}</div>
+                <div><strong>Product:</strong> {plan.productTitle}</div>
+                <div><strong>Total Financed:</strong> {formatPKR(plan.totalFinanced)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs"
+              >
+                Cancel (منسوخ کریں)
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteKhata}
+                disabled={isDeleting}
+                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs shadow transition-all"
+              >
+                {isDeleting ? "Deleting..." : "Permanently Delete Khata (مستقل ڈیلیٹ کریں)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Concession / Maafi Request Modal */}
+      {concessionModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 border-2 border-teal-500">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-teal-100 text-teal-800 rounded-xl">
+                  <BadgePercent className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Request Concession / Maafi (رعایت کی درخواست)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-urdu">
+                    یہ درخواست منظوری کے لیے براہ راست مالک کو جائے گی۔
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConcessionModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs space-y-1.5 font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Khata #:</span>
+                <span className="font-bold text-slate-900">#{plan.khataNumber || plan.planNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Customer:</span>
+                <span className="font-bold text-slate-900">{plan.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Price:</span>
+                <span className="font-bold text-slate-900">{formatPKR(plan.totalFinanced)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Paid So Far:</span>
+                <span className="font-bold text-emerald-800">{formatPKR(totalPaidAll)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-1">
+                <span className="text-slate-700 font-bold">Remaining Balance (بقایا):</span>
+                <span className="font-black text-rose-700">{formatPKR(remainingBalance)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitConcessionRequest} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Requested Discount Amount (رعایت کی رقم - Rs.) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={remainingBalance}
+                  value={concessionDiscountAmount}
+                  onChange={(e) => setConcessionDiscountAmount(Number(e.target.value))}
+                  className="w-full p-3 bg-slate-50 border-2 border-teal-600 rounded-xl font-mono font-black text-teal-900 text-lg outline-none"
+                />
+                <span className="text-[10px] text-slate-400 block mt-0.5 font-urdu">
+                  زیادہ سے زیادہ بقایا رقم ({formatPKR(remainingBalance)}) معاف ہو سکتی ہے۔
+                </span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Reason / Waja for Concession (رعایت کی وجہ) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ghareeb bewa / Marzi e Malik / Akhri qist maafi"
+                  value={concessionReason}
+                  onChange={(e) => setConcessionReason(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-urdu outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setConcessionModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingConcession}
+                  className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                >
+                  <Send className="w-4 h-4 text-amber-300" />
+                  <span>{isSubmittingConcession ? "Submitting..." : "Send Request to Owner (درخواست بھیجیں)"}</span>
                 </button>
               </div>
             </form>

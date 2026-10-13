@@ -21,6 +21,7 @@ import {
   Package,
   MapPin,
   UserCheck,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { UserRole } from "@/lib/db/types";
@@ -90,6 +91,7 @@ export function PortalSidebar({ mobileOpen = false, onMobileClose }: SidebarProp
               { href: "/portal/plans", label: "Installment Plans", icon: FileSpreadsheet, guideKey: "LOG_PAYMENT" },
               { href: "/portal/recovery", label: "Field Recovery (Overview)", icon: Bike, guideKey: "ROUTE_SHEET" },
               { href: "/portal/treasury", label: "Treasury & Pocket Cash", icon: Wallet, guideKey: "TREASURY" },
+              { href: "/portal/notifications", label: "Concessions & Waivers", icon: Sparkles, guideKey: "TREASURY" },
               { href: "/portal/handovers", label: "Cash Handovers (Accept Collection)", icon: ArrowRightLeft, guideKey: "HANDOVERS" },
               { href: "/portal/expenses", label: "Daily Expenses Logger", icon: Receipt, guideKey: "EXPENSES" },
               { href: "/portal/products", label: "Products & IMEI Inventory", icon: Package, guideKey: "PRODUCTS" },

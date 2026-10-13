@@ -35,6 +35,7 @@ import {
   GPSLocation,
   ChainedLedgerBlock,
   LedgerEntryPayload,
+  ConcessionRequest,
 } from "./types";
 import { allocateInstallmentPayment, calculateInstallmentBreakdown, calculateEarlySettlement } from "../calculations";
 import { decryptField, encryptField } from "../crypto/aes";
@@ -89,6 +90,7 @@ export class AppStore {
       staffTargets: this.staffTargets,
       fieldOrders: this.fieldOrders,
       ledgerChain: this.ledgerChain,
+      concessionRequests: this.concessionRequests,
     };
   }
 
@@ -126,6 +128,7 @@ export class AppStore {
     if (Array.isArray(data.staffTargets) && data.staffTargets.length > 0) this.staffTargets = this.deduplicateEntities(this.staffTargets, data.staffTargets);
     if (Array.isArray(data.fieldOrders) && data.fieldOrders.length > 0) this.fieldOrders = this.deduplicateEntities(this.fieldOrders, data.fieldOrders);
     if (Array.isArray(data.ledgerChain) && data.ledgerChain.length > 0) this.ledgerChain = this.deduplicateEntities(this.ledgerChain, data.ledgerChain);
+    if (Array.isArray(data.concessionRequests) && data.concessionRequests.length > 0) this.concessionRequests = this.deduplicateEntities(this.concessionRequests, data.concessionRequests);
   }
 
   private tenants: Tenant[] = [...initialTenants];
@@ -142,6 +145,7 @@ export class AppStore {
   private settlements: ISettlementRecord[] = [];
   private ptpLogs: IPTPLog[] = [];
   private claimRequests: IClaimRequest[] = [];
+  private concessionRequests: ConcessionRequest[] = [];
   private routeZones: IRouteZone[] = [
     {
       id: "zone_chn_rail",
@@ -821,6 +825,92 @@ export class AppStore {
     return newPlan;
   }
 
+  // --- Owner-Exclusive Khata Edit & Delete Permissions ---
+  editPlan(params: {
+    planId: string;
+    planUpdates: Partial<InstallmentPlan>;
+    customerUpdates?: Partial<Customer>;
+    editorUser: User;
+  }): { plan: InstallmentPlan; customer?: Customer } {
+    if (params.editorUser.role !== "OWNER" && params.editorUser.role !== "SUPER_ADMIN") {
+      throw new Error("Sirf Dukan ke Malik ko Khata edit ya delete karne ki ijazat hai");
+    }
+
+    const planIndex = this.plans.findIndex((p) => p.id === params.planId);
+    if (planIndex === -1) throw new Error("Plan not found");
+
+    const plan = this.plans[planIndex];
+
+    if (
+      params.editorUser.role !== "SUPER_ADMIN" &&
+      params.editorUser.tenantId &&
+      plan.tenantId !== params.editorUser.tenantId
+    ) {
+      throw new Error("Sirf Dukan ke Malik ko Khata edit ya delete karne ki ijazat hai");
+    }
+
+    Object.assign(plan, params.planUpdates);
+
+    // Dynamic auto-completion check if numbers or payments changed
+    const totalPaid = (plan.downPayment || 0) +
+      (plan.schedule || []).reduce((acc, s) => acc + (s.amountPaid || 0), 0) +
+      (plan.discountWaived || 0);
+    const remainingBalance = Math.max(0, (plan.totalFinanced || 0) - totalPaid);
+
+    if (remainingBalance === 0) {
+      plan.status = plan.discountWaived && plan.discountWaived > 0 ? "CLOSED_WITH_DISCOUNT" : "COMPLETED";
+      plan.accumulatedShortArrears = 0;
+      plan.schedule.forEach((s) => {
+        if (s.status !== "PAID") {
+          s.status = "PAID";
+          s.notes = s.notes ? `${s.notes} • Settle` : "Settled";
+        }
+      });
+    }
+
+    this.plans[planIndex] = { ...plan };
+    syncEntityToCloud("plans", this.plans[planIndex]);
+
+    let updatedCustomer: Customer | undefined;
+    if (plan.customerId && params.customerUpdates) {
+      const custIndex = this.customers.findIndex((c) => c.id === plan.customerId);
+      if (custIndex !== -1) {
+        Object.assign(this.customers[custIndex], params.customerUpdates);
+        updatedCustomer = this.customers[custIndex];
+        syncEntityToCloud("customers", updatedCustomer);
+      }
+    }
+
+    return { plan: this.plans[planIndex], customer: updatedCustomer };
+  }
+
+  deletePlan(params: {
+    planId: string;
+    deleterUser: User;
+  }): { success: boolean; deletedPlanId: string } {
+    if (params.deleterUser.role !== "OWNER" && params.deleterUser.role !== "SUPER_ADMIN") {
+      throw new Error("Sirf Dukan ke Malik ko Khata edit ya delete karne ki ijazat hai");
+    }
+
+    const planIndex = this.plans.findIndex((p) => p.id === params.planId);
+    if (planIndex === -1) throw new Error("Plan not found");
+
+    const plan = this.plans[planIndex];
+
+    if (
+      params.deleterUser.role !== "SUPER_ADMIN" &&
+      params.deleterUser.tenantId &&
+      plan.tenantId !== params.deleterUser.tenantId
+    ) {
+      throw new Error("Sirf Dukan ke Malik ko Khata edit ya delete karne ki ijazat hai");
+    }
+
+    this.plans.splice(planIndex, 1);
+    syncEntityToCloud("plans", { id: params.planId }, "DELETE");
+
+    return { success: true, deletedPlanId: params.planId };
+  }
+
   recordInstallmentPayment(params: {
     planId: string;
     installmentNo: number;
@@ -853,6 +943,49 @@ export class AppStore {
     scheduleItem.shortArrears = allocation.newShortArrears;
 
     plan.accumulatedShortArrears = allocation.newShortArrears;
+
+    // Dynamic Early Payoff & Excess Cascade:
+    if (allocation.excessAdvanceCredit > 0) {
+      let excessLeft = allocation.excessAdvanceCredit;
+      for (const futureItem of plan.schedule) {
+        if (futureItem.installmentNo <= scheduleItem.installmentNo) continue;
+        if (excessLeft <= 0) break;
+        if (futureItem.status !== "PAID") {
+          const needed = futureItem.totalDue - (futureItem.amountPaid || 0);
+          const applyNow = Math.min(excessLeft, needed);
+          futureItem.amountPaid = (futureItem.amountPaid || 0) + applyNow;
+          futureItem.paidDate = scheduleItem.paidDate;
+          futureItem.collectedBy = params.collectedBy;
+          futureItem.receiptId = scheduleItem.receiptId;
+          if (futureItem.amountPaid >= futureItem.totalDue) {
+            futureItem.status = "PAID";
+          } else {
+            futureItem.status = "SHORT_PAID";
+          }
+          excessLeft -= applyNow;
+        }
+      }
+    }
+
+    // Dynamic Early Payoff & Instant Auto-Completion Check
+    const totalPaidSoFar = (plan.downPayment || 0) +
+      plan.schedule.reduce((acc, s) => acc + (s.amountPaid || 0), 0) +
+      (plan.discountWaived || 0);
+    const remainingBalance = Math.max(0, (plan.totalFinanced || 0) - totalPaidSoFar);
+
+    if (remainingBalance === 0) {
+      plan.status = plan.discountWaived && plan.discountWaived > 0 ? "CLOSED_WITH_DISCOUNT" : "COMPLETED";
+      plan.accumulatedShortArrears = 0;
+      plan.schedule.forEach((s) => {
+        if (s.status !== "PAID") {
+          s.status = "PAID";
+          s.paidDate = s.paidDate || scheduleItem.paidDate || new Date().toISOString();
+          s.notes = s.notes ? `${s.notes} • Early payoff settled` : "Settled via early payoff";
+        }
+      });
+    }
+
+    syncEntityToCloud("plans", plan);
 
     let targetWallet: WalletAccount | undefined;
     if (params.collectorRole === "FIELD_RECOVERY") {
@@ -924,6 +1057,23 @@ export class AppStore {
     });
 
     plan.accumulatedShortArrears = accumulatedShort;
+
+    // Dynamic Early Payoff & Instant Auto-Completion Check
+    const totalPaidSoFar = (plan.downPayment || 0) +
+      plan.schedule.reduce((acc, s) => acc + (s.amountPaid || 0), 0) +
+      (plan.discountWaived || 0);
+    const remainingBalance = Math.max(0, (plan.totalFinanced || 0) - totalPaidSoFar);
+
+    if (remainingBalance === 0) {
+      plan.status = plan.discountWaived && plan.discountWaived > 0 ? "CLOSED_WITH_DISCOUNT" : "COMPLETED";
+      plan.accumulatedShortArrears = 0;
+      plan.schedule.forEach((s) => {
+        if (s.status !== "PAID") {
+          s.status = "PAID";
+          s.notes = s.notes ? `${s.notes} • Early payoff settled` : "Settled via early payoff";
+        }
+      });
+    }
 
     this.appendLedgerBlock({
       id: `tx_diary_rec_${Date.now()}`,
@@ -1772,6 +1922,130 @@ export class AppStore {
     });
 
     return claim;
+  }
+
+  // --- Concession / Maafi Request & Owner Approval Flow ---
+  requestConcession(params: {
+    planId: string;
+    discountAmount: number;
+    reason: string;
+    requestedBy: User;
+  }): ConcessionRequest {
+    const plan = this.plans.find((p) => p.id === params.planId);
+    if (!plan) throw new Error("Plan not found");
+
+    const totalPaid = (plan.downPayment || 0) +
+      plan.schedule.reduce((acc, s) => acc + (s.amountPaid || 0), 0) +
+      (plan.discountWaived || 0);
+    const remainingBalance = Math.max(0, (plan.totalFinanced || 0) - totalPaid);
+
+    if (params.discountAmount <= 0) {
+      throw new Error("Discount amount must be greater than 0");
+    }
+    if (params.discountAmount > remainingBalance) {
+      throw new Error(`Discount amount (Rs. ${params.discountAmount}) cannot exceed remaining balance (Rs. ${remainingBalance})`);
+    }
+
+    const newReq: ConcessionRequest = {
+      id: `conc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      tenantId: plan.tenantId,
+      businessId: plan.businessId || plan.tenantId,
+      planId: plan.id,
+      khataNumber: plan.khataNumber || plan.planNumber,
+      customerId: plan.customerId,
+      customerName: plan.customerName,
+      customerPhone: plan.customerPhone,
+      totalPrice: plan.totalFinanced,
+      totalPaid,
+      remainingBalance,
+      discountAmount: params.discountAmount,
+      reason: params.reason.trim(),
+      requestedBy: params.requestedBy.name,
+      requestedById: params.requestedBy.id,
+      officerRole: params.requestedBy.role,
+      status: "PENDING_APPROVAL",
+      createdAt: new Date().toISOString(),
+    };
+
+    this.concessionRequests.unshift(newReq);
+    syncEntityToCloud("concessionRequests", newReq);
+    return newReq;
+  }
+
+  getConcessionRequests(tenantId?: string): ConcessionRequest[] {
+    if (!tenantId) return this.concessionRequests;
+    return this.concessionRequests.filter((r) => r.tenantId === tenantId || r.businessId === tenantId);
+  }
+
+  approveConcessionRequest(params: {
+    requestId: string;
+    reviewer: User;
+  }): { request: ConcessionRequest; plan: InstallmentPlan } {
+    if (params.reviewer.role !== "OWNER" && params.reviewer.role !== "SUPER_ADMIN") {
+      throw new Error("Sirf Dukan ke Malik ko Khata ya Riayat approve karne ki ijazat hai.");
+    }
+
+    const req = this.concessionRequests.find((r) => r.id === params.requestId);
+    if (!req) throw new Error("Concession request not found");
+    if (req.status !== "PENDING_APPROVAL") {
+      throw new Error(`Request is already ${req.status}`);
+    }
+
+    const plan = this.plans.find((p) => p.id === req.planId);
+    if (!plan) throw new Error("Plan not found");
+
+    // Approve the concession
+    req.status = "APPROVED";
+    req.reviewedBy = params.reviewer.name;
+    req.reviewedById = params.reviewer.id;
+    req.reviewedAt = new Date().toISOString();
+
+    // Financial Audit Transparency:
+    // totalPrice: unperturbed (e.g. Rs. 6,800)
+    // totalCollected: unperturbed (actual cash received Rs. 6,300, NEVER falsely inflated)
+    // discountWaived: recorded (Rs. 500)
+    // Till / CashLedger: NEVER receives fake money!
+    plan.discountWaived = (plan.discountWaived || 0) + req.discountAmount;
+    plan.concessionReason = req.reason;
+    plan.status = "CLOSED_WITH_DISCOUNT";
+    plan.accumulatedShortArrears = 0;
+
+    // Settle all remaining unpaid schedule rows
+    plan.schedule.forEach((item) => {
+      if (item.status !== "PAID") {
+        item.status = "PAID";
+        item.notes = item.notes
+          ? `${item.notes} • Waived by Owner concession (Rs. ${req.discountAmount})`
+          : `Waived by Owner concession (Rs. ${req.discountAmount}) - Khata Closed`;
+      }
+    });
+
+    syncEntityToCloud("concessionRequests", req);
+    syncEntityToCloud("plans", plan);
+
+    return { request: req, plan };
+  }
+
+  rejectConcessionRequest(params: {
+    requestId: string;
+    reviewer: User;
+    rejectionReason?: string;
+  }): ConcessionRequest {
+    if (params.reviewer.role !== "OWNER" && params.reviewer.role !== "SUPER_ADMIN") {
+      throw new Error("Sirf Dukan ke Malik ko Khata ya Riayat reject karne ki ijazat hai.");
+    }
+
+    const req = this.concessionRequests.find((r) => r.id === params.requestId);
+    if (!req) throw new Error("Concession request not found");
+
+    req.status = "REJECTED";
+    req.reviewedBy = params.reviewer.name;
+    req.reviewedById = params.reviewer.id;
+    req.reviewedAt = new Date().toISOString();
+    req.rejectionReason = params.rejectionReason || "Owner ne riayat ki darkhwast mustarid kardi.";
+
+    syncEntityToCloud("concessionRequests", req);
+    return req;
   }
 
   // --- Dynamic Route Zones Management (Owner & Super Admin) ---
