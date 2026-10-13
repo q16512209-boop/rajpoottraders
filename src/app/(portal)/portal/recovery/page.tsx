@@ -26,6 +26,7 @@ import {
   Navigation,
   ArrowRight,
   Send,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { IPTPLog, OfflineCollectionItem, ConcessionRequest } from "@/lib/db/types";
@@ -53,9 +54,11 @@ export default function RecoveryPortalPage() {
   const [payModalPlan, setPayModalPlan] = useState<any>(null);
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payNotes, setPayNotes] = useState<string>("");
+  const [isCollecting, setIsCollecting] = useState<boolean>(false);
 
   // PTP Modal State
   const [ptpModalPlan, setPtpModalPlan] = useState<any>(null);
+  const [isSavingPTP, setIsSavingPTP] = useState<boolean>(false);
   const [ptpDate, setPtpDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 3);
@@ -187,55 +190,58 @@ export default function RecoveryPortalPage() {
   // Confirm Payment (Online or Offline-First)
   const handleConfirmCollect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payModalPlan || payAmount <= 0) return;
+    if (!payModalPlan || payAmount <= 0 || isCollecting) return;
 
+    setIsCollecting(true);
     const officerId = currentUser.id || "usr_recovery";
     const planId = payModalPlan.id;
     const clientUUID = `OFFLINE-${officerId}-${planId}-${Date.now()}`;
 
-    if (!isOnline) {
-      // Offline Emergency Buffer Handler
-      const offlineItem = {
-        clientUUID,
-        tempId: clientUUID,
-        planId: payModalPlan.id,
-        planNumber: payModalPlan.planNumber,
-        customerName: payModalPlan.customerName,
-        customerPhone: payModalPlan.customerPhone,
-        amount: Number(payAmount),
-        collectedAt: new Date().toISOString(),
-        collectedBy: currentUser.id,
-        officerName: currentUser.name,
-        notes: payNotes || "Field collection (Offline mode)",
-        synced: false,
-        paymentMethod: "CASH",
-        offlineReceiptHash: clientUUID,
-      };
-
-      const updatedQueue = [...offlineQueue, offlineItem];
-      setOfflineQueue(updatedQueue);
-      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(updatedQueue));
-      localStorage.setItem("rt_offline_queue", JSON.stringify(updatedQueue));
-
-      setMsg({
-        type: "offline",
-        text: `Offline وصولی محفوظ کر لی گئی۔ انٹرنیٹ آنے پر کلاؤڈ پر منتقل کریں۔`,
-        receiptId: clientUUID,
-        phone: payModalPlan.customerPhone,
-        customerName: payModalPlan.customerName,
-        isOfflineSlip: true,
-        clientUUID,
-        amount: Number(payAmount),
-      });
-      setPayModalPlan(null);
-      return;
-    }
-
-    // Online Collection via Direct Live Path
-    const nextInst = payModalPlan.schedule.find((s: any) => s.status !== "PAID") || payModalPlan.schedule[0];
-    if (!nextInst) return;
-
     try {
+      await new Promise((r) => setTimeout(r, 350));
+
+      if (!isOnline) {
+        // Offline Emergency Buffer Handler
+        const offlineItem = {
+          clientUUID,
+          tempId: clientUUID,
+          planId: payModalPlan.id,
+          planNumber: payModalPlan.planNumber,
+          customerName: payModalPlan.customerName,
+          customerPhone: payModalPlan.customerPhone,
+          amount: Number(payAmount),
+          collectedAt: new Date().toISOString(),
+          collectedBy: currentUser.id,
+          officerName: currentUser.name,
+          notes: payNotes || "Field collection (Offline mode)",
+          synced: false,
+          paymentMethod: "CASH",
+          offlineReceiptHash: clientUUID,
+        };
+
+        const updatedQueue = [...offlineQueue, offlineItem];
+        setOfflineQueue(updatedQueue);
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(updatedQueue));
+        localStorage.setItem("rt_offline_queue", JSON.stringify(updatedQueue));
+
+        setMsg({
+          type: "offline",
+          text: `Offline وصولی محفوظ کر لی گئی۔ انٹرنیٹ آنے پر کلاؤڈ پر منتقل کریں۔`,
+          receiptId: clientUUID,
+          phone: payModalPlan.customerPhone,
+          customerName: payModalPlan.customerName,
+          isOfflineSlip: true,
+          clientUUID,
+          amount: Number(payAmount),
+        });
+        setPayModalPlan(null);
+        return;
+      }
+
+      // Online Collection via Direct Live Path
+      const nextInst = payModalPlan.schedule.find((s: any) => s.status !== "PAID") || payModalPlan.schedule[0];
+      if (!nextInst) return;
+
       const res = store.recordInstallmentPayment({
         planId: payModalPlan.id,
         installmentNo: nextInst.installmentNo,
@@ -257,15 +263,19 @@ export default function RecoveryPortalPage() {
       setPayModalPlan(null);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to log field collection" });
+    } finally {
+      setIsCollecting(false);
     }
   };
 
   // Confirm PTP Log
-  const handleConfirmPTP = (e: React.FormEvent) => {
+  const handleConfirmPTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ptpModalPlan) return;
+    if (!ptpModalPlan || isSavingPTP) return;
 
+    setIsSavingPTP(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const createdPtp = store.logPTP({
         planId: ptpModalPlan.id,
         promisedDate: ptpDate,
@@ -288,6 +298,8 @@ export default function RecoveryPortalPage() {
       setPtpModalPlan(null);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to log PTP" });
+    } finally {
+      setIsSavingPTP(false);
     }
   };
 
@@ -311,6 +323,7 @@ export default function RecoveryPortalPage() {
 
     setIsSubmittingConcession(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.requestConcession({
         planId: concessionModalPlan.id,
         discountAmount: Number(concessionAmount),
@@ -762,9 +775,19 @@ export default function RecoveryPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-md"
+                  disabled={isCollecting}
+                  className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
                 >
-                  {isOnline ? "Confirm Payment" : "Save Offline Slip"}
+                  {isCollecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : isOnline ? (
+                    "Confirm Payment"
+                  ) : (
+                    "Save Offline Slip"
+                  )}
                 </button>
               </div>
             </form>
@@ -848,9 +871,17 @@ export default function RecoveryPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-md"
+                  disabled={isSavingPTP}
+                  className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
                 >
-                  Save PTP Promise
+                  {isSavingPTP ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>وعدہ درج ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    "Save PTP Promise"
+                  )}
                 </button>
               </div>
             </form>
@@ -954,8 +985,17 @@ export default function RecoveryPortalPage() {
                       disabled={isSubmittingConcession || concessionAmount <= 0 || concessionAmount > balance}
                       className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs rounded-xl shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>{isSubmittingConcession ? "ارسال ہو رہا ہے..." : "مالک کو ارسال کریں"}</span>
+                      {isSubmittingConcession ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>ارسال ہو رہا ہے...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>مالک کو ارسال کریں</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>

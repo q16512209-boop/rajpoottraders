@@ -17,6 +17,7 @@ import {
   CreditCard,
   Sparkles,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 export default function ExcelImportPage() {
@@ -24,6 +25,7 @@ export default function ExcelImportPage() {
   const [parsedRows, setParsedRows] = useState<ImportedCustomerRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isCommitting, setIsCommitting] = useState<boolean>(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,10 +54,12 @@ export default function ExcelImportPage() {
     }
   };
 
-  const handleCommitImport = () => {
-    if (parsedRows.length === 0) return;
+  const handleCommitImport = async () => {
+    if (parsedRows.length === 0 || isCommitting) return;
 
+    setIsCommitting(true);
     try {
+      await new Promise((r) => setTimeout(r, 400));
       const result = store.bulkImportCustomers(parsedRows, currentTenant.id);
       setMsg({
         type: "success",
@@ -65,6 +69,8 @@ export default function ExcelImportPage() {
       setFileName("");
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to commit import" });
+    } finally {
+      setIsCommitting(false);
     }
   };
 
@@ -168,10 +174,20 @@ export default function ExcelImportPage() {
 
             <button
               onClick={handleCommitImport}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
+              disabled={isCommitting}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
             >
-              <span>Confirm & Migrate {parsedRows.length} Customers</span>
-              <ArrowRight className="w-4 h-4" />
+              {isCommitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>مائیگریٹ ہو رہا ہے...</span>
+                </>
+              ) : (
+                <>
+                  <span>Confirm & Migrate {parsedRows.length} Customers</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </div>
 

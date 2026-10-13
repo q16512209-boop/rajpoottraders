@@ -19,6 +19,7 @@ import {
   Phone,
   User,
   Building,
+  Loader2,
 } from "lucide-react";
 
 export default function NewCustomerPage() {
@@ -56,70 +57,81 @@ export default function NewCustomerPage() {
   const [g2Address, setG2Address] = useState("");
   const [g2Work, setG2Work] = useState("");
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Live Defaulter Cross-Check
   const crossCheck = store.checkHouseholdDefaulter(address, cnic, phone);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!fullName || !phone || !address) {
       alert("Please enter customer basic details (Name, Phone, Address).");
       return;
     }
 
-    const cleanCnic = cnic.trim() || "N/A";
-    const guarantor1Name = g1Name.trim() || `${fullName.trim()} (خود ضامن)`;
-    const guarantor1Father = g1Father.trim() || fatherName.trim() || "";
-    const guarantor1Cnic = g1Cnic.trim() || (cleanCnic !== "N/A" ? cleanCnic : "N/A");
-    const guarantor1Phone = g1Phone.trim() || phone.trim();
-    const guarantor1Relation = g1Name.trim() ? g1Relation : "اصیل / خود ضامن (Self-Guaranteed)";
-    const guarantor1Address = g1Address.trim() || address;
+    setIsSubmitting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 350));
 
-    const guarantorsList = [
-      {
-        id: `gua_${Date.now()}_1`,
-        fullName: guarantor1Name,
-        fatherName: guarantor1Father,
-        cnic: encryptField(guarantor1Cnic),
-        phone: guarantor1Phone,
-        relation: guarantor1Relation,
-        address: guarantor1Address,
-        workplace: g1Work || "Self/Business",
-        landmark: "Chiniot",
-      },
-    ];
+      const cleanCnic = cnic.trim() || "N/A";
+      const guarantor1Name = g1Name.trim() || `${fullName.trim()} (خود ضامن)`;
+      const guarantor1Father = g1Father.trim() || fatherName.trim() || "";
+      const guarantor1Cnic = g1Cnic.trim() || (cleanCnic !== "N/A" ? cleanCnic : "N/A");
+      const guarantor1Phone = g1Phone.trim() || phone.trim();
+      const guarantor1Relation = g1Name.trim() ? g1Relation : "اصیل / خود ضامن (Self-Guaranteed)";
+      const guarantor1Address = g1Address.trim() || address;
 
-    if (g2Name && g2Name.trim().length > 0) {
-      guarantorsList.push({
-        id: `gua_${Date.now()}_2`,
-        fullName: g2Name.trim(),
-        fatherName: g2Father.trim() || "Father",
-        cnic: encryptField(g2Cnic.trim() || "N/A"),
-        phone: g2Phone.trim() || "N/A",
-        relation: g2Relation,
-        address: g2Address.trim() || address,
-        workplace: g2Work || "Corporate",
-        landmark: "Chiniot",
+      const guarantorsList = [
+        {
+          id: `gua_${Date.now()}_1`,
+          fullName: guarantor1Name,
+          fatherName: guarantor1Father,
+          cnic: encryptField(guarantor1Cnic),
+          phone: guarantor1Phone,
+          relation: guarantor1Relation,
+          address: guarantor1Address,
+          workplace: g1Work || "Self/Business",
+          landmark: "Chiniot",
+        },
+      ];
+
+      if (g2Name && g2Name.trim().length > 0) {
+        guarantorsList.push({
+          id: `gua_${Date.now()}_2`,
+          fullName: g2Name.trim(),
+          fatherName: g2Father.trim() || "Father",
+          cnic: encryptField(g2Cnic.trim() || "N/A"),
+          phone: g2Phone.trim() || "N/A",
+          relation: g2Relation,
+          address: g2Address.trim() || address,
+          workplace: g2Work || "Corporate",
+          landmark: "Chiniot",
+        });
+      }
+
+      const newCust = store.createCustomer({
+        tenantId: currentTenant.id,
+        khataNumber: khataNumber ? Number(khataNumber) : undefined,
+        fullName,
+        fatherName: fatherName || "",
+        cnic: encryptField(cleanCnic),
+        phone,
+        secondaryPhone,
+        address,
+        landmark: landmark || (gpsLocation?.address ? `GPS Pin: ${gpsLocation.address}` : "Near Landmark / Bazaar"),
+        city,
+        zoneArea: gpsLocation?.aiSuggestedZone || zoneArea,
+        photoUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
+        gpsLocation,
+        guarantors: guarantorsList,
       });
+
+      router.push(`/portal/plans/new?cust=${newCust.id}`);
+    } catch (err) {
+      console.error(err);
+      setIsSubmitting(false);
     }
-
-    const newCust = store.createCustomer({
-      tenantId: currentTenant.id,
-      khataNumber: khataNumber ? Number(khataNumber) : undefined,
-      fullName,
-      fatherName: fatherName || "",
-      cnic: encryptField(cleanCnic),
-      phone,
-      secondaryPhone,
-      address,
-      landmark: landmark || (gpsLocation?.address ? `GPS Pin: ${gpsLocation.address}` : "Near Landmark / Bazaar"),
-      city,
-      zoneArea: gpsLocation?.aiSuggestedZone || zoneArea,
-      photoUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
-      gpsLocation,
-      guarantors: guarantorsList,
-    });
-
-    router.push(`/portal/plans/new?cust=${newCust.id}`);
   };
 
   return (
@@ -414,10 +426,20 @@ export default function NewCustomerPage() {
 
           <button
             type="submit"
-            className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold text-sm rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+            disabled={isSubmitting}
+            className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
           >
-            <span>Save Customer & Create Plan</span>
-            <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>محفوظ ہو رہا ہے (Saving to Cloud)...</span>
+              </>
+            ) : (
+              <>
+                <span>Save Customer & Create Plan</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </form>

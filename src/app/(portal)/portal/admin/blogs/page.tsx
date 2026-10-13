@@ -22,6 +22,7 @@ import {
   Eye,
   ArrowRight,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 
 export default function AdminBlogsPage() {
@@ -31,6 +32,7 @@ export default function AdminBlogsPage() {
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [isCreating, setIsCreating] = useState(false);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [isSavingArticle, setIsSavingArticle] = useState(false);
 
   // Form States
   const [title, setTitle] = useState("");
@@ -110,43 +112,49 @@ export default function AdminBlogsPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !slug || !excerpt || !contentHtml) {
       alert("Please fill in Title, Slug, Excerpt, and Article Content.");
       return;
     }
 
-    const keywordList = keywords.split(",").map((k) => k.trim()).filter(Boolean);
+    setIsSavingArticle(true);
+    try {
+      await new Promise((r) => setTimeout(r, 350));
+      const keywordList = keywords.split(",").map((k) => k.trim()).filter(Boolean);
 
-    if (editingArticleId) {
-      store.updateArticle(editingArticleId, {
-        title,
-        urduTitle,
-        slug,
-        category,
-        excerpt,
-        readTime,
-        author,
-        keywords: keywordList,
-        contentHtml,
-      });
-    } else {
-      store.createArticle({
-        title,
-        urduTitle: urduTitle || title,
-        slug,
-        category,
-        excerpt,
-        readTime,
-        author,
-        keywords: keywordList,
-        contentHtml,
-      });
+      if (editingArticleId) {
+        store.updateArticle(editingArticleId, {
+          title,
+          urduTitle,
+          slug,
+          category,
+          excerpt,
+          readTime,
+          author,
+          keywords: keywordList,
+          contentHtml,
+        });
+      } else {
+        store.createArticle({
+          title,
+          urduTitle: urduTitle || title,
+          slug,
+          category,
+          excerpt,
+          readTime,
+          author,
+          keywords: keywordList,
+          contentHtml,
+        });
+      }
+
+      setArticles([...store.getArticles()]);
+      setIsCreating(false);
+    } finally {
+      setIsSavingArticle(false);
     }
-
-    setArticles([...store.getArticles()]);
-    setIsCreating(false);
   };
 
   const insertSnippet = (snippet: string) => {
@@ -517,10 +525,20 @@ export default function AdminBlogsPage() {
 
                 <button
                   type="submit"
-                  className="px-7 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg flex items-center gap-2"
+                  disabled={isSavingArticle}
+                  className="px-7 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{editingArticleId ? "Update & Re-Publish Article" : "Publish Live to SEO Blog"}</span>
+                  {isSavingArticle ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{editingArticleId ? "Update & Re-Publish Article" : "Publish Live to SEO Blog"}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Sparkles,
   Printer,
+  Loader2,
 } from "lucide-react";
 
 interface QuickRecoveryModalProps {
@@ -137,7 +138,7 @@ export function QuickRecoveryModal({ isOpen, onClose, onPaymentRecorded }: Quick
   };
 
   // Submit payment
-  const handleSubmitPayment = (e: React.FormEvent) => {
+  const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlan) {
       setErrorMsg("براہ کرم پہلے کھاتہ نمبر منتخب کریں۔");
@@ -156,6 +157,7 @@ export function QuickRecoveryModal({ isOpen, onClose, onPaymentRecorded }: Quick
     setErrorMsg(null);
 
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const nextPending = selectedPlan.schedule.find((s: any) => s.status !== "PAID") || selectedPlan.schedule[0];
       const instNo = nextPending ? nextPending.installmentNo : 1;
 
@@ -453,12 +455,19 @@ export function QuickRecoveryModal({ isOpen, onClose, onPaymentRecorded }: Quick
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                   >
-                    <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
-                    <span>
-                      {isSubmitting ? "پوسٹ ہو رہا ہے..." : `قسط وصول کریں اور کھاتہ اپ ڈیٹ کریں [Enter]`}
-                    </span>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                        <span>قسط کلاؤڈ پر درج ہو رہی ہے...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 fill-amber-300 text-amber-300" />
+                        <span>قسط وصول کریں اور کھاتہ اپ ڈیٹ کریں [Enter]</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

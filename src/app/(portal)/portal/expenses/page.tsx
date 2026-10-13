@@ -10,6 +10,7 @@ import {
   PlusCircle,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { ExpenseRecord } from "@/lib/db/types";
 
@@ -24,12 +25,16 @@ export default function ExpensesPage() {
   const [description, setDescription] = useState<string>("");
   const [receiptRef, setReceiptRef] = useState<string>("");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!currentUser) return null;
 
-  const handleRecordExpense = (e: React.FormEvent) => {
+  const handleRecordExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.recordExpense({
         tenantId: currentTenant.id,
         category,
@@ -49,6 +54,8 @@ export default function ExpensesPage() {
       setReceiptRef("");
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to log expense" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -144,9 +151,17 @@ export default function ExpensesPage() {
 
             <button
               type="submit"
-              className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow transition-colors"
+              disabled={isSubmitting}
+              className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold rounded-xl shadow transition-colors flex items-center justify-center gap-2"
             >
-              Record & Debit Wallet
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>محفوظ ہو رہا ہے...</span>
+                </>
+              ) : (
+                <span>Record & Debit Wallet</span>
+              )}
             </button>
           </form>
         </div>

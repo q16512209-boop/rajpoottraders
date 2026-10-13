@@ -19,6 +19,7 @@ import {
   Layers,
   Sparkles,
   ShoppingBag,
+  Loader2,
 } from "lucide-react";
 
 export default function PortalProductsPage() {
@@ -40,6 +41,7 @@ export default function PortalProductsPage() {
   const [stockQuantity, setStockQuantity] = useState<number>(20);
   const [warrantySpec, setWarrantySpec] = useState("1 Year Warranty");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!currentUser) return null;
 
@@ -51,9 +53,12 @@ export default function PortalProductsPage() {
     p.category.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const newProd = store.createProduct(currentUser, {
         tenantId: currentTenant.id,
         title,
@@ -82,6 +87,8 @@ export default function PortalProductsPage() {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create product" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -363,10 +370,20 @@ export default function PortalProductsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Product to Catalog</span>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Save Product to Catalog</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

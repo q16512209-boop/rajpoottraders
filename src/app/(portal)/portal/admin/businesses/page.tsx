@@ -19,6 +19,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Store,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 
@@ -28,6 +29,7 @@ export default function BusinessManagerPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isCreatingBusiness, setIsCreatingBusiness] = useState(false);
 
   // Form State
   const [name, setName] = useState("");
@@ -76,14 +78,16 @@ export default function BusinessManagerPage() {
     }
   };
 
-  const handleCreateBusiness = (e: React.FormEvent) => {
+  const handleCreateBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !ownerName.trim() || !phone.trim()) {
       setMsg({ type: "error", text: "Please fill all required fields." });
       return;
     }
 
+    setIsCreatingBusiness(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const newBiz = store.createBusiness({
         name: name.trim(),
         slug: slug.trim() || undefined,
@@ -112,6 +116,8 @@ export default function BusinessManagerPage() {
       setTimeout(() => setMsg(null), 6000);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to register business." });
+    } finally {
+      setIsCreatingBusiness(false);
     }
   };
 
@@ -443,9 +449,17 @@ export default function BusinessManagerPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow-md"
+                  disabled={isCreatingBusiness}
+                  className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Register Business
+                  {isCreatingBusiness ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>رجسٹر ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <span>Register Business</span>
+                  )}
                 </button>
               </div>
             </form>

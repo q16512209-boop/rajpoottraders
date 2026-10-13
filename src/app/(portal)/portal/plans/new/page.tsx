@@ -21,6 +21,7 @@ import {
   Trash2,
   Layers,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
 interface ProductLineItem {
@@ -79,6 +80,7 @@ function NewPlanForm() {
     initialProduct?.defaultTotalInstallments || 13
   );
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const recalculateFromItems = (items: ProductLineItem[]) => {
     const sumCash = items.reduce((acc, item) => acc + item.cashPrice * item.quantity, 0);
@@ -143,8 +145,9 @@ function NewPlanForm() {
   const compositeTitle = productItems.map((p) => p.title + (p.quantity > 1 ? " (x" + p.quantity + ")" : "")).join(" + ");
   const compositeSerial = productItems.map((p) => p.imeiSerial || "SN-NA").join(", ");
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const customer = customers.find((c) => c.id === selectedCustomerId);
 
     if (!customer) {
@@ -152,7 +155,10 @@ function NewPlanForm() {
       return;
     }
 
-    const schedule = [];
+    setIsSubmitting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 350));
+      const schedule = [];
     const baseDate = new Date(startDate);
     const interval =
       collectionIntervalDays ||
@@ -226,7 +232,11 @@ function NewPlanForm() {
       contractVerified: true,
     });
 
-    router.push("/portal/plans/" + plan.id);
+      router.push("/portal/plans/" + plan.id);
+    } catch (err) {
+      console.error(err);
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -516,10 +526,20 @@ function NewPlanForm() {
 
           <button
             type="submit"
-            className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-sm tracking-wide transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2"
+            disabled={isSubmitting}
+            className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-2xl font-black text-sm tracking-wide transition-all shadow-lg hover:shadow-emerald-500/20 flex items-center justify-center gap-2"
           >
-            <CheckCircle2 className="w-5 h-5" />
-            <span>Create Plan & Print Form</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>پلان بن رہا ہے (Activating Plan)...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-5 h-5" />
+                <span>Create Plan & Print Form</span>
+              </>
+            )}
           </button>
         </div>
       </form>

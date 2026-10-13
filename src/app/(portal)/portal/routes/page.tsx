@@ -15,6 +15,7 @@ import {
   Navigation,
   Search,
   ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 
@@ -61,11 +62,16 @@ export default function RoutesManagerPage() {
   // Bulk Assign All Routes Modal
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkStaffId, setBulkStaffId] = useState("");
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const [isAddingRoute, setIsAddingRoute] = useState(false);
+  const [isUpdatingRoute, setIsUpdatingRoute] = useState(false);
 
-  const handleBulkAssignAll = (e: React.FormEvent) => {
+  const handleBulkAssignAll = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bulkStaffId) return;
+    if (!bulkStaffId || isBulkAssigning) return;
+    setIsBulkAssigning(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const selectedStaff = staffUsers.find((u) => u.id === bulkStaffId);
       if (!selectedStaff) return;
       const count = store.assignAllRoutesToStaff(currentUser, bulkStaffId, currentTenant.id);
@@ -78,6 +84,8 @@ export default function RoutesManagerPage() {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to bulk assign routes" });
+    } finally {
+      setIsBulkAssigning(false);
     }
   };
 
@@ -91,9 +99,12 @@ export default function RoutesManagerPage() {
     );
   });
 
-  const handleAddRoute = (e: React.FormEvent) => {
+  const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAddingRoute) return;
+    setIsAddingRoute(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const selectedCollector = collectors.find((c) => c.id === assignedCollectorId);
       const created = store.createRouteZone(currentUser, {
         tenantId: currentTenant.id,
@@ -115,6 +126,8 @@ export default function RoutesManagerPage() {
       setMsg({ type: "success", text: `Route "${created.name}" created successfully and assigned to ${created.assignedCollectorName || "General Pool"}.` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create route" });
+    } finally {
+      setIsAddingRoute(false);
     }
   };
 
@@ -129,9 +142,12 @@ export default function RoutesManagerPage() {
     setMsg(null);
   };
 
-  const handleUpdateRoute = (e: React.FormEvent) => {
+  const handleUpdateRoute = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUpdatingRoute) return;
+    setIsUpdatingRoute(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const selectedCollector = collectors.find((c) => c.id === editCollectorId);
       store.updateRouteZone(currentUser, editId, {
         name: editName.trim(),
@@ -147,6 +163,8 @@ export default function RoutesManagerPage() {
       setMsg({ type: "success", text: `Route "${editName}" updated successfully!` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to update route" });
+    } finally {
+      setIsUpdatingRoute(false);
     }
   };
 
@@ -444,10 +462,20 @@ export default function RoutesManagerPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isAddingRoute}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Route</span>
+                  {isAddingRoute ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Save Route</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -546,10 +574,20 @@ export default function RoutesManagerPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isUpdatingRoute}
+                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Update Route</span>
+                  {isUpdatingRoute ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>اپ ڈیٹ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Update Route</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -612,11 +650,20 @@ export default function RoutesManagerPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!bulkStaffId}
+                  disabled={!bulkStaffId || isBulkAssigning}
                   className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black rounded-xl shadow flex items-center gap-1.5 transition-all"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>تمام روٹس تفویض کریں (Assign All)</span>
+                  {isBulkAssigning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>تفویض ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>تمام روٹس تفویض کریں (Assign All)</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

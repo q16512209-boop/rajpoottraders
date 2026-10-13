@@ -34,6 +34,7 @@ import {
   Square,
   Save,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { MapLocationPicker } from "@/components/ui/MapLocationPicker";
@@ -82,6 +83,11 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
   const [reschedInstNo, setReschedInstNo] = useState<number>(1);
   const [newDueDate, setNewDueDate] = useState<string>("");
   const [reschedReason, setReschedReason] = useState<string>("Customer requested reschedule");
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
+  const [isSavingDiary, setIsSavingDiary] = useState(false);
+  const [isCorrecting, setIsCorrecting] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isSavingGps, setIsSavingGps] = useState(false);
 
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -337,9 +343,12 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
     setMsg(null);
   };
 
-  const handleRecordPayment = (e: React.FormEvent) => {
+  const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRecordingPayment) return;
+    setIsRecordingPayment(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const res = store.recordInstallmentPayment({
         planId: plan.id,
         installmentNo: activeInstallmentNo,
@@ -359,6 +368,8 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Payment logging failed" });
+    } finally {
+      setIsRecordingPayment(false);
     }
   };
 
@@ -380,8 +391,11 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
     );
   };
 
-  const handleSaveDiaryReconciliation = () => {
+  const handleSaveDiaryReconciliation = async () => {
+    if (isSavingDiary) return;
+    setIsSavingDiary(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const entries = diaryItems.map((item) => ({
         installmentNo: item.installmentNo,
         paidDate: item.paidDate,
@@ -406,17 +420,22 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to save diary reconciliation." });
+    } finally {
+      setIsSavingDiary(false);
     }
   };
 
-  const handleConfirmCorrection = (e: React.FormEvent) => {
+  const handleConfirmCorrection = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCorrecting) return;
     if (!corrReason.trim()) {
       alert("Please enter a valid reason for khata correction.");
       return;
     }
 
+    setIsCorrecting(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.correctInstallmentPayment({
         planId: plan.id,
         installmentNo: corrInstNo,
@@ -436,12 +455,17 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
+    } finally {
+      setIsCorrecting(false);
     }
   };
 
-  const handleConfirmReschedule = (e: React.FormEvent) => {
+  const handleConfirmReschedule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRescheduling) return;
+    setIsRescheduling(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.updatePlanNextDueDate({
         planId: plan.id,
         installmentNo: reschedInstNo,
@@ -460,6 +484,8 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message });
+    } finally {
+      setIsRescheduling(false);
     }
   };
 
@@ -500,13 +526,16 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const handleSaveGpsModal = (e: React.FormEvent) => {
+  const handleSaveGpsModal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingGps) return;
     if (!gpsLocation) {
       alert("Please pin a location on the map first.");
       return;
     }
+    setIsSavingGps(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.updatePlanGps(plan.id, gpsLocation, custAddressEdit, currentUser.id);
       const updated = store.getPlanById(plan.id)!;
       setPlan({ ...updated });
@@ -517,6 +546,8 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to update GPS" });
+    } finally {
+      setIsSavingGps(false);
     }
   };
 
@@ -869,11 +900,21 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
+              disabled={isSavingDiary}
               onClick={handleSaveDiaryReconciliation}
-              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-lg flex items-center gap-2"
+              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-lg flex items-center gap-2"
             >
-              <Save className="w-4 h-4" />
-              <span>Save & Update Khata Ledger</span>
+              {isSavingDiary ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>محفوظ ہو رہا ہے...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Save & Update Khata Ledger</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1044,9 +1085,17 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow"
+                  disabled={isRecordingPayment}
+                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  Save Payment (محفوظ کریں)
+                  {isRecordingPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>قسط درج ہو رہی ہے...</span>
+                    </>
+                  ) : (
+                    <span>Save Payment (محفوظ کریں)</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1103,9 +1152,17 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow"
+                  disabled={isRescheduling}
+                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
-                  Update Due Date
+                  {isRescheduling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>تاریخ تبدیل ہو رہی ہے...</span>
+                    </>
+                  ) : (
+                    <span>Update Due Date</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1178,9 +1235,17 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow"
+                  disabled={isCorrecting}
+                  className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold rounded-xl shadow flex items-center gap-1.5"
                 >
-                  Save Correction
+                  {isCorrecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>درستگی ہو رہی ہے...</span>
+                    </>
+                  ) : (
+                    <span>Save Correction</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1235,9 +1300,17 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black rounded-xl shadow"
+                  disabled={isSavingGps}
+                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  Save GPS Location
+                  {isSavingGps ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <span>Save GPS Location</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1427,9 +1500,16 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 <button
                   type="submit"
                   disabled={isSubmittingEdit}
-                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl shadow transition-all"
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black rounded-xl shadow transition-all flex items-center gap-1.5"
                 >
-                  {isSubmittingEdit ? "Updating..." : "Save Khata Changes (تبدیلیاں محفوظ کریں)"}
+                  {isSubmittingEdit ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <span>Save Khata Changes (تبدیلیاں محفوظ کریں)</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -1480,9 +1560,16 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 type="button"
                 onClick={handleConfirmDeleteKhata}
                 disabled={isDeleting}
-                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs shadow transition-all"
+                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black rounded-xl text-xs shadow transition-all flex items-center gap-1.5"
               >
-                {isDeleting ? "Deleting..." : "Permanently Delete Khata (مستقل ڈیلیٹ کریں)"}
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Permanently Delete Khata (مستقل ڈیلیٹ کریں)</span>
+                )}
               </button>
             </div>
           </div>
@@ -1582,10 +1669,19 @@ export default function PlanDetailPage({ params }: { params: { id: string } }) {
                 <button
                   type="submit"
                   disabled={isSubmittingConcession}
-                  className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  className="px-6 py-2.5 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <Send className="w-4 h-4 text-amber-300" />
-                  <span>{isSubmittingConcession ? "Submitting..." : "Send Request to Owner (درخواست بھیجیں)"}</span>
+                  {isSubmittingConcession ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>درخواست بھیجی جا رہی ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 text-amber-300" />
+                      <span>Send Request to Owner (درخواست بھیجیں)</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

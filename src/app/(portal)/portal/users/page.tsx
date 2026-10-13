@@ -24,6 +24,7 @@ import {
   Edit3,
   Lock,
   UserCheck,
+  Loader2,
 } from "lucide-react";
 
 export default function UsersManagementPage() {
@@ -58,6 +59,8 @@ export default function UsersManagementPage() {
   const [editSelectedRoutes, setEditSelectedRoutes] = useState<string[]>([]);
   const [editStatus, setEditStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [showEditPass, setShowEditPass] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -112,9 +115,12 @@ export default function UsersManagementPage() {
   // Strict Privacy: Super Admin is completely invisible to Owner and staff
   const visibleUsers = users.filter((u) => (isSuperAdmin ? true : u.role !== "SUPER_ADMIN"));
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCreatingUser) return;
+    setIsCreatingUser(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const isAllRoutes = routeAssignmentMode === "ALL";
       const finalRouteZone = isAllRoutes
         ? "تمام روٹس (All Routes)"
@@ -152,12 +158,17 @@ export default function UsersManagementPage() {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to create user" });
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
-  const handleUpdateUser = (e: React.FormEvent) => {
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUpdatingUser) return;
+    setIsUpdatingUser(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const isAllRoutes = editRouteAssignmentMode === "ALL";
       const finalRouteZone = isAllRoutes
         ? "تمام روٹس (All Routes)"
@@ -188,6 +199,8 @@ export default function UsersManagementPage() {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to update user" });
+    } finally {
+      setIsUpdatingUser(false);
     }
   };
 
@@ -689,10 +702,20 @@ export default function UsersManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isUpdatingUser}
+                  className="px-6 py-2.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Changes & Update Password</span>
+                  {isUpdatingUser ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Save Changes & Update Password</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -899,10 +922,20 @@ export default function UsersManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isCreatingUser}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Staff Member</span>
+                  {isCreatingUser ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Save Staff Member</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

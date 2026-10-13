@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Filter,
   Upload,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 
@@ -38,10 +39,12 @@ export default function CustomersPage() {
   const [selectedCustForGps, setSelectedCustForGps] = useState<Customer | null>(null);
   const [editGpsLoc, setEditGpsLoc] = useState<GPSLocation | undefined>(undefined);
   const [editAddr, setEditAddr] = useState("");
+  const [isSavingGps, setIsSavingGps] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Edit Customer Modal State
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [editCustId, setEditCustId] = useState("");
   const [editKhataNumber, setEditKhataNumber] = useState<string>("");
   const [editFullName, setEditFullName] = useState("");
@@ -94,10 +97,12 @@ export default function CustomersPage() {
     setEditAddr(c.address);
   };
 
-  const handleSaveCustomerGps = (e: React.FormEvent) => {
+  const handleSaveCustomerGps = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustForGps || !editGpsLoc) return;
+    setIsSavingGps(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.updateCustomerGps(selectedCustForGps.id, editGpsLoc, editAddr);
       setCustomers([...store.getCustomers(currentTenant.id)]);
       setSelectedCustForGps(null);
@@ -107,6 +112,8 @@ export default function CustomersPage() {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to update GPS" });
+    } finally {
+      setIsSavingGps(false);
     }
   };
 
@@ -166,11 +173,13 @@ export default function CustomersPage() {
     setMsg(null);
   };
 
-  const handleSaveCustomerEdit = (e: React.FormEvent) => {
+  const handleSaveCustomerEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser || !editCustId) return;
 
+    setIsSavingCustomer(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const guarantorsList: any[] = [];
       if (editG1Name.trim()) {
         guarantorsList.push({
@@ -224,6 +233,8 @@ export default function CustomersPage() {
       });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to update customer" });
+    } finally {
+      setIsSavingCustomer(false);
     }
   };
 
@@ -527,10 +538,20 @@ export default function CustomersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isSavingGps}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black rounded-xl shadow flex items-center gap-1.5"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Location Pin</span>
+                  {isSavingGps ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Save Location Pin</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -836,10 +857,20 @@ export default function CustomersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-7 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md flex items-center gap-2 transition-all"
+                  disabled={isSavingCustomer}
+                  className="px-7 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black rounded-xl shadow-md flex items-center gap-2 transition-all"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>محفوظ کریں (Save Changes)</span>
+                  {isSavingCustomer ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>محفوظ کریں (Save Changes)</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

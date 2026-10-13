@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   Layers,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 
 export default function RepossessPlanPage() {
@@ -52,7 +53,7 @@ export default function RepossessPlanPage() {
   const badDebtWrittenOff = Math.max(0, plan.totalFinanced - totalPaid);
   const selectedOfficer = officers.find((o) => o.id === officerId) || currentUser;
 
-  const handleConfirmRepossess = (e: React.FormEvent) => {
+  const handleConfirmRepossess = async (e: React.FormEvent) => {
     e.preventDefault();
     if (resaleValuation <= 0) {
       alert("Please provide a valid resale valuation.");
@@ -65,6 +66,7 @@ export default function RepossessPlanPage() {
 
     setIsSubmitting(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       store.repossessPlan({
         planId: plan.id,
         seizedDate,
@@ -290,8 +292,17 @@ export default function RepossessPlanPage() {
             disabled={isSubmitting}
             className="px-8 py-3.5 bg-gradient-to-r from-rose-700 to-rose-800 hover:from-rose-600 hover:to-rose-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
           >
-            <ShieldAlert className="w-4 h-4" />
-            <span>Confirm Repossession & Update Inventory</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>ضبطگی درج ہو رہی ہے...</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-4 h-4" />
+                <span>Confirm Repossession & Update Inventory</span>
+              </>
+            )}
           </button>
         </div>
       </form>

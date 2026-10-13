@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Clock,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 
@@ -52,6 +53,7 @@ export default function MasterReportsPage() {
   const [targetEndDate, setTargetEndDate] = useState(todayStr);
   const [targetNotes, setTargetNotes] = useState("");
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isSettingTarget, setIsSettingTarget] = useState(false);
 
   const staffUsers = useMemo(() => store.getUsers(currentTenant.id), [currentTenant.id]);
   const allPlans = useMemo(() => store.getPlans(currentTenant.id), [currentTenant.id]);
@@ -174,9 +176,11 @@ export default function MasterReportsPage() {
   }, [allPlans, allClaims, allProducts, startDate, endDate]);
 
   // --- Target Creation ---
-  const handleCreateTarget = (e: React.FormEvent) => {
+  const handleCreateTarget = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSettingTarget(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const staff = staffUsers.find((u) => u.id === targetStaffId);
       if (!staff) throw new Error("Please select a staff member.");
 
@@ -200,6 +204,8 @@ export default function MasterReportsPage() {
       setMsg({ type: "success", text: `Performance target set for ${created.staffName} (${formatPKR(created.targetValue)}).` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to set target" });
+    } finally {
+      setIsSettingTarget(false);
     }
   };
 
@@ -720,10 +726,20 @@ export default function MasterReportsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isSettingTarget}
+                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Set Performance Target</span>
+                  {isSettingTarget ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>ٹارگٹ محفوظ ہو رہا ہے...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Set Performance Target</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

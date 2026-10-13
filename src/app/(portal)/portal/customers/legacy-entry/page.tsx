@@ -24,6 +24,7 @@ import {
   Sparkles,
   Zap,
   Cloud,
+  Loader2,
 } from "lucide-react";
 
 export default function LegacyCustomerEntryPage() {
@@ -102,12 +103,13 @@ export default function LegacyCustomerEntryPage() {
     setLoading(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
 
     try {
+      await new Promise((r) => setTimeout(r, 350));
       if (!khataNumber || !salesmanName || !fullName || !phone || !address) {
         throw new Error("براہ کرم لازمی تفصیلات درج کریں (کھاتہ نمبر، سیلز مین، گاہک کا نام، موبائل نمبر، اور پتہ)");
       }
@@ -598,8 +600,17 @@ export default function LegacyCustomerEntryPage() {
             disabled={loading}
             className="w-full py-4 bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-base rounded-2xl shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.99]"
           >
-            <CheckCircle2 className="w-6 h-6" />
-            <span>{loading ? "Saving Customer Khata..." : "Save Customer & Activate Khata (کھاتہ محفوظ کریں)"}</span>
+            {loading ? (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span>محفوظ ہو رہا ہے (Saving Customer Khata)...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-6 h-6" />
+                <span>Save Customer & Activate Khata (کھاتہ محفوظ کریں)</span>
+              </>
+            )}
           </button>
           <p className="text-center text-xs text-slate-500 mt-2 font-urdu">
             نوٹ: محفوظ کرنے کے بعد آپ کو فوری اگلا کھاتہ درج کرنے کا بٹن مل جائے گا تاکہ تمام کھاتے تیزی سے درج ہو سکیں۔

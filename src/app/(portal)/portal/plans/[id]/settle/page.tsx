@@ -23,6 +23,7 @@ import {
   Layers,
   CheckSquare,
   Square,
+  Loader2,
 } from "lucide-react";
 
 export default function EarlySettlementPage() {
@@ -123,8 +124,9 @@ export default function EarlySettlementPage() {
 
   const isAuthorizedForRebate = currentUser.role === "SUPER_ADMIN" || currentUser.role === "OWNER";
 
-  const handleSettle = (e: React.FormEvent) => {
+  const handleSettle = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError(null);
 
     if (rebatePct > 0 && !isAuthorizedForRebate) {
@@ -139,6 +141,7 @@ export default function EarlySettlementPage() {
 
     setIsSubmitting(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       if (allSelectedPlans.length > 1) {
         const { settlement } = store.settleMultiplePlansEarly({
           planIds: allSelectedPlans.map((p) => p.id),
@@ -502,7 +505,10 @@ export default function EarlySettlementPage() {
             className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
           >
             {isSubmitting ? (
-              <span>Settling...</span>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>تصفیہ ہو رہا ہے (Settling)...</span>
+              </>
             ) : (
               <>
                 <FileCheck className="w-4 h-4" />

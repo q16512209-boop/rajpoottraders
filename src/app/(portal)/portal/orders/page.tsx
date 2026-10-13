@@ -20,6 +20,7 @@ import {
   Phone,
   MapPin,
   XCircle,
+  Loader2,
 } from "lucide-react";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import Link from "next/link";
@@ -57,6 +58,11 @@ export default function FieldOrdersPage() {
   const [showCashModal, setShowCashModal] = useState(false);
   const [selectedWalletId, setSelectedWalletId] = useState(wallets[0]?.id || "");
 
+  // Loading States
+  const [isBooking, setIsBooking] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
+  const [isFulfillingCash, setIsFulfillingCash] = useState(false);
+
   if (!currentUser) return null;
 
   const isOwnerOrManager = currentUser.role === "SUPER_ADMIN" || currentUser.role === "OWNER" || currentUser.role === "BRANCH_MANAGER";
@@ -72,9 +78,11 @@ export default function FieldOrdersPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleBookOrder = (e: React.FormEvent) => {
+  const handleBookOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsBooking(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const prod = products.find((p) => p.id === selectedProdId);
       if (!prod) throw new Error("Please select a valid product from catalog.");
 
@@ -104,6 +112,8 @@ export default function FieldOrdersPage() {
       setMsg({ type: "success", text: `Order #${newOrder.orderNumber} booked successfully! Owner notified for dispatch.` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to book order" });
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -113,10 +123,12 @@ export default function FieldOrdersPage() {
     setShowDispatchModal(true);
   };
 
-  const handleConfirmDispatch = (e: React.FormEvent) => {
+  const handleConfirmDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrder) return;
+    setIsDispatching(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const officer = staffUsers.find((u) => u.id === dispatchOfficerId);
       store.updateFieldOrderStatus(currentUser, selectedOrder.id, "OUT_FOR_DELIVERY", {
         dispatchedWithOfficerId: officer?.id,
@@ -129,6 +141,8 @@ export default function FieldOrdersPage() {
       setMsg({ type: "success", text: `Order #${selectedOrder.orderNumber} dispatched with ${officer?.name || "officer"}!` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to dispatch order" });
+    } finally {
+      setIsDispatching(false);
     }
   };
 
@@ -137,16 +151,20 @@ export default function FieldOrdersPage() {
     setShowCashModal(true);
   };
 
-  const handleConfirmCashFulfill = (e: React.FormEvent) => {
+  const handleConfirmCashFulfill = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrder) return;
+    setIsFulfillingCash(true);
     try {
+      await new Promise((r) => setTimeout(r, 350));
       const res = store.fulfillFieldOrderAsCashSale(currentUser, selectedOrder.id, selectedWalletId);
       setOrders([...store.getFieldOrders(currentTenant.id)]);
       setShowCashModal(false);
       setMsg({ type: "success", text: `Order #${selectedOrder.orderNumber} fulfilled as CASH SALE! Receipt #${res.receiptId} issued.` });
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to fulfill cash order" });
+    } finally {
+      setIsFulfillingCash(false);
     }
   };
 
@@ -537,10 +555,20 @@ export default function FieldOrdersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isBooking}
+                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Submit Order Booking</span>
+                  {isBooking ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Booking Order...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Submit Order Booking</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -597,10 +625,20 @@ export default function FieldOrdersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isDispatching}
+                  className="px-6 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-black rounded-xl shadow flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <Truck className="w-4 h-4" />
-                  <span>Dispatch for Delivery</span>
+                  {isDispatching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Dispatching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="w-4 h-4" />
+                      <span>Dispatch for Delivery</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -655,10 +693,20 @@ export default function FieldOrdersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5"
+                  disabled={isFulfillingCash}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Confirm Cash Sale</span>
+                  {isFulfillingCash ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Recording Cash Sale...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Confirm Cash Sale</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

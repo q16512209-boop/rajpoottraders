@@ -18,6 +18,7 @@ import {
   X,
   Clock,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/lib/context/auth-context";
 import { store } from "@/lib/db/store";
@@ -25,6 +26,7 @@ import { formatPKR } from "@/lib/formatters";
 import { UrduSpeaker } from "@/components/ui/UrduSpeaker";
 import { QuickRecoveryModal } from "@/components/recovery/QuickRecoveryModal";
 import { ConcessionRequest } from "@/lib/db/types";
+import { subscribeToSyncStatus, SyncStatus } from "@/lib/db/live-sync";
 
 interface HeaderProps {
   onMenuToggle?: () => void;
@@ -34,6 +36,7 @@ export function PortalHeader({ onMenuToggle }: HeaderProps) {
   const { currentUser, currentTenant, availableTenants, switchTenant } = useAuth();
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
   const [quickRecoveryOpen, setQuickRecoveryOpen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ connected: true, isSyncing: false });
 
   // Owner Notification Center State
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -41,6 +44,11 @@ export function PortalHeader({ onMenuToggle }: HeaderProps) {
     if (!currentTenant) return [];
     return store.getConcessionRequests(currentTenant.id).filter((c) => c.status === "PENDING_APPROVAL");
   });
+
+  useEffect(() => {
+    const unsub = subscribeToSyncStatus((s) => setSyncStatus(s));
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (!currentTenant) return;
@@ -180,6 +188,14 @@ export function PortalHeader({ onMenuToggle }: HeaderProps) {
                 ⚡ فوری ریکوری درج کریں
               </span>
             </button>
+          )}
+
+          {/* Live DB Syncing Loader Indicator */}
+          {syncStatus.isSyncing && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 border border-amber-500 text-amber-950 rounded-xl text-xs font-black animate-pulse shadow-sm">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+              <span className="hidden sm:inline font-urdu">کلاؤڈ سنک ہو رہا ہے...</span>
+            </div>
           )}
 
           {/* Global Urdu Voice Assistant Indicator */}
