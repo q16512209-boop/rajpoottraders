@@ -252,6 +252,9 @@ export async function pullStoreFromMongo(store: AppStore): Promise<{ success: bo
         lastSyncedAt: new Date().toISOString(),
         error: undefined,
       });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("storage"));
+      }
       return { success: true, counts: result.counts };
     } else {
       updateStatus({

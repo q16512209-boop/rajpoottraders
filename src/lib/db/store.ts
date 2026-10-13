@@ -62,7 +62,9 @@ export class AppStore {
           "rajpoot_pending_cloud_queue_v1",
           "rt_store_snapshot",
           "rt_customers_cache",
-          "rt_plans_cache"
+          "rt_plans_cache",
+          "offline_recovery_queue",
+          "rt_offline_queue"
         ];
         legacyKeys.forEach((k) => localStorage.removeItem(k));
       } catch (e) {}
@@ -113,22 +115,22 @@ export class AppStore {
   importFullState(data: Partial<ReturnType<AppStore["exportFullState"]>>) {
     if (Array.isArray(data.tenants) && data.tenants.length > 0) this.tenants = this.deduplicateEntities(this.tenants, data.tenants);
     if (Array.isArray(data.users) && data.users.length > 0) this.users = this.deduplicateEntities(this.users, data.users);
-    if (Array.isArray(data.customers) && data.customers.length > 0) this.customers = this.deduplicateEntities(this.customers, data.customers);
+    if (Array.isArray(data.customers)) this.customers = data.customers;
     if (Array.isArray(data.products) && data.products.length > 0) this.products = this.deduplicateEntities(this.products, data.products);
-    if (Array.isArray(data.plans) && data.plans.length > 0) this.plans = this.deduplicateEntities(this.plans, data.plans);
+    if (Array.isArray(data.plans)) this.plans = data.plans;
     if (Array.isArray(data.wallets) && data.wallets.length > 0) this.wallets = this.deduplicateEntities(this.wallets, data.wallets);
-    if (Array.isArray(data.handovers) && data.handovers.length > 0) this.handovers = this.deduplicateEntities(this.handovers, data.handovers);
-    if (Array.isArray(data.expenses) && data.expenses.length > 0) this.expenses = this.deduplicateEntities(this.expenses, data.expenses);
+    if (Array.isArray(data.handovers)) this.handovers = data.handovers;
+    if (Array.isArray(data.expenses)) this.expenses = data.expenses;
     if (Array.isArray(data.routeZones) && data.routeZones.length > 0) this.routeZones = this.deduplicateEntities(this.routeZones, data.routeZones);
-    if (Array.isArray(data.claimRequests) && data.claimRequests.length > 0) this.claimRequests = this.deduplicateEntities(this.claimRequests, data.claimRequests);
-    if (Array.isArray(data.repossessions) && data.repossessions.length > 0) this.repossessions = this.deduplicateEntities(this.repossessions, data.repossessions);
-    if (Array.isArray(data.settlements) && data.settlements.length > 0) this.settlements = this.deduplicateEntities(this.settlements, data.settlements);
-    if (Array.isArray(data.ptpLogs) && data.ptpLogs.length > 0) this.ptpLogs = this.deduplicateEntities(this.ptpLogs, data.ptpLogs);
+    if (Array.isArray(data.claimRequests)) this.claimRequests = data.claimRequests;
+    if (Array.isArray(data.repossessions)) this.repossessions = data.repossessions;
+    if (Array.isArray(data.settlements)) this.settlements = data.settlements;
+    if (Array.isArray(data.ptpLogs)) this.ptpLogs = data.ptpLogs;
     if (Array.isArray(data.articles) && data.articles.length > 0) this.articles = this.deduplicateEntities(this.articles, data.articles);
-    if (Array.isArray(data.staffTargets) && data.staffTargets.length > 0) this.staffTargets = this.deduplicateEntities(this.staffTargets, data.staffTargets);
-    if (Array.isArray(data.fieldOrders) && data.fieldOrders.length > 0) this.fieldOrders = this.deduplicateEntities(this.fieldOrders, data.fieldOrders);
+    if (Array.isArray(data.staffTargets)) this.staffTargets = data.staffTargets;
+    if (Array.isArray(data.fieldOrders)) this.fieldOrders = data.fieldOrders;
     if (Array.isArray(data.ledgerChain) && data.ledgerChain.length > 0) this.ledgerChain = this.deduplicateEntities(this.ledgerChain, data.ledgerChain);
-    if (Array.isArray(data.concessionRequests) && data.concessionRequests.length > 0) this.concessionRequests = this.deduplicateEntities(this.concessionRequests, data.concessionRequests);
+    if (Array.isArray(data.concessionRequests)) this.concessionRequests = data.concessionRequests;
   }
 
   private tenants: Tenant[] = [...initialTenants];
