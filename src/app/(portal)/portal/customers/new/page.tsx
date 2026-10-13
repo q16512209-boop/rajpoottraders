@@ -60,21 +60,29 @@ export default function NewCustomerPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !cnic || !phone || !address) {
-      alert("Please enter customer basic details (Name, CNIC, Phone, Address).");
+    if (!fullName || !phone || !address) {
+      alert("Please enter customer basic details (Name, Phone, Address).");
       return;
     }
+
+    const cleanCnic = cnic.trim() || "N/A";
+    const guarantor1Name = g1Name.trim() || `${fullName.trim()} (خود ضامن)`;
+    const guarantor1Father = g1Father.trim() || fatherName.trim() || "";
+    const guarantor1Cnic = g1Cnic.trim() || (cleanCnic !== "N/A" ? cleanCnic : "N/A");
+    const guarantor1Phone = g1Phone.trim() || phone.trim();
+    const guarantor1Relation = g1Name.trim() ? g1Relation : "اصیل / خود ضامن (Self-Guaranteed)";
+    const guarantor1Address = g1Address.trim() || address;
 
     const guarantorsList = [
       {
         id: `gua_${Date.now()}_1`,
-        fullName: g1Name || "Guarantor 1",
-        fatherName: g1Father || "Father",
-        cnic: encryptField(g1Cnic || "33202-0000001-1"),
-        phone: g1Phone || "0300-1111111",
-        relation: g1Relation,
-        address: g1Address || address,
-        workplace: g1Work || "Business",
+        fullName: guarantor1Name,
+        fatherName: guarantor1Father,
+        cnic: encryptField(guarantor1Cnic),
+        phone: guarantor1Phone,
+        relation: guarantor1Relation,
+        address: guarantor1Address,
+        workplace: g1Work || "Self/Business",
         landmark: "Chiniot",
       },
     ];
@@ -82,12 +90,12 @@ export default function NewCustomerPage() {
     if (g2Name && g2Name.trim().length > 0) {
       guarantorsList.push({
         id: `gua_${Date.now()}_2`,
-        fullName: g2Name,
-        fatherName: g2Father || "Father",
-        cnic: encryptField(g2Cnic || "33202-0000002-2"),
-        phone: g2Phone || "0300-2222222",
+        fullName: g2Name.trim(),
+        fatherName: g2Father.trim() || "Father",
+        cnic: encryptField(g2Cnic.trim() || "N/A"),
+        phone: g2Phone.trim() || "N/A",
         relation: g2Relation,
-        address: g2Address || address,
+        address: g2Address.trim() || address,
         workplace: g2Work || "Corporate",
         landmark: "Chiniot",
       });
@@ -96,8 +104,8 @@ export default function NewCustomerPage() {
     const newCust = store.createCustomer({
       tenantId: currentTenant.id,
       fullName,
-      fatherName,
-      cnic: encryptField(cnic),
+      fatherName: fatherName || "",
+      cnic: encryptField(cleanCnic),
       phone,
       secondaryPhone,
       address,
@@ -179,13 +187,12 @@ export default function NewCustomerPage() {
             </div>
 
             <div>
-              <label className="block text-slate-700 font-bold mb-1">CNIC Number *</label>
+              <label className="block text-slate-700 font-bold mb-1">CNIC Number (Optional / اختیاری)</label>
               <input
                 type="text"
-                required
                 value={cnic}
                 onChange={(e) => setCnic(e.target.value)}
-                placeholder="35201-1234567-1"
+                placeholder="35201-1234567-1 (اختیاری)"
                 className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono focus:border-emerald-500 focus:bg-white outline-none"
               />
             </div>
@@ -279,7 +286,7 @@ export default function NewCustomerPage() {
             {/* Guarantor 1 */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <span className="font-extrabold text-emerald-800 text-xs uppercase tracking-wider block">
-                Guarantor 1 (Mandatory) *
+                Guarantor 1 (Optional — اگر خالی ہو تو کسٹمر خود ضامن بنے گا)
               </span>
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Full Name</label>
@@ -287,7 +294,7 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g1Name}
                   onChange={(e) => setG1Name(e.target.value)}
-                  placeholder="Muhammad Aslam"
+                  placeholder="اختیاری (خالی چھوڑنے پر گاہک خود ضامن ہوگا)"
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl outline-none font-urdu"
                 />
               </div>
@@ -297,7 +304,7 @@ export default function NewCustomerPage() {
                   type="text"
                   value={g1Cnic}
                   onChange={(e) => setG1Cnic(e.target.value)}
-                  placeholder="33202-9876543-1"
+                  placeholder="33202-9876543-1 (اختیاری)"
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>
@@ -307,7 +314,7 @@ export default function NewCustomerPage() {
                   type="tel"
                   value={g1Phone}
                   onChange={(e) => setG1Phone(e.target.value)}
-                  placeholder="0300-7654321"
+                  placeholder="0300-7654321 (اختیاری)"
                   className="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono outline-none"
                 />
               </div>

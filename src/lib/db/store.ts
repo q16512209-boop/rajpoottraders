@@ -713,9 +713,30 @@ export class AppStore {
   }
 
   createCustomer(data: Omit<Customer, "id" | "createdAt" | "riskScore" | "isDefaulter">): Customer {
-    const overlap = this.checkHouseholdDefaulter(data.address, data.cnic, data.phone);
+    const rawCnic = data.cnic ? decryptField(data.cnic) : "N/A";
+    const plainCnic = rawCnic && rawCnic !== "[ENCRYPTED DATA]" ? rawCnic : (data.cnic || "N/A");
+
+    // Auto-guarantor fallback: If no guarantors provided, make customer themselves the guarantor
+    const guarantors: Guarantor[] = (data.guarantors && data.guarantors.length > 0)
+      ? data.guarantors
+      : [
+          {
+            id: `gua_${Date.now()}_self`,
+            fullName: `${data.fullName} (خود ضامن)`,
+            fatherName: data.fatherName || "N/A",
+            cnic: data.cnic || encryptField("N/A"),
+            phone: data.phone,
+            relation: "اصیل / خود ضامن (Self-Guaranteed)",
+            address: data.address,
+            workplace: "کاروبار / ذاتی",
+            landmark: data.landmark || data.city || "Chiniot",
+          },
+        ];
+
+    const overlap = this.checkHouseholdDefaulter(data.address, plainCnic, data.phone);
     const newCust: Customer = {
       ...data,
+      guarantors,
       id: `cust_${Date.now()}`,
       createdAt: new Date().toISOString(),
       riskScore: overlap.matchedDefaulters.length > 0 ? 85 : 10,
@@ -729,11 +750,11 @@ export class AppStore {
     return newCust;
   }
 
-  checkHouseholdDefaulter(address: string, cnicRaw: string, phone: string) {
-    const cleanAddress = address.toLowerCase().trim();
-    const cleanPhone = phone.replace(/\D/g, "");
-    const cleanCnic = cnicRaw.replace(/\D/g, "").slice(0, 13);
-    const cnicPrefix = cleanCnic.slice(0, 5);
+  checkHouseholdDefaulter(address?: string, cnicRaw?: string, phone?: string) {
+    const cleanAddress = address ? address.toLowerCase().trim() : "";
+    const cleanPhone = phone ? phone.replace(/\D/g, "") : "";
+    const cleanCnic = (cnicRaw && cnicRaw !== "N/A") ? cnicRaw.replace(/\D/g, "").slice(0, 13) : "";
+    const cnicPrefix = cleanCnic.length >= 5 ? cleanCnic.slice(0, 5) : "";
 
     const matchedDefaulters: Customer[] = [];
     const warningFlags: string[] = [];
@@ -748,10 +769,10 @@ export class AppStore {
       if (cleanAddress.length > 5 && (cAddress.includes(cleanAddress) || cleanAddress.includes(cAddress))) {
         matchedDefaulters.push(c);
         warningFlags.push(`Exact residential address match with recorded defaulter "${c.fullName}" (${c.address})`);
-      } else if (cleanPhone && cPhone === cleanPhone) {
+      } else if (cleanPhone && cleanPhone.length >= 10 && cPhone === cleanPhone) {
         matchedDefaulters.push(c);
         warningFlags.push(`Shared mobile number match with defaulter "${c.fullName}"`);
-      } else if (cnicPrefix && cDecryptedCnic.startsWith(cnicPrefix)) {
+      } else if (cnicPrefix && cleanCnic.length >= 5 && cDecryptedCnic.startsWith(cnicPrefix)) {
         warningFlags.push(`CNIC Family Division prefix overlap (${cnicPrefix}) with defaulter "${c.fullName}"`);
       }
     }
@@ -2556,31 +2577,38 @@ export class AppStore {
   // --- Fast Manual Legacy / Old Customer Onboarding ---
   createLegacyKhataCustomer(data: LegacyCustomerInput): { customer: Customer; plan: InstallmentPlan } {
     const customerId = `cust_leg_${Date.now()}`;
+    const cleanCnic = (data.cnic && data.cnic.trim()) ? data.cnic.trim() : "N/A";
+    const g1Name = (data.guarantor1Name && data.guarantor1Name.trim()) || `${data.fullName.trim()} (خود ضامن)`;
+    const g1Phone = (data.guarantor1Phone && data.guarantor1Phone.trim()) || data.phone.trim();
+    const g1Cnic = (data.guarantor1Cnic && data.guarantor1Cnic.trim()) || (cleanCnic !== "N/A" ? cleanCnic : "N/A");
+    const g1Relation = (data.guarantor1Relation && data.guarantor1Relation.trim()) ||
+      (data.guarantor1Name?.trim() ? "ضامن" : "اصیل / خود ضامن (Self-Guaranteed)");
+
     const guarantors: Guarantor[] = [
       {
         id: `g1_${Date.now()}`,
-        fullName: data.guarantor1Name,
-        fatherName: "N/A",
-        cnic: data.guarantor1Cnic,
-        phone: data.guarantor1Phone,
-        relation: data.guarantor1Relation || "ضامن",
+        fullName: g1Name,
+        fatherName: data.fatherName || "N/A",
+        cnic: g1Cnic,
+        phone: g1Phone,
+        relation: g1Relation,
         address: data.address,
         workplace: "مقامی مارکیٹ",
-        landmark: data.landmark || data.zoneArea,
+        landmark: data.landmark || data.zoneArea || "Chiniot",
       },
     ];
 
     if (data.guarantor2Name && data.guarantor2Name.trim().length > 0) {
       guarantors.push({
         id: `g2_${Date.now()}`,
-        fullName: data.guarantor2Name,
+        fullName: data.guarantor2Name.trim(),
         fatherName: "N/A",
-        cnic: data.guarantor2Cnic || "33202-0000000-0",
-        phone: data.guarantor2Phone || data.phone,
+        cnic: (data.guarantor2Cnic && data.guarantor2Cnic.trim()) || "N/A",
+        phone: (data.guarantor2Phone && data.guarantor2Phone.trim()) || data.phone,
         relation: data.guarantor2Relation || "پڑوسی",
         address: data.address,
         workplace: "کاروبار",
-        landmark: data.zoneArea,
+        landmark: data.zoneArea || "Chiniot",
       });
     }
 
@@ -2588,12 +2616,12 @@ export class AppStore {
       id: customerId,
       tenantId: data.tenantId,
       fullName: data.fullName,
-      fatherName: data.fatherName,
-      cnic: data.cnic,
+      fatherName: data.fatherName || "والد کا نام درج نہیں",
+      cnic: cleanCnic,
       phone: data.phone,
       secondaryPhone: data.secondaryPhone,
       address: data.address,
-      landmark: data.landmark || data.zoneArea,
+      landmark: data.landmark || data.zoneArea || "Chiniot",
       city: data.city || "چنیوٹ (Chiniot)",
       zoneArea: data.zoneArea || "محلہ رحمن آباد و مسلم بازار چنیوٹ",
       guarantors,
@@ -2650,7 +2678,7 @@ export class AppStore {
       tenantId: data.tenantId,
       customerId,
       customerName: data.fullName,
-      customerCnic: data.cnic,
+      customerCnic: cleanCnic,
       customerPhone: data.phone,
       salesmanName: data.salesmanName || "ضہیم",
       productId: data.productId || `prod_leg_${Date.now()}`,
@@ -2674,7 +2702,7 @@ export class AppStore {
       endDate: schedule[schedule.length - 1]?.dueDate || new Date().toISOString(),
       schedule,
       guarantorIds: guarantors.map((g) => g.id),
-      areaZone: data.zoneArea,
+      areaZone: data.zoneArea || customer.zoneArea,
       contractVerified: true,
       tamperProofHash: `LEG_HASH_CHN_${Date.now()}`,
     };

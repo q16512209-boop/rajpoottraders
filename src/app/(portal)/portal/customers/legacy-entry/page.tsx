@@ -108,26 +108,32 @@ export default function LegacyCustomerEntryPage() {
     setMsg(null);
 
     try {
-      if (!khataNumber || !salesmanName || !fullName || !fatherName || !cnic || !phone || !address || !g1Name || !g1Phone) {
-        throw new Error("Please fill in all mandatory fields (Khata #, Salesman, Customer info, and Guarantor 1).");
+      if (!khataNumber || !salesmanName || !fullName || !phone || !address) {
+        throw new Error("براہ کرم لازمی تفصیلات درج کریں (کھاتہ نمبر، سیلز مین، گاہک کا نام، موبائل نمبر، اور پتہ)");
       }
+
+      const cleanCnic = cnic.trim() || "N/A";
+      const guarantor1Name = g1Name.trim() || `${fullName.trim()} (خود ضامن)`;
+      const guarantor1Phone = g1Phone.trim() || phone.trim();
+      const guarantor1Cnic = g1Cnic.trim() || (cleanCnic !== "N/A" ? cleanCnic : "N/A");
+      const guarantor1Relation = g1Relation.trim() || (g1Name.trim() ? "ضامن" : "اصیل / خود ضامن (Self-Guaranteed)");
 
       const res = store.createLegacyKhataCustomer({
         tenantId: currentTenant.id,
         khataNumber,
         salesmanName,
         fullName,
-        fatherName,
-        cnic,
+        fatherName: fatherName.trim() || "والد کا نام درج نہیں",
+        cnic: cleanCnic,
         phone,
         secondaryPhone: secondaryPhone || undefined,
         address,
         city,
         zoneArea,
-        guarantor1Name: g1Name,
-        guarantor1Phone: g1Phone,
-        guarantor1Cnic: g1Cnic || "33202-0000000-0",
-        guarantor1Relation: g1Relation || "ضامن",
+        guarantor1Name,
+        guarantor1Phone,
+        guarantor1Cnic,
+        guarantor1Relation,
         guarantor2Name: g2Name || undefined,
         guarantor2Phone: g2Phone || undefined,
         guarantor2Cnic: g2Cnic || undefined,
@@ -366,11 +372,10 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Father's Name (والد کا نام) *</label>
+              <label className="block font-bold text-slate-700 mb-1">Father's Name (والد کا نام — اختیاری)</label>
               <input
                 type="text"
-                required
-                placeholder="e.g. Nusrat Hussain"
+                placeholder="e.g. Nusrat Hussain (اختیاری)"
                 value={fatherName}
                 onChange={(e) => setFatherName(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-600 focus:bg-white font-urdu text-sm"
@@ -378,11 +383,10 @@ export default function LegacyCustomerEntryPage() {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">CNIC Number (شناختی کارڈ) *</label>
+              <label className="block font-bold text-slate-700 mb-1">CNIC Number (شناختی کارڈ — اختیاری)</label>
               <input
                 type="text"
-                required
-                placeholder="33202-6717585-1"
+                placeholder="33202-6717585-1 (اختیاری)"
                 value={cnic}
                 onChange={(e) => setCnic(e.target.value)}
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:border-emerald-600 focus:bg-white"
@@ -484,46 +488,43 @@ export default function LegacyCustomerEntryPage() {
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-700" />
               <h2 className="text-base font-black text-slate-900">
-                3. Guarantors Information (ضامن تفصیلات)
+                3. Guarantors Information (ضامن تفصیلات — اختیاری)
               </h2>
             </div>
-            <span className="text-xs font-urdu text-slate-500">پہلا ضامن لازمی، دوسرا ضامن اختیاری ہے</span>
+            <span className="text-xs font-urdu text-slate-500">اگر ضامن نہ ہو تو کسٹمر خود ہی ضامن درج ہوگا</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
             {/* Guarantor 1 */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <span className="font-black text-emerald-800 block text-xs">
-                Guarantor 1 (ضامن نمبر 1 — لازمی) *
+                Guarantor 1 (ضامن نمبر 1 — اختیاری، خالی چھوڑنے پر گاہک خود ضامن بنے گا)
               </span>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Guarantor Name *</label>
+                <label className="block font-bold text-slate-600 mb-1">Guarantor Name (ضامن کا نام)</label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Muhammad Aslam"
+                  placeholder="اختیاری (خالی چھوڑنے پر گاہک خود ضامن ہوگا)"
                   value={g1Name}
                   onChange={(e) => setG1Name(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-urdu font-bold text-slate-900 focus:border-emerald-600"
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Guarantor Phone *</label>
+                <label className="block font-bold text-slate-600 mb-1">Guarantor Phone (موبائل نمبر)</label>
                 <input
                   type="tel"
-                  required
-                  placeholder="0300-1122334"
+                  placeholder="0300-1122334 (اختیاری)"
                   value={g1Phone}
                   onChange={(e) => setG1Phone(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-mono focus:border-emerald-600"
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-600 mb-1">Guarantor CNIC *</label>
+                <label className="block font-bold text-slate-600 mb-1">Guarantor CNIC (شناختی کارڈ)</label>
                 <input
                   type="text"
-                  required
-                  placeholder="33202-1234567-1"
+                  placeholder="33202-1234567-1 (اختیاری)"
                   value={g1Cnic}
                   onChange={(e) => setG1Cnic(e.target.value)}
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none font-mono focus:border-emerald-600"

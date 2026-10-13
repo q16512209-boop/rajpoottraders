@@ -37,7 +37,9 @@ export function formatDateTime(dateStr: string | Date | undefined | null): strin
  * Format CNIC to standard format: 35201-1234567-1
  */
 export function formatCNIC(raw: string): string {
+  if (!raw || raw === "N/A" || raw.trim() === "") return "N/A";
   const digits = raw.replace(/\D/g, "").slice(0, 13);
+  if (!digits) return raw;
   if (digits.length <= 5) return digits;
   if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
   return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`;
